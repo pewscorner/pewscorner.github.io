@@ -1,0 +1,165 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Analog Clock</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.box#clock {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    text-align: center;
+}
+
+div.box#description {
+    -webkit-flex: 1 1 50%;
+    flex: 1 1 50%;
+}
+
+div.frame {
+    display: inline-block;
+    position:relative;
+    box-sizing: content-box;
+    width:128px;
+    height:128px;
+}
+
+div.clip {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    width: 128px;
+    height: 128px;
+    margin: 0px;
+    border: 0px solid black;
+    padding: 0px;
+    overflow: hidden;
+}
+
+div.pan {
+    position: relative;
+    left: 0px;
+    top: 0px;
+    width: 128px;
+    height: 128px;
+    margin: 0px;
+    border: 0px solid black;
+    padding: 0px;
+}
+</style>
+<script type="text/javascript">
+var hourHandSrcX = new Array(316, 326, 340, 357, 377, 399, 424, 452, 482, 532, 532, 532, 532, 532, 532, 532, 532, 532, 532, 532, 532, 532, 482, 452, 424, 399, 377, 357, 340, 326, 316, 302, 285, 265, 243, 218, 190, 160, 128, 568, 568, 568, 568, 568, 568, 568, 568, 568, 568, 568, 568, 568, 128, 160, 190, 218, 243, 265, 285, 302);
+var hourHandSrcY = new Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 28, 53, 75, 95, 112, 126, 137, 151, 168, 188, 210, 235, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 36, 235, 210, 188, 168, 151, 137, 126, 112, 95, 75, 53, 28, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+var hourHandDstX = new Array(58, 58, 58, 58, 58, 58, 58, 58, 58, 59, 59, 59, 60, 60, 60, 60, 60, 60, 60, 59, 59, 59, 58, 58, 58, 58, 58, 58, 58, 58, 58, 54, 51, 48, 46, 43, 40, 38, 36, 34, 33, 32, 31, 31, 30, 31, 30, 31, 31, 32, 33, 34, 36, 38, 40, 43, 46, 48, 51, 54);
+var hourHandDstY = new Array(31, 30, 31, 31, 32, 33, 34, 36, 38, 40, 43, 46, 48, 51, 54, 57, 58, 58, 58, 58, 58, 58, 58, 58, 59, 59, 59, 60, 60, 60, 61, 60, 60, 60, 59, 59, 59, 58, 58, 58, 58, 58, 58, 58, 58, 58, 54, 51, 48, 46, 43, 40, 38, 36, 34, 33, 32, 31, 31, 30);
+var hourHandBoxW = new Array(10, 14, 17, 20, 22, 25, 28, 30, 32, 33, 34, 35, 35, 35, 36, 35, 36, 35, 35, 35, 34, 33, 32, 30, 28, 25, 22, 20, 17, 14, 10, 14, 17, 20, 22, 25, 28, 30, 32, 33, 34, 35, 35, 35, 36, 34, 36, 35, 35, 35, 34, 33, 32, 30, 28, 25, 22, 20, 17, 14);
+var hourHandBoxH = new Array(34, 36, 35, 35, 35, 34, 33, 32, 30, 28, 25, 22, 20, 17, 14, 11, 14, 17, 20, 22, 25, 28, 30, 32, 33, 34, 35, 35, 35, 36, 34, 36, 35, 35, 35, 34, 33, 32, 30, 28, 25, 22, 20, 17, 14, 11, 14, 17, 20, 22, 25, 28, 30, 32, 33, 34, 35, 35, 35, 36);
+
+var secondHandSrcX = new Array(328, 332, 341, 355, 373, 396, 424, 456, 492, 604, 604, 604, 604, 604, 604, 604, 604, 604, 604, 604, 604, 604, 492, 456, 424, 396, 373, 355, 341, 332, 328, 319, 305, 287, 264, 236, 204, 168, 128, 656, 656, 656, 656, 656, 656, 656, 656, 656, 656, 656, 656, 656, 128, 168, 204, 236, 264, 287, 305, 319);
+var secondHandSrcY = new Array(72, 72, 72, 72, 72, 72, 72, 72, 72, 0, 32, 60, 83, 101, 115, 124, 128, 137, 151, 169, 192, 220, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 124, 220, 192, 169, 151, 137, 128, 124, 115, 101, 83, 60, 32, 0, 72, 72, 72, 72, 72, 72, 72, 72);
+var secondHandDstX = new Array(61, 60, 59, 59, 58, 57, 56, 56, 55, 55, 54, 54, 53, 53, 53, 53, 53, 53, 53, 54, 54, 55, 55, 56, 56, 57, 58, 59, 59, 60, 61, 57, 53, 49, 45, 41, 38, 34, 31, 29, 26, 25, 23, 22, 21, 21, 21, 22, 23, 25, 26, 29, 31, 34, 38, 41, 45, 49, 53, 57);
+var secondHandDstY = new Array(21, 21, 22, 23, 25, 26, 29, 31, 34, 38, 41, 45, 49, 53, 57, 61, 60, 59, 59, 58, 57, 56, 56, 55, 55, 54, 54, 53, 53, 53, 53, 53, 53, 53, 54, 54, 55, 55, 56, 56, 57, 58, 59, 59, 60, 61, 57, 53, 49, 45, 41, 38, 34, 31, 29, 26, 25, 23, 22, 21);
+var secondHandBoxW = new Array(4, 9, 14, 18, 23, 28, 32, 36, 40, 42, 46, 47, 50, 51, 52, 52, 52, 51, 50, 47, 46, 42, 40, 36, 32, 28, 23, 18, 14, 9, 4, 9, 14, 18, 23, 28, 32, 36, 40, 42, 46, 47, 50, 51, 52, 52, 52, 51, 50, 47, 46, 42, 40, 36, 32, 28, 23, 18, 14, 9);
+var secondHandBoxH = new Array(52, 52, 51, 50, 47, 46, 42, 40, 36, 32, 28, 23, 18, 14, 9, 4, 9, 14, 18, 23, 28, 32, 36, 40, 42, 46, 47, 50, 51, 52, 52, 52, 51, 50, 47, 46, 42, 40, 36, 32, 28, 23, 18, 14, 9, 4, 9, 14, 18, 23, 28, 32, 36, 40, 42, 46, 47, 50, 51, 52);
+
+var minuteHandSrcX = new Array(315, 323, 336, 353, 374, 399, 427, 459, 494, 708, 708, 708, 708, 708, 708, 708, 708, 708, 708, 708, 708, 708, 494, 459, 427, 399, 374, 353, 336, 323, 315, 302, 285, 264, 239, 211, 179, 144, 106, 753, 753, 753, 753, 753, 753, 753, 753, 753, 753, 753, 753, 753, 106, 144, 179, 211, 239, 264, 285, 302);
+var minuteHandSrcY = new Array(176, 176, 176, 176, 176, 176, 176, 176, 176, 0, 32, 60, 85, 106, 123, 136, 145, 158, 175, 196, 221, 249, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 221, 249, 221, 196, 175, 158, 145, 136, 123, 106, 85, 60, 32, 0, 176, 176, 176, 176, 176, 176, 176, 176);
+var minuteHandDstX = new Array(59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 54, 50, 46, 42, 39, 35, 32, 29, 27, 25, 23, 22, 21, 21, 21, 21, 21, 22, 23, 25, 27, 29, 32, 35, 39, 42, 46, 50, 54);
+var minuteHandDstY = new Array(21, 21, 21, 22, 23, 25, 27, 29, 32, 35, 39, 42, 46, 50, 54, 58, 59, 59, 59, 59, 59, 59, 59, 59, 59, 60, 60, 60, 60, 60, 61, 60, 60, 60, 60, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 59, 54, 50, 46, 42, 39, 35, 32, 29, 27, 25, 23, 22, 21, 21);
+var minuteHandBoxW = new Array(8, 13, 17, 21, 25, 28, 32, 35, 38, 40, 42, 43, 44, 45, 45, 45, 45, 45, 44, 43, 41, 40, 38, 35, 32, 28, 25, 21, 17, 13, 8, 13, 17, 21, 25, 28, 32, 35, 38, 40, 41, 43, 44, 45, 45, 44, 45, 45, 44, 43, 41, 40, 38, 35, 32, 28, 25, 21, 17, 13);
+var minuteHandBoxH = new Array(44, 45, 45, 44, 43, 41, 40, 38, 35, 32, 28, 25, 21, 17, 13, 9, 13, 17, 21, 25, 28, 32, 35, 38, 40, 41, 43, 44, 45, 45, 44, 45, 45, 44, 43, 42, 40, 38, 35, 32, 28, 25, 21, 17, 13, 9, 13, 17, 21, 25, 28, 32, 35, 38, 40, 41, 43, 44, 45, 45);
+
+var hourClip;
+var hourPan;
+var minuteClip;
+var minutePan;
+var secondClip;
+var secondPan;
+
+function showTime(h, m, s) {
+  h = (5 * h + Math.floor(m/12)) % 60;
+  m = m % 60;
+  s = s % 60;
+  hourClip.style.left = hourHandDstX[h] + "px";
+  hourClip.style.top = hourHandDstY[h] + "px";
+  hourClip.style.width = hourHandBoxW[h] + "px";
+  hourClip.style.height = hourHandBoxH[h] + "px";
+  hourPan.style.left = -hourHandSrcX[h] + "px";
+  hourPan.style.top = -hourHandSrcY[h] + "px";
+
+  minuteClip.style.left = minuteHandDstX[m] + "px";
+  minuteClip.style.top = minuteHandDstY[m] + "px";
+  minuteClip.style.width = minuteHandBoxW[m] + "px";
+  minuteClip.style.height = minuteHandBoxH[m] + "px";
+  minutePan.style.left = -minuteHandSrcX[m] + "px";
+  minutePan.style.top = -minuteHandSrcY[m] + "px";
+
+  secondClip.style.left = secondHandDstX[s] + "px";
+  secondClip.style.top = secondHandDstY[s] + "px";
+  secondClip.style.width = secondHandBoxW[s] + "px";
+  secondClip.style.height = secondHandBoxH[s] + "px";
+  secondPan.style.left = -secondHandSrcX[s] + "px";
+  secondPan.style.top = -secondHandSrcY[s] + "px";
+}
+
+var oldSeconds = -1;
+
+function timer() {
+  var d = new Date();
+  var s = d.getSeconds();
+  if (s != oldSeconds) {
+    oldSeconds = s;
+    showTime(d.getHours(), d.getMinutes(), s);
+  }
+}
+
+function init() {
+  hourClip = document.getElementById("hour_clip");
+  hourPan = document.getElementById("hour_pan");
+  minuteClip = document.getElementById("minute_clip");
+  minutePan = document.getElementById("minute_pan");
+  secondClip = document.getElementById("second_clip");
+  secondPan = document.getElementById("second_pan");
+
+  setInterval(timer, 100);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Analog Clock</h1>
+
+<div class="box" id="clock">
+<div class="frame">
+  <div class="clip">
+    <div class="pan"><img class="noshrink" src="anaclock.png" alt=""></div>
+  </div>
+  <div id="hour_clip" class="clip">
+    <div id="hour_pan" class="pan"><img class="noshrink" src="anaclock.png" alt=""></div>
+  </div>
+  <div id="minute_clip" class="clip">
+    <div id="minute_pan" class="pan"><img class="noshrink" src="anaclock.png" alt=""></div>
+  </div>
+  <div id="second_clip" class="clip">
+    <div id="second_pan" class="pan"><img class="noshrink" src="anaclock.png" alt=""></div>
+  </div>
+</div>
+</div>
+
+<div class="box" id="description">
+This shows parts of a single static PNG image.
+The parts shown depend on the current time.
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Programmer's Number Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+.hidden {
+    display: none;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 1rem 0rem 0.5rem 0rem;
+    width: 100%;
+}
+
+div.indent_wrap {
+    margin-top: 0.5em;
+    margin-bottom: 0.5em;
+    padding-left: 2em;
+    text-indent: -2em;
+}
+
+label {
+    display: inline-block;
+    text-indent: 0;
+}
+
+.data {
+    box-sizing: border-box;
+    border: 1px solid #888888;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 15em;
+    max-height: 15em;
+    margin: 0em;
+    padding: 0.2em;
+    overflow: scroll;
+    white-space: pre;
+    word-wrap: normal; /* Workaround for some browsers defaulting to break-word */
+    font-family: Courier New, Courier, monospace;
+    font-size: 1rem;
+}
+
+.data[readonly] {
+    background-color: transparent;
+}
+
+#convertbut {
+    box-sizing: border-box;
+    width: 100%;
+    font-weight: bold;
+}
+
+input[type="number"] {
+    text-align: right;
+}
+
+.in_digit_base, .in_number_field_width, .in_number_n_twos_compl_bits,
+.out_digit_base, .out_number_n_int_digits, .out_number_n_twos_compl_bits, .reshape_n_rows_or_cols {
+    width: 3em;
+}
+
+.out_number_prefix, .out_number_suffix, .out_number_separator,
+.out_row_prefix, .out_row_suffix, .out_row_separator {
+    width: 5em;
+}
+
+.in_digit_grp_char {
+    width: 2em;
+}
+
+option:disabled {
+    color: #999999;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+///////////////////////////////////////////////////////////////////////////////
+// Class ConversionConfig
+//
+
+var ConversionConfig = function()
+{
+    this.in_digit_base = 10;
+    this.in_numbers_are_delimited = true;
+    this.in_number_field_width = 2;
+    this.in_number_signed_type = ConversionConfig.SIGNED_TYPE.SIGNED;
+    this.in_number_n_twos_compl_bits = 8;
+    this.in_twos_compl_half_max_nbr = undefined;    // calculated from other members
+    this.in_number_has_frac = true;
+    this.in_radix_char = '.';
+    this.in_digit_grp_char = '';
+    this.in_number_regexp = undefined;              // calculated from other members
+    this.in_number_garbage_regexp = undefined;      // calculated from other members
+    this.out_digit_base = 16;
+    this.out_numbers_are_fixed_width = false;
+    this.out_number_n_int_digits = 2;
+    this.out_number_signed_type = ConversionConfig.SIGNED_TYPE.SIGNED;
+    this.out_number_n_twos_compl_bits = 8;
+    this.out_twos_compl_half_max_nbr = undefined;   // calculated from other members
+    this.out_number_has_frac = true;
+    this.out_radix_char = '.';
+    this.out_number_n_frac_digits = 100;
+    this.out_number_zero_extended_frac = false;
+    this.out_digit_grp_char = '';
+    this.out_number_prefix = '';
+    this.out_number_suffix = '';
+    this.out_number_separator = ', ';
+    this.out_row_prefix = '';
+    this.out_row_suffix = '\n';
+    this.out_row_separator = '';
+    this.reshape = false;
+    this.reshape_n_rows_or_cols = 1;
+    this.reshape_set_rows = false;
+    this.reverse_number_order = false;
+    this.recalc();
+};
+
+//
+// Class ConversionConfig - static properties 
+//
+
+ConversionConfig.SIGNED_TYPE = {UNSIGNED: 0, SIGNED: 1, TWOS_COMPL: 2};
+
+//
+// Class ConversionConfig - static methods
+//
+
+//
+// Class ConversionConfig - instance methods
+//
+
+ConversionConfig.prototype.recalc = function()
+// Recalculates the calculated members from the non-calculated members of this ConversionConfig
+{
+    var digit_re = 
+        this.in_digit_base <= 10 ? '[0-' + (this.in_digit_base - 1) + ']' :
+        '[0-9a-' + String.fromCharCode(this.in_digit_base - 10 + 97) + ']';
+    this.in_number_garbage_regexp = new RegExp('[^' + digit_re.slice(1), 'gi');
+
+    if (!this.in_numbers_are_delimited)
+    {
+        // Capture fixed number of digits as integer part, and empty strings as sign and fractional parts
+        this.in_number_regexp = new RegExp('()(' + digit_re + '{' + this.in_number_field_width + '})()', 'gi');
+    }
+    else
+    {
+        // Sign capture
+        var sign_re = this.in_number_signed_type == ConversionConfig.SIGNED_TYPE.SIGNED ? '([+-]?)' : '()';
+        // Allow but don't capture prefixes for certain bases 
+        var prefix_re =
+            this.in_digit_base == 16 ? '(?:0x)?' :
+            this.in_digit_base == 2 ? '(?:0b)?' :
+            '';
+        var grp_char_re = escape_string_for_regexp(this.in_digit_grp_char);
+        var digit_grps_re = digit_re + '+(?:' + grp_char_re + digit_re + '+)*';
+        if (this.in_number_has_frac)
+        {
+            var radix_char_re = escape_string_for_regexp(this.in_radix_char);
+            // Integer part capture (allow an empty integer part if the fractional part is not empty) 
+            var int_re = sign_re + prefix_re + '(' + digit_grps_re + '|(?=' + radix_char_re + digit_re + '))';
+            // Fractional part capture (exclude radix char)
+            var frac_re = radix_char_re + '?(' + digit_grps_re + '|)';
+        }
+        else
+        {
+            // Integer part capture 
+            var int_re = sign_re + prefix_re + '(' + digit_grps_re + ')';
+            // Empty fractional part capture
+            var frac_re = '()';
+        }
+
+        this.in_number_regexp = new RegExp(int_re + frac_re, 'gi');
+    }
+
+    // Calculate input two's-complement half max constant if required
+    if (this.in_number_signed_type == ConversionConfig.SIGNED_TYPE.TWOS_COMPL)
+    {
+        Nbr.calc_digit_group_base(2);
+        var n_bits_per_group = Nbr.n_digits_per_group_for_digit_base[2];
+        var n_half_max_bits = this.in_number_n_twos_compl_bits - 1;
+        var n_bit_groups = Math.floor(n_half_max_bits / n_bits_per_group);
+        var n_remaining_bits = n_half_max_bits - n_bits_per_group * n_bit_groups; 
+        var half_max_nbr = new Nbr(1 << n_remaining_bits, 2);
+        half_max_nbr.n_frac_digit_groups = -n_bit_groups;
+        half_max_nbr.change_base(this.in_digit_base);
+        this.in_twos_compl_half_max_nbr = half_max_nbr;
+    } 
+
+    // Calculate output two's-complement half max constant if required
+    if (this.out_number_signed_type == ConversionConfig.SIGNED_TYPE.TWOS_COMPL)
+    {
+        Nbr.calc_digit_group_base(2);
+        var n_bits_per_group = Nbr.n_digits_per_group_for_digit_base[2];
+        var n_half_max_bits = this.out_number_n_twos_compl_bits - 1;
+        var n_bit_groups = Math.floor(n_half_max_bits / n_bits_per_group);
+        var n_remaining_bits = n_half_max_bits - n_bits_per_group * n_bit_groups; 
+        var half_max_nbr = new Nbr(1 << n_remaining_bits, 2);
+        half_max_nbr.n_frac_digit_groups = -n_bit_groups;
+        half_max_nbr.change_base(this.out_digit_base);
+        this.out_twos_compl_half_max_nbr = half_max_nbr;
+    } 
+};
+
+ConversionConfig.prototype.merge_digit_groups = function(str)
+{
+    return str.replace(this.in_number_garbage_regexp, '');
+}
+
+ConversionConfig.prototype.extract_next_nbr_parts = function(str)
+// Returns an object containing the sign, integer, and fractional strings for the next number found
+// in the specified string, or null if no more numbers are found.
+{
+    var matches = this.in_number_regexp.exec(str);
+    return matches && {
+        sign_str: matches[1],
+        int_str: this.merge_digit_groups(matches[2]) || '0',
+        frac_str: this.merge_digit_groups(matches[3])
+    };
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Class Nbr
+//
+
+var Nbr = function(val, digit_base)
+{
+    // Internal representation:
+    // The digit_group_vec represents the mantissa/significand of the Nbr. It is a little-endian
+    // list of non-negative values, each representing a group of digits in the given digit_base.
+    // The n_frac_digit_groups represents the exponent of the Nbr. If it is 0, the digit_group_vec
+    // represents the Nbr without modification, i.e. the radix point is on the right side of the
+    // least significant digit group. If n_frac_digit_groups > 0 (or < 0), the radix point of the
+    // Nbr is shifted that many digit groups to the left (or right).    
+    //
+    // For a normalized Nbr the following applies: the digit_group_vec contains no leading or
+    // trailing zero values, and the Nbr zero is represented as digit_group_vec = [],
+    // n_frac_digit_groups = 0, and is_negative = false.
+    //
+    // A Nbr is invalid if and only if digit_group_vec is undefined. 
+
+    // Instance properties
+    this.digit_group_vec = undefined;
+    this.digit_base = undefined;
+    this.n_frac_digit_groups = 0;
+    this.is_negative = false;
+    //this.repetend_len = 0;
+
+    if (val !== undefined)
+    {
+        this.set_base(digit_base || 10);
+        var digit_group_base = Nbr.digit_group_base_for_digit_base[this.digit_base];
+        if (val < 0)
+        {
+            this.is_negative = true;
+            val = -val;
+        }
+        var int_part = Math.floor(val);
+        var frac_part = Math.floor((val - int_part) * digit_group_base);
+        if (!int_part && !frac_part)
+        {
+            this.is_negative = false;
+        }
+        this.digit_group_vec = [];
+        if (frac_part > 0)
+        {
+            this.digit_group_vec.push(frac_part);
+            this.n_frac_digit_groups += 1;
+        }
+        while (int_part >= digit_group_base)
+        {
+            var new_int = Math.floor(int_part / digit_group_base);
+            this.digit_group_vec.push(int_part - new_int * digit_group_base);
+            int_part = new_int;
+        }
+        if (int_part > 0)
+        {
+            this.digit_group_vec.push(int_part);
+        }
+    }
+};
+
+//
+// Class Nbr - static properties 
+//
+
+Nbr.n_digits_per_group_for_digit_base = undefined;
+Nbr.digit_group_base_for_digit_base = undefined;
+Nbr.conversion_config = undefined;
+
+//
+// Class Nbr - static methods
+//
+
+Nbr.calc_digit_group_base = function(digit_base)
+// Calculates and stores the digit group base corresponding to a given digit base, unless this has
+// already been done previously for the same digit base.
+{
+    // Create static variables if they don't already exist
+    Nbr.n_digits_per_group_for_digit_base = Nbr.n_digits_per_group_for_digit_base || {};
+    Nbr.digit_group_base_for_digit_base = Nbr.digit_group_base_for_digit_base || {};
+    if (Nbr.n_digits_per_group_for_digit_base[digit_base] == undefined)
+    {
+        // Javascript max integer without loss = 2^53 (actually 2^53-1, but 2^53 loses only a 0 which
+        // doesn't matter), and we want to allow multiplications without overflow, so we store no more
+        // than the squareroot of the max integer in each Nbr.digit_group_vec element;
+        // we also want to store an integer number of digits with the given base for easy conversion
+        // to/from strings, so the max number of digits stored per digit_group_vec element becomes:
+        // floor(ln(sqrt(2^53))/ln(base)), or floor(53/2 * ln(2)/ln(base))
+        Nbr.n_digits_per_group_for_digit_base[digit_base] =
+            Math.floor(53 * Math.log(2) / (2 * Math.log(digit_base)));
+        // Each digit_group_vec element can be considered to be a single digit with a base given by:
+        Nbr.digit_group_base_for_digit_base[digit_base] =
+            Math.pow(digit_base, Nbr.n_digits_per_group_for_digit_base[digit_base]);
+    }
+};
+
+Nbr.from_string = function(str)
+// Returns a new Nbr converted from the next match in the specified string, or null if no more matches.
+// Nbr.conversion_config must be set before calling this method.
+{
+    var nbr_parts = Nbr.conversion_config.extract_next_nbr_parts(str);
+    if (!nbr_parts)
+    {
+        return null;
+    }
+
+    var nbr = new Nbr();
+    nbr.set_base(Nbr.conversion_config.in_digit_base);
+    var n_digits_per_group = Nbr.n_digits_per_group_for_digit_base[nbr.digit_base];
+
+    if (nbr_parts.sign_str == '-')
+    {
+        nbr.is_negative = true;
+    }
+    nbr.n_frac_digit_groups =
+        Math.floor((nbr_parts.frac_str.length + n_digits_per_group - 1) / n_digits_per_group);  
+    // Append zeros to frac_str until its length is a multiple of n_digits_per_group
+    var n_zeros_to_append = nbr.n_frac_digit_groups * n_digits_per_group - nbr_parts.frac_str.length
+        + 1; // Append 1 extra dummy char so we can slice with negative end index later
+    nbr_parts.frac_str += (new Array(n_zeros_to_append + 1)).join('0');
+
+    var entire_str = nbr_parts.int_str + nbr_parts.frac_str;
+    nbr.digit_group_vec = [];
+    var start_i;
+    var end_i = -1; // index of first char after last char in slice, initially index of dummy char appended above
+    // Repeatedly get slices as long as end of slice is within string
+    while (end_i > -entire_str.length)
+    {
+        start_i = end_i - n_digits_per_group;
+        nbr.digit_group_vec.push(parseInt(entire_str.slice(start_i, end_i), nbr.digit_base));
+        end_i = start_i;
+    }
+
+    // Convert two's-complement number to signed
+    if (Nbr.conversion_config.in_number_signed_type == ConversionConfig.SIGNED_TYPE.TWOS_COMPL)
+    {
+        var half_max_nbr = Nbr.conversion_config.in_twos_compl_half_max_nbr;
+        var x = nbr.sub(half_max_nbr);
+        if (!x.is_negative)
+        {
+            // nbr - 2^(nbits-1) >= 0, so move nbr to negative range
+            nbr = x.sub(half_max_nbr);
+            if (!nbr.is_negative)
+            {
+                // nbr - 2^nbits >= 0, so nbr is out of range
+                nbr.digit_group_vec = undefined;
+            }
+        }
+    }
+
+    nbr.normalize();
+    return nbr;
+};
+
+Nbr.convert = function(in_str, conv_cfg)
+// Returns a string that is the specified string converted according to the specified ConversionConfig.
+// The specified string may contain multiple rows of numbers which will all be converted.
+{
+    conv_cfg.recalc();
+    Nbr.conversion_config = conv_cfg;
+    var in_rows = in_str.trim().split(/\r?\n/);
+    var in_matrix = [];
+    var in_n_columns = 0;
+    for (var i = 0; i < in_rows.length; i++)
+    {
+        var numbers = [];
+        var nbr;
+        while (nbr = Nbr.from_string(in_rows[i]))
+        {
+            nbr.change_base(conv_cfg.out_digit_base);
+            numbers.push(nbr);
+        }
+        if (numbers.length > 0)
+        {
+            in_n_columns = Math.max(in_n_columns, numbers.length);
+            in_matrix.push(numbers);
+        }
+    }
+    var in_n_rows = in_matrix.length;
+
+    // Create output matrix from input matrix
+    var total_n_elems = in_n_rows * in_n_columns;  
+    var out_n_columns = in_n_columns;
+    var out_n_rows = in_n_rows;
+    if (conv_cfg.reshape)
+    {
+        if (conv_cfg.reshape_set_rows)
+        {
+            out_n_rows = conv_cfg.reshape_n_rows_or_cols;
+            out_n_columns = Math.ceil(total_n_elems / out_n_rows); 
+        }
+        else
+        {
+            out_n_columns = conv_cfg.reshape_n_rows_or_cols;
+            out_n_rows = Math.ceil(total_n_elems / out_n_columns); 
+        }
+    }
+    var out_matrix = new Array(out_n_rows);
+    for (var i = 0; i < out_n_rows; i++)
+    {
+        out_matrix[i] = new Array(out_n_columns);
+    }
+    var in_1st_step = {dr: 0, dc: 1};
+    var in_2nd_step = {dr: 1, dc: -in_n_columns};
+    var out_1st_step = {dr: 0, dc: 1};
+    var out_2nd_step = {dr: 1, dc: -out_n_columns};
+    var in_r = 0;
+    var in_c = 0;
+    var out_r = 0;
+    var out_c = 0;
+    if (conv_cfg.reverse_number_order)
+    {
+        in_1st_step = {dr: 0, dc: -1};
+        in_2nd_step = {dr: 1, dc: in_n_columns};
+        in_c = in_n_columns - 1;
+    }
+    for (var i = 0; i < total_n_elems; i++)
+    {
+        if (in_matrix[in_r][in_c] !== undefined)
+        {
+            out_matrix[out_r][out_c] = in_matrix[in_r][in_c];
+        } 
+        in_r += in_1st_step.dr;
+        in_c += in_1st_step.dc;
+        if (in_r < 0 || in_r >= in_n_rows || in_c < 0 || in_c >= in_n_columns)
+        {
+            in_r += in_2nd_step.dr;
+            in_c += in_2nd_step.dc;
+        }
+        out_r += out_1st_step.dr;
+        out_c += out_1st_step.dc;
+        if (out_r < 0 || out_r >= out_n_rows || out_c < 0 || out_c >= out_n_columns)
+        {
+            out_r += out_2nd_step.dr;
+            out_c += out_2nd_step.dc;
+        }
+    }
+
+    // Convert matrix to string
+    var out_rows = new Array(out_n_rows);
+    for (out_r = 0; out_r < out_n_rows; out_r++)
+    {
+        var row = out_matrix[out_r];
+        // Remove undefined elements
+        row = Object.keys(row).map(function(k){return row[k];});
+        if (row.length > 0)
+        {
+            out_rows.push(conv_cfg.out_row_prefix + row.join(conv_cfg.out_number_separator) + conv_cfg.out_row_suffix);
+        }
+    }
+    var out_str = out_rows.join(conv_cfg.out_row_separator);
+    return out_str;
+}
+
+Nbr.self_test = function()
+{
+    function check_nbr(test_id, nbr, digit_group_vec, n_frac_digit_groups, digit_base, is_negative)
+    {
+        if (!digit_group_vec && nbr.digit_group_vec ||
+            digit_group_vec && (
+                !nbr.digit_group_vec || nbr.digit_group_vec.length != digit_group_vec.length ||
+                nbr.digit_group_vec.some(function(v,i){return v != digit_group_vec[i];}) ||
+                nbr.n_frac_digit_groups != n_frac_digit_groups ||
+                nbr.is_negative != is_negative || nbr.digit_base != digit_base))
+        {
+            throw 'Nbr self-test ' + test_id;
+        }
+    }
+
+    // Test constructor
+    var nbr1 = new Nbr(1.3, 10);                        // 1.3
+    check_nbr(1.1, nbr1, [3000000, 1], 1, 10, false);
+    var nbr2m = new Nbr(-10000002, 10);                 // -1'0000002
+    check_nbr(1.2, nbr2m, [2, 1], 0, 10, true);
+
+    // Test negate
+    var nbr1m = nbr1.negate();                          // -1.3
+    check_nbr(2.1, nbr1m, [3000000, 1], 1, 10, true);
+    var nbr2 = nbr2m.negate();                          // 1'0000002
+    check_nbr(2.2, nbr2, [2, 1], 0, 10, false);
+
+    // Test add
+    check_nbr(3.1, nbr1.add(nbr2), [3000000, 3, 1], 1, 10, false);          // 1'0000003.3
+    check_nbr(3.2, nbr1.add(nbr2m), [7000000, 0, 1], 1, 10, true);          // -1'0000000.7
+    check_nbr(3.3, nbr1m.add(nbr2), [7000000, 0, 1], 1, 10, false);         // 1'0000000.7
+    check_nbr(3.4, nbr1m.add(nbr2m), [3000000, 3, 1], 1, 10, true);         // -1'0000003.3
+
+    // Test sub
+    check_nbr(4.1, nbr1.sub(nbr2), [7000000, 0, 1], 1, 10, true);           // -1'0000000.7
+    check_nbr(4.2, nbr1.sub(nbr2m), [3000000, 3, 1], 1, 10, false);         // 1'0000003.3
+    check_nbr(4.3, nbr1m.sub(nbr2), [3000000, 3, 1], 1, 10, true);          // -1'0000003.3
+    check_nbr(4.4, nbr1m.sub(nbr2m), [7000000, 0, 1], 1, 10, false);        // 1'0000000.7
+
+    // Test mul
+    nbr2m.n_frac_digit_groups = -1;                                         // 1'0000002'0000000
+    check_nbr(5.1, nbr1.mul(nbr2), [6000000, 3000002, 1], 1, 10, false);    // 1'3000002.6
+    check_nbr(5.1, nbr1.mul(nbr2m), [6000000, 3000002, 1], 0, 10, true);    // -1'3000002'6000000
+    check_nbr(5.1, nbr1m.mul(nbr2), [6000000, 3000002, 1], 1, 10, true);    // -1'3000002.6
+    check_nbr(5.1, nbr1m.mul(nbr2m), [6000000, 3000002, 1], 0, 10, false);  // 1'3000002'6000000
+
+    // Test add and sub with operands of very different magnitudes
+    nbr1.n_frac_digit_groups = 3;                                           // 0.0000000'0000001'3
+    nbr2.n_frac_digit_groups = -3;                                          // 1'0000002'0000000'0000000'0000000
+    check_nbr(6.1, nbr1.add(nbr2), [3000000, 1, 0, 0, 0, 0, 2, 1], 3, 10, false); // 1'0000002'0000000'0000000'0000000.0000000'0000001'3
+    check_nbr(6.2, nbr2.add(nbr1), [3000000, 1, 0, 0, 0, 0, 2, 1], 3, 10, false); // 1'0000002'0000000'0000000'0000000.0000000'0000001'3
+    check_nbr(6.3, nbr1.sub(nbr2), [7000000, 9999998, 9999999, 9999999, 9999999, 9999999, 1, 1], 3, 10, true); // -1'0000001'9999999'9999999'9999999.9999999'9999998'7
+    check_nbr(6.4, nbr2.sub(nbr1), [7000000, 9999998, 9999999, 9999999, 9999999, 9999999, 1, 1], 3, 10, false); // 1'0000001'9999999'9999999'9999999.9999999'9999998'7
+}
+
+//
+// Class Nbr - instance methods
+//
+
+Nbr.prototype.is_zero = function()
+// Returns true if this Nbr is zero, otherwise false. Works also for non-normalized Nbrs.
+{
+    for (var i = 0; i < this.digit_group_vec.length; i++)
+    {
+        if (this.digit_group_vec[i] != 0)
+        {
+            return false;
+        }
+    }
+    return true;
+};
+
+Nbr.prototype.set_base = function(digit_base)
+// Sets the digit base of this number and updates the corresponding static digit group info if needed.
+{
+    this.digit_base = digit_base;
+    Nbr.calc_digit_group_base(digit_base);
+};
+
+Nbr.prototype.change_base = function(new_digit_base)
+// Converts this Nbr to a new base.
+{
+    if (new_digit_base == this.digit_base || this.digit_group_vec == undefined)
+    {
+        return;
+    }
+
+    // Initialize the result to 0 in the new base (and update the static digit_group_base_for_digit_base
+    // info for the new base)  
+    var result = new Nbr(0, new_digit_base);
+    // Get the old and new digit group bases and create Nbrs representing these in the opposite bases
+    var old_digit_group_base = Nbr.digit_group_base_for_digit_base[this.digit_base];
+    var new_digit_group_base = Nbr.digit_group_base_for_digit_base[new_digit_base];
+    var old_dig_grp_base_in_new_base = new Nbr(old_digit_group_base, new_digit_base);
+    var new_dig_grp_base_in_old_base = new Nbr(new_digit_group_base, this.digit_base);
+
+    // Convert integer part by repeatedly "left-shifting" the result by 1 old digit group and adding
+    // in the next digit group value (both values expressed in the new base).
+    for (var i = this.digit_group_vec.length - 1; i >= this.n_frac_digit_groups; i--) 
+    {
+        result = result.mul(old_dig_grp_base_in_new_base);
+        if (i >= 0)
+        {
+            var old_digit_group_in_new_base = new Nbr(this.digit_group_vec[i], new_digit_base);
+            result = result.add(old_digit_group_in_new_base);
+        }
+    }
+
+    // Convert fractional part by repeatedly "left-shifting" the remaining fractional part by 1 new
+    // digit group (both values expressed in the old base), clipping off the integer overflow,
+    // converting that to the new base, and storing it as the next digit group of the result. 
+    var remaining_frac = new Nbr(0, this.digit_base);
+    remaining_frac.digit_group_vec = this.digit_group_vec.slice(0, Math.max(0, this.n_frac_digit_groups));
+    remaining_frac.n_frac_digit_groups = this.n_frac_digit_groups;
+    var max_frac_groups = 4; // FIXME: Set this to something less arbitrary
+    while (!remaining_frac.is_zero() && result.n_frac_digit_groups < max_frac_groups)
+    {
+        remaining_frac = remaining_frac.mul(new_dig_grp_base_in_old_base);
+        var new_digit_group = 0;
+        while (remaining_frac.digit_group_vec.length > remaining_frac.n_frac_digit_groups)
+        {
+            new_digit_group = new_digit_group * old_digit_group_base + remaining_frac.digit_group_vec.pop();
+        }
+        result.digit_group_vec.unshift(new_digit_group);
+        result.n_frac_digit_groups++;
+    }
+    // If the remaining fractional part still isn't zero, then perform rounding of the result. 
+    if (!remaining_frac.is_zero())
+    {
+        // Check each fractional digit group starting with the most significant one, until one is
+        // found that determines the rounding direction. The difference between 2*group and
+        // group_base determines the rounding direction as follows: round up if diff >= 0,
+        // round down if diff <= -2, check next group if diff = -1.
+        // (For even bases diff will never be -1, so it is sufficient to check the first group).
+        var diff = -1; // Indicates that rounding direction is initially unknown
+        for (var i = remaining_frac.n_frac_digit_groups - 1; diff == -1; i--)
+        {
+            diff = (remaining_frac.digit_group_vec[i] || 0) * 2 - old_digit_group_base;
+        }
+        if (diff >= 0) 
+        {
+            // Round up
+            var lsb_one = new Nbr(1, new_digit_base);
+            lsb_one.n_frac_digit_groups = result.n_frac_digit_groups;
+            result = result.add(lsb_one);
+        }
+    }
+
+    result.normalize();
+    this.digit_group_vec = result.digit_group_vec;
+    this.n_frac_digit_groups = result.n_frac_digit_groups;
+    this.digit_base = result.digit_base;
+}
+
+Nbr.prototype.normalize = function()
+// Normalizes this Nbr (removes unnecessary zero groups, and corrects -0 to +0).
+{
+    if (this.digit_group_vec == undefined)
+    {
+        return;
+    }
+    var start_i, end_i;
+    // Find index of first non-zero group at start of digit_group_vec (i.e. skip trailing zeros)
+    for (start_i = 0;
+        start_i < this.digit_group_vec.length && this.digit_group_vec[start_i] == 0;
+        start_i++);
+    // Find index of last non-zero group at end of digit_group_vec (i.e. skip leading zeros)
+    for (end_i = this.digit_group_vec.length - 1;
+        end_i >= 0 && this.digit_group_vec[end_i] == 0;
+        end_i--);
+    // Cut away the leading/trailing zeros
+    this.digit_group_vec = this.digit_group_vec.slice(start_i, end_i + 1);
+    // Adjust the number of fractional groups
+    this.n_frac_digit_groups -= start_i;
+    // if the Nbr is zero (digit_group_vec is empty), make it non-negative with 0 fractional groups
+    if (this.digit_group_vec.length == 0)
+    {
+        this.is_negative = false;
+        this.n_frac_digit_groups = 0;
+    }
+}
+
+Nbr.prototype.negate = function()
+// Returns a new Nbr that is this Nbr negated.
+{
+    var result = new Nbr(0, this.digit_base);
+    result.digit_group_vec = this.digit_group_vec.slice(0);
+    result.is_negative = !this.is_negative;
+    result.n_frac_digit_groups = this.n_frac_digit_groups;
+    return result;
+}
+
+Nbr.prototype.add = function(nbr)
+// Returns a new Nbr that is this Nbr plus the specified Nbr; both Nbrs must have the same digit_base.
+{
+    if (!this.is_negative && nbr.is_negative)
+    {
+        return this.sub(nbr.negate());
+    }
+    else if (this.is_negative && !nbr.is_negative)
+    {
+        return nbr.sub(this.negate());
+    }
+    var digit_group_base = Nbr.digit_group_base_for_digit_base[this.digit_base];
+    var result = new Nbr(0, this.digit_base);
+    result.is_negative = this.is_negative;
+    result.n_frac_digit_groups = Math.max(this.n_frac_digit_groups, nbr.n_frac_digit_groups);
+    // Calculate starting index for the 1st operand (i1 <= 0) 
+    var i1 = this.n_frac_digit_groups - result.n_frac_digit_groups;
+    // Calculate starting index for the 2nd operand (i2 <= 0) 
+    var i2 = nbr.n_frac_digit_groups - result.n_frac_digit_groups;
+    var carry = 0;
+    while (i1 < this.digit_group_vec.length || i2 < nbr.digit_group_vec.length || carry != 0)
+    {
+        var temp = (this.digit_group_vec[i1++] || 0) + (nbr.digit_group_vec[i2++] || 0) + carry;
+        carry = (temp >= digit_group_base); 
+        if (carry)
+        {
+            temp -= digit_group_base;
+        }
+        result.digit_group_vec.push(temp);
+    }
+    result.normalize();
+    return result;
+};
+
+Nbr.prototype.sub = function(nbr)
+// Returns a new Nbr that is this Nbr minus the specified Nbr; both Nbrs must have the same digit_base.
+{
+    if (!this.is_negative && nbr.is_negative)
+    {
+        return this.add(nbr.negate());
+    }
+    else if (this.is_negative && !nbr.is_negative)
+    {
+        return this.add(nbr.negate());
+    }
+    var digit_group_base = Nbr.digit_group_base_for_digit_base[this.digit_base];
+    var result = new Nbr(0, this.digit_base);
+    result.is_negative = this.is_negative;
+    result.n_frac_digit_groups = Math.max(this.n_frac_digit_groups, nbr.n_frac_digit_groups);
+    // Calculate starting index for the 1st operand (i1 <= 0) 
+    var i1 = this.n_frac_digit_groups - result.n_frac_digit_groups;
+    // Calculate starting index for the 2nd operand (i2 <= 0) 
+    var i2 = nbr.n_frac_digit_groups - result.n_frac_digit_groups;
+    var borrow = 0;
+    while (i1 < this.digit_group_vec.length || i2 < nbr.digit_group_vec.length)
+    {
+        var temp = (this.digit_group_vec[i1++] || 0) - (nbr.digit_group_vec[i2++] || 0) - borrow;
+        borrow = (temp < 0); 
+        if (borrow)
+        {
+            temp += digit_group_base;
+        }
+        result.digit_group_vec.push(temp);
+    }
+    // If there's still a borrow after all digit groups have been processed, then flip the sign of
+    // the result and calculate the radix-complement of its digit groups
+    if (borrow)
+    {
+        result.is_negative = !result.is_negative;
+        borrow = 0;
+        for (var i3 = 0; i3 < result.digit_group_vec.length; i3++)
+        {
+            var temp = -result.digit_group_vec[i3] - borrow;
+            borrow = (temp < 0); 
+            if (borrow)
+            {
+                temp += digit_group_base;
+            }
+            result.digit_group_vec[i3] = temp;
+        }
+    }
+    result.normalize();
+    return result;
+};
+
+Nbr.prototype.mul = function(nbr)
+// Returns a new Nbr that is this Nbr multiplied by the specified Nbr; both Nbrs must have the same digit_base.
+{
+    var digit_group_base = Nbr.digit_group_base_for_digit_base[this.digit_base];
+    var result = new Nbr(0, this.digit_base);
+    for (var i = 0; i < this.digit_group_vec.length; i++)
+    {
+        var carry = 0;
+        for (var j = 0; j < nbr.digit_group_vec.length; j++)
+        {
+            var temp = (result.digit_group_vec[i + j] || 0) +
+                this.digit_group_vec[i] * nbr.digit_group_vec[j] + carry;
+            if (temp >= digit_group_base)
+            {
+                carry = Math.floor(temp / digit_group_base);
+                temp = temp % digit_group_base;
+            }
+            else
+            {
+                carry = 0;
+            }
+            result.digit_group_vec[i + j] = temp;
+        }
+        if (carry)
+        {
+            result.digit_group_vec[i + j] = carry;
+        }
+    }
+    result.n_frac_digit_groups = this.n_frac_digit_groups + nbr.n_frac_digit_groups;
+    result.is_negative = this.is_negative != nbr.is_negative; 
+    return result;
+};
+
+Nbr.prototype.toString = function()
+{
+    if (this.digit_group_vec == undefined) return '?';
+
+    var nbr = this;
+
+    // Convert number to two's-complement if required
+    if (Nbr.conversion_config.out_number_signed_type == ConversionConfig.SIGNED_TYPE.TWOS_COMPL)
+    {
+        if (this.is_negative)
+        {
+            nbr = this.add(Nbr.conversion_config.out_twos_compl_half_max_nbr);
+            if (nbr.is_negative)
+            {
+                return '?';
+            }
+            nbr = nbr.add(Nbr.conversion_config.out_twos_compl_half_max_nbr);
+        }
+        else
+        {
+            var temp_nbr = this.sub(Nbr.conversion_config.out_twos_compl_half_max_nbr);
+            if (!temp_nbr.is_negative)
+            {
+                return '?';
+            }
+        }
+    }
+
+    var digit_group_base = Nbr.digit_group_base_for_digit_base[nbr.digit_base];
+    // Zeros need to be prepended if the radix point is further left than the left end of the stored digits
+    var n_zero_groups_to_prepend = Math.max(0, nbr.n_frac_digit_groups - nbr.digit_group_vec.length);
+    // Zeros need to be appended if the radix point is further right than the right end of the stored digits
+    var n_zero_groups_to_append = Math.max(0, -nbr.n_frac_digit_groups);
+    // Calculate the radix char position in the array of digit group string
+    var radix_char_pos = Math.max(0, nbr.digit_group_vec.length - nbr.n_frac_digit_groups);
+    // Preallocate the digit group strings
+    var strings = new Array(n_zero_groups_to_prepend + nbr.digit_group_vec.length + n_zero_groups_to_append);
+    var str_i = 0;
+    // Prepend zeros
+    for (var i = 0; i < n_zero_groups_to_prepend; i++)
+    {
+        strings[str_i++] = digit_group_base.toString(nbr.digit_base).slice(1); 
+    }
+    // Convert the stored digits
+    for (var i = nbr.digit_group_vec.length - 1; i >= 0; i--)
+    {
+        strings[str_i++] =
+            (nbr.digit_group_vec[i] + digit_group_base).toString(nbr.digit_base).slice(1);
+    }
+    // Append zeros
+    for (var i = 0; i < n_zero_groups_to_append; i++)
+    {
+        strings[str_i++] = digit_group_base.toString(nbr.digit_base).slice(1); 
+    }
+    // Join the integer part strings and remove leading zeros; if nothing remains, add a single zero
+    var s = strings.slice(0, radix_char_pos).join('').replace(/^0+/, '') || '0';
+    var sign = (Nbr.conversion_config.out_number_signed_type == ConversionConfig.SIGNED_TYPE.SIGNED && nbr.is_negative ? '-' : '');
+    // If fixed width, prepend '0' digits 
+    var padding_char = '0';
+    if (Nbr.conversion_config.out_numbers_are_fixed_width)
+    {
+        var n_padding_chars = Nbr.conversion_config.out_number_n_int_digits - s.length;
+        if (n_padding_chars < 0)
+        {
+            s = '';
+            n_padding_chars = Nbr.conversion_config.out_number_n_int_digits;
+            padding_char = '#';
+        }
+        s = (new Array(n_padding_chars + 1)).join(padding_char) + s;
+    }
+    // Add the radix char and fractional part if there is one
+    if (Nbr.conversion_config.out_number_has_frac &&
+        (nbr.n_frac_digit_groups > 0 || Nbr.conversion_config.out_number_zero_extended_frac))
+    {
+        // Join the fractional part strings
+        var s2 = strings.slice(radix_char_pos).join('');
+        if (Nbr.conversion_config.out_number_zero_extended_frac)
+        {
+            var n_padding_chars = Nbr.conversion_config.out_number_n_frac_digits - s2.length;
+            if (n_padding_chars > 0)
+            {
+                // Append '0' digits
+                s2 += (new Array(n_padding_chars + 1)).join(padding_char);
+            }
+        }
+        else
+        {
+            // Remove trailing zeros
+            s2 = s2.replace(/0+$/, '');
+        }
+        // Remove extra digits if too many
+        s2 = s2.slice(0, Nbr.conversion_config.out_number_n_frac_digits);
+        // Append the radix char and fractional digits to the integer digits
+        s += Nbr.conversion_config.out_radix_char + s2;
+    }
+    // Add the sign, prefix, and suffix
+    s = sign +
+        Nbr.conversion_config.out_number_prefix +
+        s.toUpperCase() +
+        Nbr.conversion_config.out_number_suffix;
+    return s;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// Global variables
+//
+
+var details_are_hidden = false;
+var first_data_elem;
+
+///////////////////////////////////////////////////////////////////////////////
+// Global functions
+//
+
+function apply_escapes(str)
+// Returns a string that is the specified string with all indicated escape sequences converted to
+// their corresponding characters, i.e. '\\n' to '\n', '\\t' to '\t', and all other Javascript
+// escapes.
+{
+    // Evaluate the string as a javascript string - after ensuring that all quotes are escaped
+    // (so we don't risk executing arbitrary javascript code found in the string)
+    return eval('("' + str.replace(/((?:^|[^\\])(?:\\\\)*)"/g, '$1\\"') + '")');
+}
+
+function escape_string_for_regexp(str)
+// Escapes special regexp characters in the specified string can be used in a regular expression without triggering regular expression
+// functionality.
+{
+    return str.replace(/[-.^$*+?|()[\]{}\/\\]/g, '\\$&');
+}
+
+function do_conversion()
+// Performs all the conversions specified on the web page, and updates the page with the results. 
+{
+    var conv_cfg = new ConversionConfig();
+
+    var data_elems = document.getElementsByClassName('data');
+    var in_digit_base_elems = document.getElementsByClassName('in_digit_base');
+    var in_numbers_are_delimited_elems = document.getElementsByClassName('in_numbers_are_delimited');
+    var in_number_field_width_elems = document.getElementsByClassName('in_number_field_width');
+    var in_number_signed_type_elems = document.getElementsByClassName('in_number_signed_type');
+    var in_number_n_twos_compl_bits_elems = document.getElementsByClassName('in_number_n_twos_compl_bits');
+    var in_number_has_frac_elems = document.getElementsByClassName('in_number_has_frac');
+    var in_radix_char_elems = document.getElementsByClassName('in_radix_char');
+    var in_digit_grp_char_elems = document.getElementsByClassName('in_digit_grp_char');
+    var out_digit_base_elems = document.getElementsByClassName('out_digit_base');
+    var out_number_width_type_elems = document.getElementsByClassName('out_number_width_type');
+    var out_number_n_int_digits_elems = document.getElementsByClassName('out_number_n_int_digits');
+    var out_number_signed_type_elems = document.getElementsByClassName('out_number_signed_type');
+    var out_number_n_twos_compl_bits_elems = document.getElementsByClassName('out_number_n_twos_compl_bits');
+    var out_number_has_frac_elems = document.getElementsByClassName('out_number_has_frac');
+    var out_radix_char_elems = document.getElementsByClassName('out_radix_char');
+    var out_number_prefix_elems = document.getElementsByClassName('out_number_prefix');
+    var out_number_suffix_elems = document.getElementsByClassName('out_number_suffix');
+    var out_number_separator_elems = document.getElementsByClassName('out_number_separator');
+    var out_row_prefix_elems = document.getElementsByClassName('out_row_prefix');
+    var out_row_suffix_elems = document.getElementsByClassName('out_row_suffix');
+    var out_row_separator_elems = document.getElementsByClassName('out_row_separator');
+    var reshape_elems = document.getElementsByClassName('reshape');
+    var reshape_n_rows_or_cols_elems = document.getElementsByClassName('reshape_n_rows_or_cols');
+    var reshape_set_rows_elems = document.getElementsByClassName('reshape_set_rows');
+    var reverse_number_order_elems = document.getElementsByClassName('reverse_number_order');
+    var in_str = first_data_elem.value;
+    for (var i = 0; i < in_digit_base_elems.length; i++)
+    {
+        conv_cfg.in_digit_base = +in_digit_base_elems[i].value;
+        conv_cfg.in_numbers_are_delimited = in_numbers_are_delimited_elems[i].value == 'yes';
+        conv_cfg.in_number_field_width = +in_number_field_width_elems[i].value;
+        conv_cfg.in_number_signed_type = ConversionConfig.SIGNED_TYPE[in_number_signed_type_elems[i].value];
+        conv_cfg.in_number_n_twos_compl_bits = +in_number_n_twos_compl_bits_elems[i].value;
+        conv_cfg.in_number_has_frac = in_number_has_frac_elems[i].checked;
+        conv_cfg.in_radix_char = in_radix_char_elems[i].value;
+        conv_cfg.in_digit_grp_char = in_digit_grp_char_elems[i].value;
+        conv_cfg.out_digit_base = +out_digit_base_elems[i].value;
+        conv_cfg.out_numbers_are_fixed_width = out_number_width_type_elems[i].value == 'fixed_width';
+        conv_cfg.out_number_n_int_digits = +out_number_n_int_digits_elems[i].value;
+        conv_cfg.out_number_signed_type = ConversionConfig.SIGNED_TYPE[out_number_signed_type_elems[i].value];
+        conv_cfg.out_number_n_twos_compl_bits = +out_number_n_twos_compl_bits_elems[i].value;
+        conv_cfg.out_number_has_frac = out_number_has_frac_elems[i].checked;
+        conv_cfg.out_radix_char = out_radix_char_elems[i].value;
+        conv_cfg.out_number_prefix = apply_escapes(out_number_prefix_elems[i].value);
+        conv_cfg.out_number_suffix = apply_escapes(out_number_suffix_elems[i].value);
+        conv_cfg.out_number_separator = apply_escapes(out_number_separator_elems[i].value);
+        conv_cfg.out_row_prefix = apply_escapes(out_row_prefix_elems[i].value);
+        conv_cfg.out_row_suffix = apply_escapes(out_row_suffix_elems[i].value);
+        conv_cfg.out_row_separator = apply_escapes(out_row_separator_elems[i].value);
+        conv_cfg.reshape = reshape_elems[i].value == 'yes';
+        conv_cfg.reshape_n_rows_or_cols = +reshape_n_rows_or_cols_elems[i].value;
+        conv_cfg.reshape_set_rows = reshape_set_rows_elems[i].value == 'yes';
+        conv_cfg.reverse_number_order = reverse_number_order_elems[i].checked;
+        var out_str = Nbr.convert(in_str, conv_cfg);
+        data_elems[i + 1].value = out_str;
+        in_str = out_str;
+    }
+    data_elems[i].select();
+}
+
+function activate_selected_controls(elem)
+// Updates the visibility of all elements depending on the state of elem.
+{
+    var section_elem = elem.extra.section_elem;
+    var selector_id = elem.classList[0];
+    // Construct the class name that would cause an element to be shown,
+    // and the list of class names that would cause elements to be hidden.
+    var show_cond = '';
+    var hide_conds = [];
+    if (elem.tagName == 'SELECT')
+    {
+        show_cond = elem.value;
+        var options = elem.options;
+        for (var i = 0; i < options.length; i++)
+        {
+            if (i != elem.selectedIndex)
+            {
+                hide_conds.push(options[i].value);
+            }
+        }
+    }
+    else if (elem.tagName == 'INPUT' && elem.type == 'checkbox')
+    {
+        show_cond = elem.checked ? 'yes' : 'no';
+        hide_conds = [elem.checked ? 'no' : 'yes'];
+    }
+
+    // Find all elements to be shown and make them visible
+    var elems = section_elem.getElementsByClassName('if_' + selector_id + '_' + show_cond);
+    for (var elem_i = 0; elem_i < elems.length; elem_i++)
+    {
+        var e = elems[elem_i];
+        if (e.tagName == 'OPTION')
+        {
+            e.disabled = false;
+        }
+        else
+        {
+            e.classList.remove('hidden');
+        }
+    }
+
+    // Find all elements to be hidden and hide them
+    for (var cond_i = 0; cond_i < hide_conds.length; cond_i++)
+    {
+        elems = section_elem.getElementsByClassName('if_' + selector_id + '_' + hide_conds[cond_i]);
+        for (var elem_i = 0; elem_i < elems.length; elem_i++)
+        {
+            var e = elems[elem_i];
+            if (e.tagName == 'OPTION')
+            {
+                e.disabled = true;
+                // Select a different option if the newly disabled option is selected
+                if (e.selected)
+                {
+                    // For now just select the first option without checking if it is also disabled
+                    e.parentElement.selectedIndex = 0;
+                }
+            }
+            else
+            {
+                e.classList.add('hidden');
+            }
+        }
+    }
+}
+
+function add_conversion()
+// Adds another conversion to the web page (without modifying the existing conversions).
+{
+    var conversions_elem = document.getElementById('conversions');
+    var final_output_elem = document.getElementById('final_output');
+    var conv_idx = Math.floor((conversions_elem.childNodes.length + 1) / 2) + 1;
+    var out_digit_base_elems = document.getElementsByClassName('out_digit_base');
+    var last_out_digit_base_elem = out_digit_base_elems[out_digit_base_elems.length - 1]; 
+    var prev_out_digit_base = last_out_digit_base_elem && +last_out_digit_base_elem.value || 10; 
+
+    if (conv_idx > 1)
+    {
+        conversions_elem.appendChild(final_output_elem.firstElementChild).style.display =
+            details_are_hidden ? 'none' : 'block';
+    }
+
+    var new_section = document.createElement('div');
+    new_section.innerHTML =
+        '<h2>Conversion ' + conv_idx + ' options<\/h2>'
+        + '<div class="indent_wrap">Input base (2-36): <input class="in_digit_base" type="number" min="2" max="36" value="' + prev_out_digit_base + '"><\/div>'
+        + '<div class="indent_wrap">Input numbers are:'
+        + ' <select class="in_numbers_are_delimited selector"><option value="yes">delimited<option value="no">fixed-width<\/select>'
+        + ' <label class="if_in_numbers_are_delimited_no"><input class="in_number_field_width" type="number" min="1" value="2"> digits wide<\/label>'
+        + ' <select class="in_number_signed_type selector"><option value="UNSIGNED">unsigned<option class="if_in_numbers_are_delimited_yes" value="SIGNED" selected>signed<option value="TWOS_COMPL">two\'s-complement<\/select>'
+        + ' <label class="if_in_number_signed_type_TWOS_COMPL">less than 2^<input class="in_number_n_twos_compl_bits" type="number" value="8"><\/label>'
+        + ' <label class="if_in_numbers_are_delimited_yes"><input class="in_number_has_frac selector" type="checkbox" checked>fractional<\/label>'
+        + ' <span class="if_in_numbers_are_delimited_yes"><label class="if_in_number_has_frac_yes">with radix char: <select class="in_radix_char"><option value=".">point<option value=",">comma<\/select><\/label><\/span><\/div>'
+        + '<div class="indent_wrap if_in_numbers_are_delimited_yes"><label>Input digit grouping char: <input class="in_digit_grp_char" type="text" value="" maxlength="1"><\/label><\/div>'
+        + '<div class="indent_wrap">Output base (2-36): <input class="out_digit_base" type="number" min="2" max="36" value="16"><\/div>'
+        + '<div class="indent_wrap">Output numbers are:'
+        + ' <select class="out_number_width_type selector"><option value="any_width">any-width<option value="fixed_width">fixed-width<\/select>'
+        + ' <label class="if_out_number_width_type_fixed_width"><input class="out_number_n_int_digits" type="number" min="1" value="2"> integer digits<\/label>'
+        + ' <select class="out_number_signed_type selector"><option value="SIGNED">signed<option value="TWOS_COMPL">two\'s-complement<\/select>'
+        + ' <label class="if_out_number_signed_type_TWOS_COMPL">less than 2^<input class="out_number_n_twos_compl_bits" type="number" value="8"><\/label>'
+        + ' <label><input class="out_number_has_frac selector" type="checkbox" checked>fractional<\/label>'
+        + ' <label class="if_out_number_has_frac_yes">with radix char: <select class="out_radix_char"><option value=".">point<option value=",">comma<\/select><\/label><\/div>'
+        + '<div class="indent_wrap">Output number'
+        + ' <label>prefix: <input class="out_number_prefix" type="text" value=""><\/label>'
+        + ' <label>suffix: <input class="out_number_suffix" type="text" value=""><\/label>'
+        + ' <label>separator: <input class="out_number_separator" type="text" value=", "><\/label><\/div>'
+        + '<div class="indent_wrap">Output row'
+        + ' <label>prefix: <input class="out_row_prefix" type="text" value=""><\/label>'
+        + ' <label>suffix: <input class="out_row_suffix" type="text" value="\\n"><\/label>'
+        + ' <label>separator: <input class="out_row_separator" type="text" value=""><\/label><\/div>'
+        + '<div class="indent_wrap"><select class="reshape selector"><option value="no">Don\'t reshape matrix<option value="yes">Reshape matrix to<\/select>'
+        + ' <input class="reshape_n_rows_or_cols if_reshape_yes" type="number" min="1" value="1">'
+        + ' <select class="reshape_set_rows if_reshape_yes"><option value="yes">rows<option value="no">columns<\/select><\/div>'
+        + '<div class="indent_wrap">Reverse order of numbers in each row: <input class="reverse_number_order" type="checkbox"><\/div>';
+    var selector_elems = new_section.getElementsByClassName('selector');
+    for (var i = 0; i < selector_elems.length; i++)
+    {
+        selector_elems[i].extra = {section_elem: new_section};
+        selector_elems[i].addEventListener('change', function(e){activate_selected_controls(e.target);});
+        activate_selected_controls(selector_elems[i]);
+    }
+    conversions_elem.appendChild(new_section).style.display =
+        details_are_hidden ? 'none' : 'block';
+
+    final_output_elem.innerHTML =
+        '<div><h2>Conversion ' + conv_idx + ' output<\/h2>'
+        + '<textarea class="data" readonly><\/textarea><\/div>';
+
+    document.getElementById('remove_conversion_but').disabled = (conv_idx <= 1);
+}
+
+function remove_conversion()
+// Removes the last conversion from the web page (without modifying the existing conversions).
+{
+    var conversions_elem = document.getElementById('conversions');
+    var final_output_elem = document.getElementById('final_output');
+    var n_convs = (conversions_elem.childNodes.length + 1) / 2;
+    if (n_convs > 1)
+    {
+        document.getElementById('remove_conversion_but').disabled = (n_convs <= 2);
+        conversions_elem.removeChild(conversions_elem.lastElementChild);
+        final_output_elem.replaceChild(conversions_elem.lastElementChild, final_output_elem.firstElementChild);
+        final_output_elem.firstElementChild.style.display = 'block';
+    }
+}
+
+function hide_details()
+{
+    var conversions_elem = document.getElementById('conversions');
+    var nodes = conversions_elem.childNodes;
+    for (var i = 0; i < nodes.length; i++)
+    {
+        nodes[i].style.display = "none";
+    }
+    var hide_button_elems = document.getElementsByClassName('hidebut');
+    for (var i = 0; i < hide_button_elems.length; i++)
+    {
+        if (i > 0)
+        {
+            hide_button_elems[i].classList.add('hidden');
+        }
+        hide_button_elems[i].innerHTML = 'Unhide details';
+        hide_button_elems[i].onclick = unhide_details;
+    }
+    details_are_hidden = true;
+}
+
+function unhide_details()
+{
+    var conversions_elem = document.getElementById('conversions');
+    var nodes = conversions_elem.childNodes;
+    for (var i = 0; i < nodes.length; i++)
+    {
+        nodes[i].style.display = "block";
+    }
+    var hide_button_elems = document.getElementsByClassName('hidebut');
+    for (var i = 0; i < hide_button_elems.length; i++)
+    {
+        if (i > 0)
+        {
+            hide_button_elems[i].classList.remove('hidden');
+        }
+        hide_button_elems[i].innerHTML = 'Hide details';
+        hide_button_elems[i].onclick = hide_details;
+    }
+    details_are_hidden = false;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Self-test
+//
+
+var self_tests = [
+    // Each conversion may set one or more properties of ConversionConfig. The set values are
+    // reused for subsequent conversions until they are set again.
+    {
+        data: 'F\nFEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210',
+        conversions: [
+            {
+                in_digit_base: 16,
+                out_digit_base: 10,
+                data: '15\n115277457729594790117272911370839532189043261309930451181949783328023217713680\n',
+            },
+            {
+                in_digit_base: 10,
+                out_digit_base: 16,
+                data: 'F\nFEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210\n',
+            },
+        ],
+    },
+    {
+        data: '-111111101101110010111010100110000111011001010100001100100001.0001001000110100010101100111100010011010101111',
+        conversions: [
+            {
+                in_digit_base: 2,
+                out_digit_base: 16,
+                data: '-FEDCBA987654321.123456789ABC\n',
+            },
+            {
+                in_digit_base: 16,
+                in_number_signed_type: ConversionConfig.SIGNED_TYPE.TWOS_COMPL,
+                in_number_n_twos_compl_bits: 60,
+                out_digit_base: 16,
+                data: '-123456789ABCDE.EDCBA9876544\n',
+            },
+            {
+                in_digit_base: 16,
+                in_number_signed_type: ConversionConfig.SIGNED_TYPE.SIGNED,
+                out_digit_base: 16,
+                out_number_signed_type: ConversionConfig.SIGNED_TYPE.TWOS_COMPL,
+                out_number_n_twos_compl_bits: 61,
+                data: '1FEDCBA987654321.123456789ABC\n',
+            },
+        ],
+    },
+    {
+        data: '0.1',
+        conversions: [
+            {
+                in_digit_base: 10,
+                out_digit_base: 16,
+                out_number_signed_type: ConversionConfig.SIGNED_TYPE.SIGNED,
+            },
+            {
+                in_digit_base: 16,
+                out_digit_base: 10,
+                data: '0.1\n',
+            },
+        ],
+    },
+    {
+        data: '0.5',
+        conversions: [
+            {
+                in_digit_base: 10,
+                out_digit_base: 3,
+                data: '0.1111111111111111111111111111111111111111111111111111111111111112\n',
+            },
+        ],
+    },
+    {
+        data: '0.11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111',
+        conversions: [
+            {
+                in_digit_base: 3,
+                out_digit_base: 9,
+                data: '0.44444444444444444444444444444444\n',
+            },
+        ],
+    },
+    {
+        data: '0.11111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111112',
+        conversions: [
+            {
+                in_digit_base: 3,
+                out_digit_base: 9,
+                data: '0.44444444444444444444444444444445\n',
+            },
+        ],
+    },
+    {
+        data: '1 024.062 5  .1 2 5',
+        conversions: [
+            {
+                in_digit_base: 10,
+                in_digit_grp_char: ' ',
+                out_digit_base: 16,
+                data: '400.1, 0.2\n'
+            },
+        ],
+    },
+];
+
+var self_test_results;
+
+function run_self_test()
+// Performs and checks all the conversions specified by the global self_tests variable.
+// Returns true if all tests passed.
+// Stores test results in the global self_test_results variable.
+{
+    self_test_results = 'Self-test results\n';
+    self_test_results += (new Array(self_test_results.length)).join('-') + '\n';
+
+    try
+    {
+        Nbr.self_test();
+        self_test_results += 'PASSED Nbr class test\n';
+    }
+    catch (e)
+    {
+        self_test_results += 'FAILED Nbr class test: ' + e + '\n';
+        return false;
+    }
+
+    var conv_cfg = new ConversionConfig();
+
+    var total_conv_count = 0;
+    var failed_conv_count = 0;
+    for (var test_idx = 0; test_idx < self_tests.length; test_idx++)
+    {
+        self_test_results += 'Test ' + (test_idx + 1) + ':\n';
+        var test_data = self_tests[test_idx];
+        var in_str = test_data.data;
+        for (var conv_idx = 0; conv_idx < test_data.conversions.length; conv_idx++)
+        {
+            total_conv_count++;
+            var conv_data = test_data.conversions[conv_idx];
+            for (var property in conv_data)
+            {
+                if (property in conv_cfg)
+                {
+                    conv_cfg[property] = conv_data[property];
+                }
+            }
+            var out_str = Nbr.convert(in_str, conv_cfg);
+            if ('data' in conv_data)
+            {
+                if (out_str == conv_data.data)
+                {
+                    self_test_results += '    PASSED conversion ' + (conv_idx + 1) + '\n';
+                }
+                else
+                {
+                    self_test_results += '    FAILED conversion ' + (conv_idx + 1) + '\n'
+                        + '        expected: "' + conv_data.data + '"\n'
+                        + '        received: "' + out_str + '"\n';
+                    failed_conv_count++;
+                }
+                in_str = conv_data.data;
+            }
+            else
+            {
+                in_str = out_str;
+            }
+        }
+    }
+    self_test_results += '\nSummary: ';
+    if (failed_conv_count > 0)
+    {
+        self_test_results += failed_conv_count + ' out of ' + total_conv_count + ' conversions failed!';
+    }
+    else
+    {
+        self_test_results += 'All conversions passed!';
+    }
+    return failed_conv_count == 0;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// Initialization
+//
+
+function init()
+{
+    first_data_elem = document.getElementById('data0'); 
+    if (run_self_test())
+    {
+        // Wake up page elements for normal operation
+        var disabled_elements = document.getElementsByClassName('hidden');
+        while (disabled_elements.length > 0)
+        {
+            disabled_elements[0].classList.remove('hidden');
+        }
+        unhide_details();
+        // Add first conversion
+        add_conversion();
+        // Enable, clear, and move focus to first data input element
+        first_data_elem.readOnly = false;
+        first_data_elem.value = '';
+        first_data_elem.focus();
+    }
+    else
+    {
+        alert('Self-test failed! Converter will be disabled!');
+        first_data_elem.value = self_test_results;
+        first_data_elem.scrollTop = first_data_elem.scrollHeight;
+    }
+}
+
+window.addEventListener('load', init, false);
+</script>
+
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Programmer's Number Converter</h1>
+
+<div class="box hcontainer">
+<ul>
+<li>Conversion/reformatting of entire tables/matrices of numbers in one go.
+<li>Arbitrarily large numbers, two's-complement, fractional.
+<li>A wide range of bases (binary, octal, decimal, hex, and more).
+<li>Compound conversions (multiple conversions applied sequentially).
+</ul>
+
+
+<h2 class="hidden">Input list/matrix of numbers</h2>
+<textarea id="data0" class="data" readonly></textarea>
+
+<button id="convertbut" class="hidden" onClick="do_conversion()">CONVERT!</button>
+<div class="linebreak"></div>
+<button class="hidebut hidden"></button>
+<div class="linebreak"></div>
+
+<div id="conversions"></div>
+
+<div class="linebreak"></div>
+<button class="hidebut hidden"></button>
+<div class="linebreak"></div>
+<div id="final_output"></div>
+
+<div class="linebreak"></div>
+<button id="add_conversion_but" class="hidden" onClick="add_conversion()">Add conversion</button>
+<button id="remove_conversion_but" class="hidden" onClick="remove_conversion()">Remove conversion</button>
+
+</div>
+
+</div>
+
+</body>
+</html>

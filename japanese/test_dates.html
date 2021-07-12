@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Translation Practice: Dates</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var daysinmonth = [31,28,31,30,31,30,31,31,30,31,30,31];
+
+var weekdaysEn = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+var weekdaysJp = ["nichi-yoobi","getsu-yoobi","ka-yoobi","sui-yoobi","moku-yoobi","kin-yoobi","do-yoobi"];
+var monthsEn = ["January","February","March","April","May","June","July","August","Sepember","October","November","December"];
+var monthsJp = [
+    "ichi-gatsu","ni-gatsu","san-gatsu","shi-gatsu",
+    "go-gatsu","roku-gatsu","shichi-gatsu","hachi-gatsu",
+    "ku-gatsu","juu-gatsu","juuichi-gatsu","juuni-gatsu"];
+var daysJp = [
+    "tsuitachi","futsuka","mikka","yokka","itsuka",
+    "muika","nanoka","yooka","kokonoka","tooka",
+    "juuichi-nichi","juuni-nichi","juusan-nichi","juuyokka","juugo-nichi",
+    "juuroku-nichi","juushichi-nichi","juuhachi-nichi","juuku-nichi","hatsuka",
+    "nijuuichi-nichi","nijuuni-nichi","nijuusan-nichi","nijuuyokka","nijuugo-nichi",
+    "nijuuroku-nichi","nijuushichi-nichi","nijuuhachi-nichi","nijuuku-nichi",
+    "sanjuu-nichi","sanjuuichi-nichi"];
+
+var wday = 0;
+var month = 0;
+var day = 0;
+var output = "";
+var result = "";
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+    wday = Math.floor(Math.random()*7);
+    month = Math.floor(Math.random()*12);
+    day = Math.floor(Math.random()*daysinmonth[month]);
+
+    output = "Translate the following into Japanese:<br>" +
+        weekdaysEn[wday] + " " + monthsEn[month] + " " + (day+1);
+    document.getElementById('output').innerHTML = output;
+    result = weekdaysJp[wday] + " " + monthsJp[month] + " " + daysJp[day];
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Translation Practice:<br>Dates</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button>
+
+</div>
+
+</div>
+
+</body>
+</html>

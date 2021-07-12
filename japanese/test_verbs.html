@@ -1,0 +1,274 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Translation Practice: Verbs</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var verb_columns = 7;
+var verbs = new Array(
+    0,   "Dictionary",   "Formal", "Negative",  "Past tense", "-te",        "English",
+    2,   "ageru",        "",       "",          "",           "",           "give",
+    2,   "akeru",        "",       "",          "",           "",           "open",
+    1,   "aru",          "",       "nai",       "",           "",           "be, have",
+    1,   "aruku",        "",       "",          "",           "",           "walk",
+    1,   "asobu",        "",       "",          "",           "",           "play",
+    1,   "au",           "",       "",          "",           "",           "meet",
+    1,   "chigau",       "",       "",          "",           "",           "be wrong",
+    2,   "dekiru",       "",       "",          "",           "",           "be able",
+    2,   "deru",         "",       "",          "",           "",           "leave",
+    1,   "gambaru",      "",       "",          "",           "",           "do one's best",
+    1,   "hairu",        "",       "",          "",           "",           "enter",
+    1,   "hajimaru",     "",       "",          "",           "",           "begin",
+    1,   "hanasu",       "",       "",          "",           "",           "speak",
+    1,   "hashiru",      "",       "",          "",           "",           "run",
+    1,   "iku",          "",       "",          "itta",       "",           "go",
+    1,   "irassharu",    "irasshaimasu","",     "",           "",           "go, be",
+    1,   "iru",          "",       "",          "",           "",           "need",
+    2,   "iru",          "",       "",          "",           "",           "be",
+    1,   "itadaku",      "",       "",          "",           "",           "accept",
+    1,   "iu",           "",       "",          "",           "",           "say",
+    1,   "kaeru",        "",       "",          "",           "",           "return",
+    1,   "kakaru",       "",       "",          "",           "",           "take",
+    2,   "kakeru",       "",       "",          "",           "",           "sit down",
+    1,   "kaku",         "",       "",          "",           "",           "write",
+    2,   "kangaeru",     "",       "",          "",           "",           "think",
+    1,   "kau",          "",       "",          "",           "",           "buy",
+    1,   "kesu",         "",       "",          "",           "",           "turn off",
+    1,   "kiku",         "",       "",          "",           "",           "hear, listen, ask",
+    1,   "kiru",         "",       "",          "",           "",           "cut",
+    2,   "kiru",         "",       "",          "",           "",           "wear",
+    1,   "komu",         "",       "",          "",           "",           "be crowded",
+    1,   "kudasaru",     "kudasaimasu","",      "",           "",           "give (to me by superior)",
+    2,   "kureru",       "",       "",          "",           "",           "give (to me)",
+    3,   "kuru",         "",       "konai",     "",           "",           "come",
+    1,   "magaru",       "",       "",          "",           "",           "turn",
+    1,   "matsu",        "",       "",          "",           "",           "wait",
+    2,   "miru",         "",       "",          "",           "",           "see",
+    2,   "miseru",       "",       "",          "",           "",           "show",
+    1,   "morau",        "",       "",          "",           "",           "receive",
+    1,   "motsu",        "",       "",          "",           "",           "have",
+    1,   "narau",        "",       "",          "",           "",           "learn",
+    1,   "naru",         "",       "",          "",           "",           "become",
+    1,   "nemuru",       "",       "",          "",           "",           "sleep",
+    2,   "neru",         "",       "",          "",           "",           "sleep, go to bed",
+    1,   "nomu",         "",       "",          "",           "",           "drink",
+    1,   "noru",         "",       "",          "",           "",           "ride, get on",
+    2,   "okiru",        "",       "",          "",           "",           "get up",
+    1,   "okuru",        "",       "",          "",           "",           "send",
+    1,   "omou",         "",       "",          "",           "",           "think",
+    2,   "oriru",        "",       "",          "",           "",           "get off",
+    2,   "oshieru",      "",       "",          "",           "",           "teach, tell",
+    1,   "osu",          "",       "",          "",           "",           "push",
+    1,   "owaru",        "",       "",          "",           "",           "finish",
+    1,   "oyogu",        "",       "",          "",           "",           "swim",
+    2,   "shimeru",      "",       "",          "",           "",           "close",
+    2,   "shinjiru",     "",       "",          "",           "",           "believe",
+    1,   "shiru",        "",       "",          "",           "",           "know",
+    1,   "sugosu",       "",       "",          "",           "",           "pass, spend",
+    1,   "sumu",         "",       "",          "",           "",           "live",
+    3,   "suru",         "",       "shinai",    "",           "",           "do",
+    1,   "suu",          "",       "",          "",           "",           "smoke",
+    1,   "suwaru",       "",       "",          "",           "",           "sit",
+    2,   "taberu",       "",       "",          "",           "",           "eat",
+    1,   "tatsu",        "",       "",          "",           "",           "stand",
+    2,   "todokeru",     "",       "",          "",           "",           "deliver",
+    1,   "tomaru",       "",       "",          "",           "",           "stay (at hotel)",
+    2,   "tomeru",       "",       "",          "",           "",           "stop, park",
+    1,   "toru",         "",       "",          "",           "",           "take (a picture)",
+    1,   "tsukau",       "",       "",          "",           "",           "use",
+    2,   "tsukareru",    "",       "",          "",           "",           "get tired",
+    2,   "tsukeru",      "",       "",          "",           "",           "turn on",
+    1,   "tsuku",        "",       "",          "",           "",           "arrive",
+    1,   "tsukuru",      "",       "",          "",           "",           "make",
+    2,   "tsutomeru",    "",       "",          "",           "",           "work for",
+    1,   "uru",          "",       "",          "",           "",           "sell",
+    1,   "utau",         "",       "",          "",           "",           "sing",
+    1,   "wakaru",       "",       "",          "",           "",           "understand",
+    1,   "warau",        "",       "",          "",           "",           "laugh",
+    1,   "yaru",         "",       "",          "",           "",           "do, perform",
+    1,   "yomu",         "",       "",          "",           "",           "read"
+);
+
+function romaji_simple(text)
+{
+    return text.replace(/shi/g,"si").replace(/ji/g,"zi").replace(/chi/g,"ti").replace(/tsu/g,"tu")
+        .replace(/fu/g,"hu")
+        .replace(/sh(a|u|o)/g,"S$1").replace(/ch(a|u|o)/g,"T$1").replace(/j(a|u|o)/g,"Z$1")
+        .replace(/([aeiou])(u)$/,"$1w$2");
+}
+
+function romaji_normal(text)
+{
+    return text.replace(/si/g,"shi").replace(/(z|d)i/g,"ji").replace(/ti/g,"chi").replace(/tu/g,"tsu")
+        .replace(/hu/g,"fu").replace(/du/g,"zu")
+        .replace(/S(a|u|o)/g,"sh$1").replace(/T(a|u|o)/g,"ch$1").replace(/Z(a|u|o)/g,"j$1")
+        .replace(/w([iue])/g,"$1");
+}
+
+function conjugate()
+{
+    var v,vtype,vstem,vstem2,vpast;
+    for (var i = verb_columns; i < verbs.length; i += verb_columns)
+    {
+        vtype = verbs[i];
+        v = romaji_simple(verbs[i + 1]);
+        switch (vtype)
+        {
+            case 1:
+                vstem = v.slice(0,-1);
+                vstem2 = vstem + "i";
+                vpast = v.replace(/ku$/,"ita").replace(/gu$/,"ida").replace(/(t|w|r)u$/,"tta")
+                    .replace(/(n|b|m)u$/,"nda").replace(/su$/,"shita");
+                break;
+            case 2:
+                vstem = v.slice(0,-2);
+                vstem2 = vstem;
+                vpast = vstem2 + "ta";
+                break;
+            case 3:
+                vstem = v.slice(0,-3);
+                vstem2 = vstem + "i";
+                vpast = vstem2 + "ta";
+                break;
+        }
+        if (verbs[i + 2] == "") verbs[i + 2] = romaji_normal(vstem2 + "masu");
+        if (verbs[i + 3] == "") verbs[i + 3] = romaji_normal(vstem.replace(/([^aeiou])$/,"$1a") + "nai");
+        if (verbs[i + 4] == "") verbs[i + 4] = romaji_normal(vpast);
+        if (verbs[i + 5] == "") verbs[i + 5] = verbs[i + 4].slice(0,-1) + "e";
+    }
+}
+
+conjugate();
+
+function show_cheat_sheet()
+{
+    var i,j;
+    var newwin = window.open("","verbs","");
+    newwin.document.open();
+    newwin.document.write('<!doctype html>');
+    newwin.document.write('<html><head><meta http-equiv="content-type" content="text/html; charset=utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">');
+    newwin.document.write('<link rel="icon" type="image/x-icon" href="../favicon.ico"><link rel="stylesheet" type="text/css" href="../style2.css">');
+    newwin.document.write('<title>Verbs<\/title>');
+    newwin.document.write('<script type="text/javascript" src="../page.js"><\/script>');
+    newwin.document.write('<style type="text/css">table { margin: auto; border-spacing: 0.2em; } table td { background-color: #BBFFBB; padding: 0.2em; }<\/style><\/head>');
+    newwin.document.write('<body onLoad="window.focus()"><div class="hcontainer">');
+    newwin.document.writeln('<h1>Verbs<\/h1>');
+    newwin.document.writeln('<div class="box"><table>');
+    newwin.document.write('<tr>');
+    for (j = 1; j < verb_columns; j++) {
+        newwin.document.writeln("<td><b>"+verbs[j]+"<\/b>");
+    }
+    for (i = verb_columns; i < verbs.length; i += verb_columns) {
+        newwin.document.write("<tr>");
+        for (j = 1; j < verb_columns; j++) {
+            newwin.document.writeln("<td>"+verbs[i+j]);
+        }
+    }
+    newwin.document.write("<\/table><\/div><\/div><\/body><\/html>");
+    newwin.document.close();
+}
+
+var permd_indices = new Array((verbs.length/verb_columns - 1)*(verb_columns - 2));
+for (var i = 0; i < permd_indices.length; i++) permd_indices[i] = i;
+
+function permute()
+{
+    var i,j,t;
+    j = Math.floor(Math.random() * (permd_indices.length - 1));
+    t = permd_indices[0];
+    permd_indices[0] = permd_indices[j];
+    permd_indices[j] = t;
+    for (i = 1; i < permd_indices.length - 1; i++) {
+        j = Math.floor(Math.random() * (permd_indices.length - i)) + i;
+        t = permd_indices[i];
+        permd_indices[i] = permd_indices[j];
+        permd_indices[j] = t;
+    }
+}
+
+permute();
+var permindex = 0;
+
+var output = "";
+var result = "";
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+    if (permindex >= permd_indices.length) {
+        permute();
+        permindex = 0;
+    }
+    var vi = permd_indices[permindex++];
+    var vrow = Math.floor(vi/(verb_columns - 2)) + 1;
+    var vcol = vi % (verb_columns - 2) + 1;
+    output = "What is the " + verbs[vcol].toLowerCase() + " form of the Japanese word for:<br>" +
+        verbs[verb_columns*(vrow + 1) - 1];
+    result = verbs[verb_columns*vrow + vcol];
+    document.getElementById('output').innerHTML = output;
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Translation Practice:<br>Verbs</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button>
+<button type="button" id="cheat_key" onClick="show_cheat_sheet()">Cheat sheet</button>
+
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Random Code Generator</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+input#alphabet {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+input#codesize {
+    text-align: right;
+}
+
+div#code {
+    font: bold 100% 'Courier New', monospace;
+    box-sizing: border-box;
+    word-break: break-all;
+    width: 100%;
+    border: 1px solid;
+    padding: 0.2em;
+    margin: 0.2em 0px;
+}
+</style>
+<script type="text/javascript">
+var alphabets = {
+    hex: '0123456789ABCDEF',
+    dec: '0123456789',
+    bin: '01',
+    mime64: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+    unambig_ascii: 'ABCDEFGHJKLMNPQRSTUVXYZabcdefghijkmnopqrstuvxyz23456789!#$%&*+-./:;=?@[\]{}',
+    unambig_alphanum: 'ABCDEFGHJKLMNPQRSTUVXYZabcdefghijkmnopqrstuvxyz23456789'
+};
+
+function gencode(mode) {
+    var nchars = 1*document.getElementById('codesize').value;
+    var code, i, alph, alphlen, format, is_unambig, ch, last_ch;
+
+    if (isNaN(nchars) || (nchars < 1) || (nchars > 128)) {
+        document.getElementById('code').innerHTML = 'Invalid code size!';
+        return 0;
+    }
+    if (mode != 0) {
+        document.getElementById('codeformat').value = 'user';
+    }
+    format = document.getElementById('codeformat').value;
+    is_unambig = (format.lastIndexOf('unambig', 0) === 0);
+    alph = alphabets[format];
+    if (alph) {
+        document.getElementById('alphabet').value = alph;
+    } else {
+        alph = document.getElementById('alphabet').value;
+    }
+    alphlen = alph.length;
+    document.getElementById('nbits').innerHTML =
+        String(Math.round(100 * nchars * Math.log(alphlen)/Math.LN2)/100);
+    code = '';
+    last_ch = '';
+    for (i = 0; i < nchars; i++) {
+        do {
+            ch = alph.charAt(Math.floor(Math.random() * alphlen));
+        } while (is_unambig && ['vv', 'VV', 'rn', 'rm'].indexOf(last_ch + ch) >= 0);
+        code = code + ch;
+        last_ch = ch;
+    }
+    document.getElementById('code').innerHTML = code;
+}
+
+function init() {
+    gencode(0);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Random Code Generator</h1>
+
+<div class="box">
+Code format:
+<select id="codeformat" name="codeformat" onChange="gencode(0)">
+    <option value="hex">Hex
+    <option value="dec">Decimal
+    <option value="bin">Binary
+    <option value="mime64">MIME base64
+    <option value="unambig_ascii">Unambiguous ASCII
+    <option value="unambig_alphanum" selected>Unambiguous alphanumeric
+    <option value="user">User defined
+</select>
+
+<p>
+Alphabet:
+<input type="text" id="alphabet" name="alphabet" size=64 maxlength=128 onFocus="this.select()" onChange="gencode(1)">
+</p>
+
+<p>
+Code size:
+<input type="text" id="codesize" name="codesize" value="8" size=4 maxlength=4 onFocus="this.select()" onChange="gencode(0)"> characters
+(=&nbsp;<span id="nbits">0</span>&nbsp;bits)
+</p>
+
+<button type="button" name="gen" onClick="gencode(0)">Generate new code</button>
+<div id="code"></div>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Thai Consonants</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+div.box { text-align: center; }
+table.main { display: inline-block; margin: auto; border-spacing: 0.2em; }
+table.main th, table.main td { vertical-align: baseline; background-color: #BBFFBB; padding: 0.2em; text-align: center; }
+table.main th { background-color: #AAEEAA; }
+table.main td.cons { font-size: 200%; }
+table.main th.low, table.main td.low { color: #4040FF; background-color: #AACCFF; }
+table.main th.mid, table.main td.mid { color: #505050; background-color: #DDDDDD; }
+table.main th.high, table.main td.high { color: #FF3030; background-color: #FFBBBB; }
+table.main td.name { font-size: 150%; }
+</style>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Thai Consonants</h1>
+
+<div class="box">
+
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var charclassname = new Array("mid","high","low");
+var chars = new Array(
+  "\u0e01",1,"&#3652;&#3585;&#3656;",                            "k&agrave;i",
+  "\u0e02",2,"&#3652;&#3586;&#3656;",                            "kh&agrave;i",
+"(\u0e03)",2,"&#3586;&#3623;&#3604;",                            "kh&ugrave;at",
+  "\u0e04",3,"&#3588;&#3623;&#3634;&#3618;",                     "khwaay",
+"(\u0e05)",3,"&#3588;&#3609;",                                   "khon",
+  "\u0e06",3,"&#3619;&#3632;&#3590;&#3633;&#3591;",              "ra-khang",
+  "\u0e07",3,"&#3591;&#3641;",                                   "nguu",
+  "\u0e08",1,"&#3592;&#3634;&#3609;",                            "jaan",
+  "\u0e09",2,"&#3593;&#3636;&#3656;&#3591;",                     "ch&igrave;ng",
+  "\u0e0a",3,"&#3594;&#3657;&#3634;&#3591;",                     "ch&aacute;ang",
+  "\u0e0b",3,"&#3650;&#3595;&#3656;",                            "s&ocirc;o",
+  "\u0e0c",3,"&#3648;&#3596;&#3629;",                            "choee",
+  "\u0e0d",3,"&#3627;&#3597;&#3636;&#3591;",                     "y&#464;ng",
+  "\u0e0e",1,"&#3594;&#3598;&#3634;",                            "chadaa",
+  "\u0e0f",1,"&#3611;&#3599;&#3633;&#3585;",                     "pat&agrave;k",
+  "\u0e10",2,"&#3600;&#3634;&#3609;",                            "th&#462;an",
+  "\u0e11",3,"&#3617;&#3603;&#3650;&#3601;",                     "mon-thoo",
+  "\u0e12",3,"&#3612;&#3641;&#3657;&#3648;&#3602;&#3656;&#3634;","ph&ucirc;u-th&acirc;w",
+  "\u0e13",3,"&#3648;&#3603;&#3619;",                            "neen",
+  "\u0e14",1,"&#3648;&#3604;&#3655;&#3585;",                     "d&egrave;k",
+  "\u0e15",1,"&#3648;&#3605;&#3656;&#3634;",                     "t&agrave;w",
+  "\u0e16",2,"&#3606;&#3640;&#3591;",                            "th&#468;ng",
+  "\u0e17",3,"&#3607;&#3627;&#3634;&#3619;",                     "thah&#462;an",
+  "\u0e18",3,"&#3608;&#3591;",                                   "thong",
+  "\u0e19",3,"&#3627;&#3609;&#3641;",                            "n&#468;u",
+  "\u0e1a",1,"&#3651;&#3610;&#3652;&#3617;&#3657;",              "bai-m&aacute;ai",
+  "\u0e1b",1,"&#3611;&#3621;&#3634;",                            "plaa",
+  "\u0e1c",2,"&#3612;&#3638;&#3657;&#3591;",                     "ph&ucirc;eng",
+  "\u0e1d",2,"&#3613;&#3634;",                                   "f&#462;a",
+  "\u0e1e",3,"&#3614;&#3634;&#3609;",                            "phaan",
+  "\u0e1f",3,"&#3615;&#3633;&#3609;",                            "fan",
+  "\u0e20",3,"&#3626;&#3635;&#3648;&#3616;&#3634;",              "s&#462;m-phaw",
+  "\u0e21",3,"&#3617;&#3657;&#3634;",                            "m&aacute;a",
+  "\u0e22",3,"&#3618;&#3633;&#3585;&#3625;&#3660;",              "y&aacute;k",
+  "\u0e23",3,"&#3648;&#3619;&#3639;&#3629;",                     "rueea",
+  "\u0e24",3,"&#3619;&#3638;",                                   "rue",
+  "\u0e25",3,"&#3621;&#3636;&#3591;",                            "ling",
+  "\u0e26",3,"&#3621;&#3638;",                                   "lue",
+  "\u0e27",3,"&#3649;&#3627;&#3623;&#3609;",                     "w&#462;een",
+  "\u0e28",2,"&#3624;&#3634;&#3621;&#3634;",                     "s&#462;a-laa",
+  "\u0e29",2,"&#3620;&#3653;&#3625;&#3637;",                     "ruee-s&#464;i",
+  "\u0e2a",2,"&#3648;&#3626;&#3639;&#3629;",                     "s&#468;eea",
+  "\u0e2b",2,"&#3627;&#3637;&#3610;",                            "h&igrave;ip",
+  "\u0e2c",3,"&#3592;&#3640;&#3628;&#3634;",                     "j&ugrave;-laa",
+  "\u0e2d",1,"&#3629;&#3656;&#3634;&#3591;",                     "&agrave;ang",
+  "\u0e2e",3,"&#3609;&#3585;&#3630;&#3641;&#3585;",              "n&oacute;k-h&ucirc;uk"
+);
+
+var fields = 4;
+
+document.writeln("<table class='main'>");
+document.writeln("<tr>");
+document.writeln("<th class='mid'>Class 1<br>(mid)");
+document.writeln("<th class='high'>Class 2<br>(high)");
+document.writeln("<th class='low'>Class 3<br>(low)");
+document.writeln("<th><b>Name</b>");
+document.writeln("<th><b>Transliteration</b>");
+for (var i = 0; i < chars.length/fields; i++) {
+  var ch = chars[fields*i];
+  var chclass = chars[fields*i+1];
+  var chname_th = chars[fields*i+2];
+  var chname_en = chars[fields*i+3];
+  document.writeln("<tr>");
+  for (var j = 1; j <= 3; j++) {
+    document.write("<td class='cons "+charclassname[j-1]+"'>"+
+                   (j == chclass ? ch : "&nbsp;"));
+  }
+  document.write("<td class='name'>"+chname_th);
+  document.write("<td>"+chname_en);
+}
+document.writeln("<\/table>");
+</script>
+
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Character Reading Practice: Hiragana</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+
+span.kana {
+    font-size: 150%;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var chars = [
+    "\u3042","\u3044","\u3046","\u3048","\u304a",
+    "\u3060","\u3062","\u3065","\u3067","\u3069",
+    "\u3084","\u3084\u3063\u304d","\u3086","\u3088\u3063\u307a","\u3088",
+    "\u308f","\u308f\u3063\u3061","\u308f\u3063\u3059","\u3092\u3063\u3066","\u3092",
+    "\u3055","\u3057","\u3059","\u305b","\u305d",
+    "\u3056","\u3058","\u305a","\u305c","\u305e",
+    "\u305f","\u3061","\u3064","\u3066","\u3068",
+    "\u304b","\u304d","\u304f","\u3051","\u3053",
+    "\u304c","\u304e","\u3050","\u3052","\u3054",
+    "\u306a","\u306b","\u306c","\u306d","\u306e",
+    "\u306f","\u3072","\u3075","\u3078","\u307b",
+    "\u3070","\u3073","\u3076","\u3079","\u307c",
+    "\u3071","\u3074","\u3077","\u307a","\u307d",
+    "\u307e","\u307f","\u3080","\u3081","\u3082",
+    "\u3089","\u308a","\u308b","\u308c","\u308d"];
+
+var modchars = ["\u3083","\u3085","\u3087"];
+
+var charsounds = [
+    "a","i","u","e","o",
+    "d","j","z","d","d",
+    "y","yakk","y","yopp","y",
+    "w","watch","wass","wott","w",
+    "s","sh","s","s","s",
+    "z","j","z","z","z",
+    "t","ch","ts","t","t",
+    "k","k","k","k","k",
+    "g","g","g","g","g",
+    "n","n","n","n","n",
+    "h","h","f","h","h",
+    "b","b","b","b","b",
+    "p","p","p","p","p",
+    "m","m","m","m","m",
+    "r","r","r","r","r"];
+
+function show_cheat_sheet()
+{
+    window.open("hiragana.html","hiragana");
+}
+
+var permd_indices;
+
+function permute()
+{
+    var i,j,t;
+    j = Math.floor(Math.random() * (permd_indices.length - 1));
+    t = permd_indices[0];
+    permd_indices[0] = permd_indices[j];
+    permd_indices[j] = t;
+    for (i = 1; i < permd_indices.length - 1; i++) {
+        j = Math.floor(Math.random() * (permd_indices.length - i)) + i;
+        t = permd_indices[i];
+        permd_indices[i] = permd_indices[j];
+        permd_indices[j] = t;
+    }
+}
+
+var permindex;
+
+var output = "";
+var result = "";
+
+var cookie_vals = document.cookie.match(/last=(\d+)\+(\d+(\+\d+)*)/);
+if (cookie_vals != null)
+{
+    permindex = 1*cookie_vals[1];
+    permd_indices = cookie_vals[2].split("+");
+    if (permd_indices.length != chars.length) cookie_vals = null;
+}
+if (cookie_vals == null)
+{
+    permd_indices = new Array(chars.length);
+    for (var i = 0; i < permd_indices.length; i++) permd_indices[i] = i;
+    permute();
+    permindex = 0;
+}
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+
+    if (permindex >= permd_indices.length)
+    {
+        permute();
+        permindex = 0;
+    }
+
+    var syllable = 1*permd_indices[permindex++];
+
+    var cookie_str = permd_indices.toString().replace(/,/g,"+");
+    document.cookie = "last=" + permindex + "+" + cookie_str;
+
+    var group = syllable % 5;
+    var long_vowel = (Math.floor(Math.random() * 2) == 0);
+    var add_n = (Math.floor(Math.random() * 4) == 0);
+
+    var charstr = chars[syllable];
+    result = charsounds[syllable];
+    if ((syllable >= 20) && (group == 1)) {
+    var mod_syll = (Math.floor(Math.random() * 2) == 0);
+    if (mod_syll)
+    {
+        group = 2 * Math.floor(Math.random() * 3);
+        charstr += modchars[group / 2];
+        if (syllable >= 35) result += "y";
+    }
+    }
+    if (syllable >= 5) result += charsounds[group];
+    if (long_vowel)
+    {
+        if (group < 3)
+        {
+            charstr += chars[group];
+        }
+        else
+        {
+            charstr += chars[group - 2];
+        }
+        result += charsounds[group];
+    }
+    if (add_n)
+    {
+        charstr += "\u3093";
+        result += "n";
+    }
+    output = 'Transliterate this:<br><span class="kana">' + charstr + '<\/span>';
+    document.getElementById('output').innerHTML = output;
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Character Reading Practice:<br>Hiragana</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button>
+<button type="button" id="cheat_key" onClick="show_cheat_sheet()">Cheat sheet</button>
+
+</div>
+
+</div>
+
+</body>
+</html>
