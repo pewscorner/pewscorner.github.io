@@ -1,0 +1,1418 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>QR Code Generator</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+#input {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 5em;
+}
+
+#output {
+    text-align: center;
+}
+
+a[href].downloadbut {
+    display: inline-block;
+    width: auto;
+}
+
+#error_msg {
+    display: none;
+    color: red;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+// Class QRCode for creating QR codes
+
+// Constructor
+var QRCode = function()
+{
+    // Create all instance variables
+    this.data = null;
+    this.error = null;
+    this.info1 = '';
+    this.info2 = '';
+    this.prefer_utf8_to_8859 = false;
+    this.is_utf8 = false;
+    this.data_values = [];
+    this.version = null;
+    this.mode = null;
+    this.error_corr_level = null;
+    this.max_char_count = null;
+    this.matrix_width = null;
+    this.total_width = null;
+    this.n_grp1_blks = null;
+    this.n_grp1_data_codewords_per_blk = null;
+    this.n_grp2_blks = null;
+    this.n_grp2_data_codewords_per_blk = null;
+    this.n_all_data_codewords = null;
+    this.n_err_corr_codewords_per_blk = null;
+    this.data_codeword_blocks = [];
+    this.error_correction_codeword_blocks = [];
+    this.final_bits = null;
+    this.mask_id = null;
+    this.masked_module_matrices = [];
+    for (var m = 0; m < this.n_masks; m++)
+    {
+        this.masked_module_matrices[m] = [];
+        for (var i = 0; i < this.max_matrix_width; i++)
+        {
+            this.masked_module_matrices[m][i] = new Array(this.max_matrix_width);
+        }
+    }
+    this.module_matrix = null;
+}
+
+QRCode.prototype.max_version = 40;
+QRCode.prototype.max_matrix_width = 21 + 4 * (QRCode.prototype.max_version - 1);
+
+QRCode.prototype.quiet_zone_width = 4; // unit: modules
+
+QRCode.prototype.mode_indicator = {
+    numeric: '0001', alphanumeric: '0010', byte: '0100', kanji: '1000', eci: '0111',
+};
+
+QRCode.prototype.err_corr_level_indicator = {
+    L: 1, M: 0, Q: 3, H: 2
+};
+
+QRCode.prototype.alphanumeric_chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:';
+
+QRCode.prototype.char_count_bit_len = {
+    numeric:      [10, 12, 14], // for versions 1-9, 10-26, 27-40, respectively
+    alphanumeric: [9, 11, 13],
+    byte:         [8, 16, 16],
+    kanji:        [8, 10, 12], // versions 1-9
+};
+
+// Class variable containing max number of data and error correction bits for each version
+QRCode.prototype.max_nbr_data_and_ec_bits = function()
+{
+    var prot = QRCode.prototype;
+    var table = [];
+    for (var version = 1; version <= prot.max_version; version++)
+    {
+        var matrix_width = 21 + 4 * (version - 1);
+        var n_alignment_patterns = 0;
+        var n_alignment_pattern_overlaps_with_timing_patterns = 0
+        if (version > 1)
+        {
+            // Number of alignment patterns in one row or column of alignment patterns
+            var n_alignment_patterns_per_dim = Math.floor(version / 7) + 2;
+            // Total number of alignment patterns (subtracting 3 that coincide with finder patterns)
+            n_alignment_patterns = n_alignment_patterns_per_dim * n_alignment_patterns_per_dim - 3;
+            // Number of alignment patterns that overlap timing patterns
+            n_alignment_pattern_overlaps_with_timing_patterns = 2 * (n_alignment_patterns_per_dim - 2);
+        }
+        // Store max number of data and error correction bits for this version
+        table[version] = matrix_width * matrix_width
+            - 3 * 8 * 8                             // 3 finder patterns
+            - n_alignment_patterns * 5 * 5          // alignment patterns
+            + n_alignment_pattern_overlaps_with_timing_patterns * 5 // avoid counting overlaps twice
+            - 2 * (matrix_width - 2 * 8)            // 2 timing patterns
+            - 2 * 15                                // 2 format info patterns
+            - ((version >= 7) && (2 * 3 * 6))       // 2 version info patterns
+            - 1;                                    // 1 fixed dark module
+    }
+    return table;
+}(); // Call function immediately to create object as a class variable (not per instance)
+
+QRCode.prototype.n_ec_cws_per_blk_idx       = 0;
+QRCode.prototype.n_g1_data_cws_per_blk_idx  = 1;
+QRCode.prototype.n_g1_blks_idx              = 2;
+QRCode.prototype.n_g2_data_cws_per_blk_idx  = 3;
+QRCode.prototype.n_g2_blks_idx              = 4;
+QRCode.prototype.n_all_data_cws_idx         = 5;
+
+// Class variable containing misc. codeword info indexed as follows
+//     codeword_info[version][error_corr_level][idx]
+// where idx is one of the above ..._idx indices
+QRCode.prototype.codeword_info = function(table)
+{
+    var prot = QRCode.prototype;
+    for (var version = 1; version < table.length; version++)
+    {
+        var max_nbr_data_and_ec_bits = prot.max_nbr_data_and_ec_bits[version];
+
+        for (var error_corr_level in prot.err_corr_level_indicator)
+        {
+            // Calculate numbers of codewords and codeword blocks
+            var codeword_info = table[version][error_corr_level];
+            var n_err_corr_codewords_per_blk = codeword_info[prot.n_ec_cws_per_blk_idx];
+            var n_grp1_data_codewords_per_blk = codeword_info[prot.n_g1_data_cws_per_blk_idx];
+            var n_grp2_data_codewords_per_blk = n_grp1_data_codewords_per_blk + 1;
+            var n_all_codewords = Math.floor(max_nbr_data_and_ec_bits / 8);
+            // Approximate number of codewords in a pair of data and error correction blocks
+            var n_codewords_per_blk_pair = n_grp1_data_codewords_per_blk + n_err_corr_codewords_per_blk;
+            // Approximate number of data and error correction block pairs
+            var n_blk_pairs = Math.floor(n_all_codewords / n_codewords_per_blk_pair) - (version != 34);
+            // First guess at number of data blocks in group 2
+            var n_grp2_blks = n_all_codewords - n_blk_pairs * n_codewords_per_blk_pair;
+            // If guess is too high, adjust numbers
+            if (n_grp2_blks > n_blk_pairs)
+            {
+                n_blk_pairs++;
+                n_grp2_blks -= n_codewords_per_blk_pair;
+            }
+            var n_grp1_blks = n_blk_pairs - n_grp2_blks;
+            var n_all_data_codewords = n_all_codewords - n_blk_pairs * n_err_corr_codewords_per_blk;
+            // Store all results in table
+            codeword_info[prot.n_g1_blks_idx] = n_grp1_blks;
+            codeword_info[prot.n_g2_data_cws_per_blk_idx] = n_grp2_data_codewords_per_blk;
+            codeword_info[prot.n_g2_blks_idx] = n_grp2_blks;
+            codeword_info[prot.n_all_data_cws_idx] = n_all_data_codewords;
+        }
+    }
+    return table;
+}( // Call function immediately to create object as a class variable (not per instance) - use
+   // following table as argument to function (this contains values for first 2 indices)
+    [
+    null,                                                 // dummy entry for non-existent version 0
+    {L: [ 7, 19], M: [10, 16], Q: [13, 13], H: [17,  9]}, // version 1
+    {L: [10, 34], M: [16, 28], Q: [22, 22], H: [28, 16]}, // version 2
+    {L: [15, 55], M: [26, 44], Q: [18, 17], H: [22, 13]}, // version 3
+    {L: [20, 80], M: [18, 32], Q: [26, 24], H: [16,  9]}, // version 4
+    {L: [26,108], M: [24, 43], Q: [18, 15], H: [22, 11]}, // version 5
+    {L: [18, 68], M: [16, 27], Q: [24, 19], H: [28, 15]}, // version 6
+    {L: [20, 78], M: [18, 31], Q: [18, 14], H: [26, 13]}, // version 7
+    {L: [24, 97], M: [22, 38], Q: [22, 18], H: [26, 14]}, // version 8
+    {L: [30,116], M: [22, 36], Q: [20, 16], H: [24, 12]}, // version 9
+    {L: [18, 68], M: [26, 43], Q: [24, 19], H: [28, 15]}, // version 10
+    {L: [20, 81], M: [30, 50], Q: [28, 22], H: [24, 12]}, // version 11
+    {L: [24, 92], M: [22, 36], Q: [26, 20], H: [28, 14]}, // version 12
+    {L: [26,107], M: [22, 37], Q: [24, 20], H: [22, 11]}, // version 13
+    {L: [30,115], M: [24, 40], Q: [20, 16], H: [24, 12]}, // version 14
+    {L: [22, 87], M: [24, 41], Q: [30, 24], H: [24, 12]}, // version 15
+    {L: [24, 98], M: [28, 45], Q: [24, 19], H: [30, 15]}, // version 16
+    {L: [28,107], M: [28, 46], Q: [28, 22], H: [28, 14]}, // version 17
+    {L: [30,120], M: [26, 43], Q: [28, 22], H: [28, 14]}, // version 18
+    {L: [28,113], M: [26, 44], Q: [26, 21], H: [26, 13]}, // version 19
+    {L: [28,107], M: [26, 41], Q: [30, 24], H: [28, 15]}, // version 20
+    {L: [28,116], M: [26, 42], Q: [28, 22], H: [30, 16]}, // version 21
+    {L: [28,111], M: [28, 46], Q: [30, 24], H: [24, 13]}, // version 22
+    {L: [30,121], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 23
+    {L: [30,117], M: [28, 45], Q: [30, 24], H: [30, 16]}, // version 24
+    {L: [26,106], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 25
+    {L: [28,114], M: [28, 46], Q: [28, 22], H: [30, 16]}, // version 26
+    {L: [30,122], M: [28, 45], Q: [30, 23], H: [30, 15]}, // version 27
+    {L: [30,117], M: [28, 45], Q: [30, 24], H: [30, 15]}, // version 28
+    {L: [30,116], M: [28, 45], Q: [30, 23], H: [30, 15]}, // version 29
+    {L: [30,115], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 30
+    {L: [30,115], M: [28, 46], Q: [30, 24], H: [30, 15]}, // version 31
+    {L: [30,115], M: [28, 46], Q: [30, 24], H: [30, 15]}, // version 32
+    {L: [30,115], M: [28, 46], Q: [30, 24], H: [30, 15]}, // version 33
+    {L: [30,115], M: [28, 46], Q: [30, 24], H: [30, 16]}, // version 34
+    {L: [30,121], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 35
+    {L: [30,121], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 36
+    {L: [30,122], M: [28, 46], Q: [30, 24], H: [30, 15]}, // version 37
+    {L: [30,122], M: [28, 46], Q: [30, 24], H: [30, 15]}, // version 38
+    {L: [30,117], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 39
+    {L: [30,118], M: [28, 47], Q: [30, 24], H: [30, 15]}, // version 40
+    ]
+);
+
+// Class variable containing max character count for each mode, error corr level, and version
+// indexed as follows:
+//     max_char_counts[mode][error_corr_level][version]
+QRCode.prototype.max_char_counts = function()
+{
+    var prot = QRCode.prototype;
+    var max_char_counts = {};
+    for (var mode in prot.char_count_bit_len)
+    {
+        var this_mode_counts = max_char_counts[mode] = {};
+        // Get number of bits for character count for all versions for this mode
+        var char_count_bit_lens = prot.char_count_bit_len[mode];
+
+        for (var error_corr_level in prot.err_corr_level_indicator)
+        {
+            var this_level_counts = this_mode_counts[error_corr_level] = [];
+
+            for (var version = 1; version <= prot.max_version; version++)
+            {
+                var char_count_bit_len = char_count_bit_lens[(version > 9) + (version > 26)];
+                var n_data_codewords = prot.codeword_info[version][error_corr_level][prot.n_all_data_cws_idx];
+                // Calculate max number of data bits excl. 4 bits for mode indicator and bits for
+                // character count
+                var n_data_bits = n_data_codewords * 8 - 4 - char_count_bit_len;
+
+                var max_char_count = 0;
+                switch (mode)
+                {
+                    case 'numeric':
+                        max_char_count = 3 * Math.floor(n_data_bits / 10);
+                        n_data_bits %= 10;
+                        max_char_count += n_data_bits >= 7 ? 2 : n_data_bits >= 4 ? 1 : 0;
+                        break;
+                    case 'alphanumeric':
+                        max_char_count = 2 * Math.floor(n_data_bits / 11);
+                        n_data_bits %= 11;
+                        max_char_count += n_data_bits >= 6 ? 1 : 0;
+                        break;
+                    case 'byte':
+                        max_char_count = Math.floor(n_data_bits / 8);
+                        break;
+                    case 'kanji':
+                        max_char_count = Math.floor(n_data_bits / 13);
+                        break;
+                }
+                this_level_counts[version] = max_char_count;
+            }
+        }
+    }
+
+    return max_char_counts;
+}(); // Call function immediately to create object as a class variable (not per instance)
+
+QRCode.prototype.padding_bytes = ['11101100', '00010001'];
+
+// Class variable containing log2 and alog2 tables in bitwise modulo 2 and bytewise modulo 285
+// arithmetic (these values are cyclic with period 255, and the tables contain one period)
+QRCode.prototype.log_tables = function()
+{
+    var log2 = 0;
+    var alog2 = 1;
+    var log2_table = [];    // will map indices 1..255 to log2 values in the range 0..254
+    var alog2_table = [];   // will map indices 0..254 to alog2 values in the range 1..255
+    while (log2 < 255)
+    {
+        log2_table[alog2] = log2;
+        alog2_table[log2] = alog2;
+        // Update log2 value by adding 1, and alog2 value by going to next power of 2
+        log2 += 1;
+        alog2 *= 2;
+        // If alog2 value is outside byte boundary, then subtract 285 using bitwise modulo 2
+        // (i.e. xor 285)
+        if (alog2 > 255)
+        {
+            alog2 ^= 285;
+        }
+    }
+    return {log2: log2_table, alog2: alog2_table};
+}(); // Call function immediately to create object as a class variable (not per instance)
+
+// Class variable containing array of generator polynomials for each possible number of error
+// correction codewords (each polynomial is an array of log2 values of the coefficients, largest
+// order coefficient first)
+QRCode.prototype.generator_polynomials = function()
+{
+    var log_tables = QRCode.prototype.log_tables;
+    // Order of largest generator polynomial to be created (i.e. max number of error correction
+    // codewords)
+    var max_n = 30;
+    // Make generator polynomial of order 0 (for 0 error correction code words)
+    var new_gen_poly_log2_coeffs = [0];
+    var generator_polynomials = [new_gen_poly_log2_coeffs];
+    // Make generator polynomials of order 1..max_n by multiplying previous generator polynomial
+    // with multiplier polynomial x + 2^(n-1) on each iteration
+    for (var n = 1; n <= max_n; n++)
+    {
+        // Make alias to previous generator polynomial
+        var prev_gen_poly_log2_coeffs = new_gen_poly_log2_coeffs;
+        // Set multiplier polynomial to x + 2^(n-1) represented as log2 values of the coefficients
+        var multiplier_poly_log2_coeffs = [0, n - 1];
+        // Initialize mulitplication result to an empty array of coefficients
+        var new_gen_poly_coeffs = [];
+        // Multiply the two polynomials by multiplying all pairs of coefficients
+        for (var i = 0; i < multiplier_poly_log2_coeffs.length; i++)
+        {
+            for (var j = 0; j < prev_gen_poly_log2_coeffs.length; j++)
+            {
+                // Multiply a pair of coefficients by adding their log2 values
+                var log2_coeff = multiplier_poly_log2_coeffs[i] + prev_gen_poly_log2_coeffs[j];
+                // Do modulo 255 (as log values are cyclic with period 255, and log_tables contain
+                // only one period)
+                if (log2_coeff > 254)
+                {
+                    log2_coeff -= 255;
+                }
+                // Convert log2 value back to coefficient and add it (using bitwise modulo 2, i.e.
+                // xor) to appropriate coefficient in resulting polynomial (make sure that
+                // coefficient, if undefined, is initialized to 0 before adding)
+                new_gen_poly_coeffs[i + j] = log_tables.alog2[log2_coeff] ^
+                    (new_gen_poly_coeffs[i + j] || 0);
+            }
+        }
+        // Convert resulting coefficients to their log2 values (overwriting original values)
+        new_gen_poly_log2_coeffs = new_gen_poly_coeffs;
+        for (var i = 0; i < new_gen_poly_coeffs.length; i++)
+        {
+            new_gen_poly_log2_coeffs[i] = log_tables.log2[new_gen_poly_coeffs[i]];
+        }
+        // Append result to array of generator polynomials
+        generator_polynomials.push(new_gen_poly_log2_coeffs);
+    }
+    return generator_polynomials;
+}(); // Call function immediately to create object as a class variable (not per instance)
+
+// Constants defining usage of bits in each module matrix cell
+QRCode.prototype.module_val_mask = 0x1;
+QRCode.prototype.functional_module_flag_mask = 0x2;
+
+QRCode.prototype.mask_formulas = [
+    function(row, column) {return (row + column) % 2 == 0;},
+    function(row, column) {return (row) % 2 == 0;},
+    function(row, column) {return (column) % 3 == 0;},
+    function(row, column) {return (row + column) % 3 == 0;},
+    function(row, column) {return ( Math.floor(row / 2) + Math.floor(column / 3) ) % 2 == 0;},
+    function(row, column) {return ((row * column) % 2) + ((row * column) % 3) == 0;},
+    function(row, column) {return ( ((row * column) % 2) + ((row * column) % 3) ) % 2 == 0;},
+    function(row, column) {return ( ((row + column) % 2) + ((row * column) % 3) ) % 2 == 0;},
+];
+
+QRCode.prototype.n_masks = QRCode.prototype.mask_formulas.length;
+
+// Pattern used to find fake finder patterns when evaluating masking of module matrix
+// (Question: Shouldn't this pattern include a zero before the first 1?)
+QRCode.prototype.mask_eval_finder_pattern = [1,0,1,1,1,0,1,0,0,0,0];
+
+QRCode.prototype.format_err_corr_generator_polynomial = parseInt('10100110111', 2);
+QRCode.prototype.format_xor_mask = parseInt('101010000010010', 2);
+
+QRCode.prototype.version_info_generator_polynomial = parseInt('1111100100101', 2);
+
+QRCode.prototype.numeric_type_flag      = 0x01;
+QRCode.prototype.alnum_type_flag        = 0x02;
+QRCode.prototype.byte_8859_1_type_flag  = 0x04;
+QRCode.prototype.all_type_flags         = 0x07;
+
+// FIXME: Add support for kanji mode
+QRCode.prototype.select_mode = function()
+{
+    var type_flags = this.all_type_flags;
+    for (var i = 0; i < this.data.length; i++)
+    {
+        var utf16_code = this.data.charCodeAt(i);
+
+        if (utf16_code >= 0x80)
+        {
+            // The character is neither numeric nor alphanumeric, nor (if UTF-8 is preferred)
+            // in the 8859-1 character set
+            type_flags &= ~(this.numeric_type_flag | this.alnum_type_flag |
+                (this.prefer_utf8_to_8859 && this.byte_8859_1_type_flag));
+
+            if (utf16_code >= 0x100)
+            {
+                // The character is not in the 8859-1 character set
+                type_flags &= ~this.byte_8859_1_type_flag;
+            }
+        }
+        else
+        {
+            var d = this.alphanumeric_chars.indexOf(String.fromCharCode(utf16_code));
+            if (d < 0)
+            {
+                // The character is neither numeric nor alphanumeric
+                type_flags &= ~(this.numeric_type_flag | this.alnum_type_flag);
+            }
+            else if (d > 9)
+            {
+                // The character is not numeric
+                type_flags &= ~this.numeric_type_flag;
+            }
+        }
+    }
+    this.mode =
+        (type_flags & this.numeric_type_flag) ? 'numeric' :
+        (type_flags & this.alnum_type_flag) ? 'alphanumeric' :
+        'byte';
+    // If no flags remain set, the data will need to be UTF-8 encoded
+    this.is_utf8 = (type_flags == 0);
+}
+
+QRCode.prototype.extract_data_values = function()
+{
+    this.data_values.length = 0;
+    if (this.mode == 'numeric' || this.mode == 'alphanumeric')
+    {
+        for (var i = 0; i < this.data.length; i++)
+        {
+            this.data_values.push(this.alphanumeric_chars.indexOf(this.data.charAt(i)));
+        }
+    }
+    else if (this.mode == 'byte')
+    {
+        if (!this.is_utf8)
+        {
+            for (var i = 0; i < this.data.length; i++)
+            {
+                this.data_values.push(this.data.charCodeAt(i));
+            }
+        }
+        else
+        {
+            for (var i = 0; i < this.data.length; i++)
+            {
+                // Get next UTF-16 value (this is the final Unicode codepoint if not part of a
+                // surrogate pair)
+                var unicode_code = this.data.charCodeAt(i);
+                if (unicode_code >= 0xD800 && unicode_code < 0xE000)
+                {
+                    // The UTF-16 value was part of a surrogate pair (high surrogate) so get 2nd
+                    // part (low surrogate)
+                    var utf16_2nd_code = this.data.charCodeAt(++i);
+                    if (unicode_code >= 0xDC00 || isNaN(utf16_2nd_code) ||
+                        utf16_2nd_code < 0xDC00 || utf16_2nd_code >= 0xE000)
+                    {
+                        this.error = 'Bad UTF-16 code in text!';
+                        return;
+                    }
+                    // Combine high and low surrogates to form final Unicode codepoint
+                    unicode_code = (((unicode_code - 0xD800) << 10) | (utf16_2nd_code - 0xDC00)) +
+                        0x10000;
+                }
+
+                // Encode Unicode codepoint to UTF-8
+                if (unicode_code < 0x80)
+                {
+                    // UTF-8 code is 1 byte
+                    this.data_values.push(unicode_code);
+                }
+                else
+                {
+                    // UTF-8 code is 2-4 bytes; calculate and store last byte
+                    this.data_values.push(unicode_code & 0x3F | 0x80);
+                    unicode_code >>= 6;
+                    var n_bytes_stored = 1;
+                    if (unicode_code > 0x1F)
+                    {
+                        // UTF-8 code is 3-4 bytes; calculate and store 2nd last byte
+                        this.data_values.splice(-1, 0, unicode_code & 0x3F | 0x80);
+                        unicode_code >>= 6;
+                        n_bytes_stored++;
+                        if (unicode_code > 0x0F)
+                        {
+                            // UTF-8 code is 4 bytes; calculate and store 3rd last byte
+                            this.data_values.splice(-2, 0, unicode_code & 0x3F | 0x80);
+                            unicode_code >>= 6;
+                            n_bytes_stored++;
+                        }
+                    }
+                    // Calculate and store 1st byte
+                    this.data_values.splice(-n_bytes_stored, 0,
+                        unicode_code | ((0x7F >> n_bytes_stored) ^ 0xFF));
+                }
+            }
+        }
+    }
+    else if (this.mode == 'kanji')
+    {
+        for (var i = 0; i < this.data.length; i++)
+        {
+            var d = this.data.charCodeAt(i);
+            // FIXME: d first needs to be converted from UTF-16 to Shift JIS
+            d -= (d < 0xE040) ? 0x8140 : 0xC140;
+            d = (d >> 8) * 0xC0 + (d & 0xFF);
+            this.data_values.push(d);
+        }
+    }
+}
+
+QRCode.prototype.calc_misc_parameters = function()
+{
+    var version = 1;
+    if (this.version != 'auto')
+    {
+        version = +this.version;
+    }
+
+    // If version is set to auto, find smallest version that will hold all data
+    var max_char_counts = this.max_char_counts[this.mode][this.error_corr_level];
+    this.max_char_count = max_char_counts[version];
+    while (this.data_values.length > this.max_char_count)
+    {
+        if (this.version != 'auto')
+        {
+            this.error = 'Text too long to fit in QR code of selected size!';
+            return;
+        }
+        version++;
+        if (version > this.max_version)
+        {
+            this.error = 'Text too long to fit in largest QR code!';
+            return;
+        }
+        this.max_char_count = max_char_counts[version];
+    }
+
+    // Save results
+    var codeword_info = this.codeword_info[version][this.error_corr_level];
+    this.version = version;
+    this.matrix_width = 21 + 4 * (version - 1); // unit: modules
+    this.total_width = this.matrix_width + 2 * this.quiet_zone_width;;
+    this.n_grp1_blks = codeword_info[this.n_g1_blks_idx];
+    this.n_grp1_data_codewords_per_blk = codeword_info[this.n_g1_data_cws_per_blk_idx];
+    this.n_grp2_blks = codeword_info[this.n_g2_blks_idx];
+    this.n_grp2_data_codewords_per_blk = codeword_info[this.n_g2_data_cws_per_blk_idx];
+    this.n_all_data_codewords = codeword_info[this.n_all_data_cws_idx];
+    this.n_err_corr_codewords_per_blk = codeword_info[this.n_ec_cws_per_blk_idx];
+}
+
+QRCode.prototype.encode = function()
+{
+    // First bits of encoded data are mode indicator and character count
+    var encoded_data = this.mode_indicator[this.mode];
+    var char_count = this.data_values.length;
+    var char_count_bits = char_count.toString(2);
+    var char_count_bit_len =
+        this.char_count_bit_len[this.mode][(this.version > 9) + (this.version > 26)];
+    if (char_count_bits.length > char_count_bit_len)
+    {
+        this.error = 'Text too long (too many bits in character count)!';
+        return;
+    }
+    encoded_data += ('000000000000000' + char_count_bits).slice(-char_count_bit_len);
+
+    // Do mode specific encoding
+    if (this.mode == 'numeric')
+    {
+        for (var i = 0; i < char_count; i += 3)
+        {
+            var n_digits = Math.min(3, char_count - i);
+            var group = this.data_values[i];
+            if (n_digits > 1)
+            {
+                group = 10 * group + this.data_values[i + 1];
+            }
+            if (n_digits > 2)
+            {
+                group = 10 * group + this.data_values[i + 2];
+            }
+            var group_bit_len = 1 + n_digits * 3;
+            encoded_data += ('000000000' + group.toString(2)).slice(-group_bit_len);
+        }
+    }
+    else if (this.mode == 'alphanumeric')
+    {
+        var idx = 0;
+        for (var i = 0; i < (char_count >> 1); i++)
+        {
+            var group = 45 * this.data_values[idx] + this.data_values[idx + 1];
+            encoded_data += ('0000000000' + group.toString(2)).slice(-11);
+            idx += 2;
+        }
+        if (idx < char_count)
+        {
+            encoded_data += ('00000' + this.data_values[idx].toString(2)).slice(-6);
+        }
+    }
+    else if (this.mode == 'byte')
+    {
+        for (var i = 0; i < char_count; i++)
+        {
+            encoded_data += ('0000000' + this.data_values[i].toString(2)).slice(-8);
+        }
+    }
+    else if (this.mode == 'kanji')
+    {
+        for (var i = 0; i < char_count; i++)
+        {
+            encoded_data += ('000000000000' + this.data_values[i].toString(2)).slice(-13);
+        }
+    }
+    else
+    {
+        this.error = 'Mode "' + this.mode + '" not supported!';
+        return;
+    }
+
+    // Add padding
+    var total_bit_len = this.n_all_data_codewords * 8;
+    var n_padding_bits = total_bit_len - encoded_data.length;
+    if (n_padding_bits > 0)
+    {
+        var n_padding_bytes = n_padding_bits >> 3;
+        n_padding_bits = n_padding_bits & 0x7;
+        encoded_data += '0000000'.slice(0, n_padding_bits);
+        if (n_padding_bytes > 0 && n_padding_bits < 4)
+        {
+            encoded_data += '00000000';
+            n_padding_bytes--;
+        }
+        for (var i = 0; i < n_padding_bytes; i++)
+        {
+            encoded_data += this.padding_bytes[i & 0x1];
+        }
+    }
+    else if (n_padding_bits < 0)
+    {
+        this.error = 'Text too long (too many bits in encoded data)!';
+        return;
+    }
+
+    // Convert binary string to integer bytes and split into blocks of codewords (bytes)
+    this.data_codeword_blocks.length = 0;
+    var i = 0;
+    var n_blks = this.n_grp1_blks;
+    var n_data_codewords_per_blk = this.n_grp1_data_codewords_per_blk;
+    for (var g = 0; g < 2; g++)
+    {
+        for (var b = 0; b < n_blks; b++)
+        {
+            var block = [];
+            this.data_codeword_blocks.push(block);
+            for (var w = 0; w < n_data_codewords_per_blk; w++)
+            {
+                block.push(parseInt(encoded_data.substr(i, 8), 2));
+                i += 8;
+            }
+        }
+        n_blks = this.n_grp2_blks;
+        n_data_codewords_per_blk = this.n_grp2_data_codewords_per_blk;
+    }
+}
+
+QRCode.prototype.calc_error_correction = function()
+{
+    // Select appropriate generator polynomial based on desired number of error correction codewords
+    var gen_poly_log2_coeffs = this.generator_polynomials[this.n_err_corr_codewords_per_blk];
+    this.error_correction_codeword_blocks.length = 0;
+    for (var b = 0; b < this.data_codeword_blocks.length; b++)
+    {
+        var data_codewords = this.data_codeword_blocks[b];
+        // Initialize remainder polynomial as a copy of data codewords
+        var remainder_poly_coeffs = data_codewords.slice();
+        // Perform division of data polynomial by generator polynomial
+        for (var k = 0; k < data_codewords.length; k++)
+        {
+            // Determine factor that makes first coefficient of generator polynomial equal to first
+            // coefficient of remainder; this factor will always be equal to first coefficient of
+            // remainder, because first coefficient of generator is always 1.
+            // NOTE: If first coefficient of remainder is 0, log2_factor and all product coefficients
+            // will be undefined, and end result will be a simple shift of all remainder coefficients
+            // as desired, so no need for special handling of this case
+            var log2_factor = this.log_tables.log2[remainder_poly_coeffs[0]];
+            // Multiply generator polynomial by factor and subtract it from remainder polynomial
+            // (no need to multiply first coefficient of generator polynomial, as subsequent
+            // subtraction will always throw this result away)
+            for (var i = 1; i < gen_poly_log2_coeffs.length; i++)
+            {
+                // Multiply by adding log2 values
+                var log2_coeff = log2_factor + gen_poly_log2_coeffs[i];
+                // Do modulo 255 (as log values are cyclic with period 255, and log_tables contain
+                // only one period)
+                if (log2_coeff > 254)
+                {
+                    log2_coeff -= 255;
+                }
+                // Convert log2 value back to coefficient and subtract it (using bitwise modulo 2, i.e.
+                // xor) from appropriate coefficient in remainder polynomial (make sure that any
+                // undefined values are replaced by 0 before subtracting)
+                remainder_poly_coeffs[i] = (remainder_poly_coeffs[i] || 0) ^
+                    (this.log_tables.alog2[log2_coeff] || 0);
+            }
+            // Discard first coefficient (which is always 0 and therefore not calculated above)
+            remainder_poly_coeffs.shift();
+        }
+        // Remainder polynomial coefficients are now desired error correction codewords, except for
+        // some garbage at end which we now discard
+        remainder_poly_coeffs.length = this.n_err_corr_codewords_per_blk;
+        this.error_correction_codeword_blocks.push(remainder_poly_coeffs);
+    }
+}
+
+QRCode.prototype.combine_data_and_error_correction = function()
+{
+    // Combine data codewords by interleaving blocks, and convert to one long bit string
+    var final_bits = '';
+    for (var i = 0; i < this.data_codeword_blocks[this.data_codeword_blocks.length - 1].length; i++)
+    {
+        for (var b = 0; b < this.data_codeword_blocks.length; b++)
+        {
+            var codeword = this.data_codeword_blocks[b][i];
+            if (codeword !== undefined)
+            {
+                final_bits += ('0000000' + codeword.toString(2)).slice(-8);
+            }
+        }
+    }
+    // Append error correction codewords (interleaved by block) to bit string
+    for (var i = 0; i < this.error_correction_codeword_blocks[0].length; i++)
+    {
+        for (var b = 0; b < this.error_correction_codeword_blocks.length; b++)
+        {
+            var codeword = this.error_correction_codeword_blocks[b][i];
+            final_bits += ('0000000' + codeword.toString(2)).slice(-8);
+        }
+    }
+
+    // Add remainder bits, i.e. pad with zero-bits to the max capacity of the QR code (when there
+    // is less than 1 unused byte remaining)
+    var n_remainder_bits = this.max_nbr_data_and_ec_bits[this.version] - final_bits.length;
+    if (n_remainder_bits < 0)
+    {
+        this.error = 'Data and error correction combining failed (' + final_bits.length +
+            ' modules won\'t fit in ' + this.max_nbr_data_and_ec_bits[this.version] + ' spaces)!';
+        return;
+    }
+    final_bits += '0000000'.substr(0, n_remainder_bits);
+    this.final_bits = final_bits;
+}
+
+QRCode.prototype.get_alignment_pattern_positions = function(version)
+{
+    // Calculate number of patterns and positions of their center modules
+    var n_patterns = Math.floor(version / 7) + 2;
+    var first_pos = 6;
+    var positions = [first_pos];
+    var matrix_width = 17 + 4 * version
+    var last_pos = matrix_width - 1 - first_pos;
+    var second_last_pos = Math.floor(
+        (first_pos + last_pos * (n_patterns - 2)    // Interpolate end points to get point
+        + ((n_patterns - 1) >> 1)                   // Round to nearest int by adding half
+                                                    // of divisor before division
+        ) / (n_patterns - 1)                        // Divide by number of intervals
+                                                    // to complete interpolation
+        ) & -2;                                     // Round down to even integer
+    var pos_step = last_pos - second_last_pos;
+    var second_pos = last_pos - (n_patterns - 2) * pos_step;
+    for (var pos = second_pos; pos <= last_pos; pos += pos_step)
+    {
+        positions.push(pos);
+    }
+    return positions;
+}
+
+// For testing only
+QRCode.prototype.test_alignment_pattern_positions = function()
+{
+    for (var version = 2; version <= 40; version++)
+    {
+        console.log(version + ': ' + this.get_alignment_pattern_positions(version));
+    }
+}
+
+QRCode.prototype.calc_and_place_version_info = function()
+{
+    if (this.version >= 7)
+    {
+        // Divide version polynomial by generator polynomial to get error correction bits
+        var remainder = this.version << 6;
+        for (var i = 0; i < 6; i++)
+        {
+            remainder <<= 1;
+            if (remainder & (1 << 12))
+            {
+                remainder ^= this.version_info_generator_polynomial;
+            }
+        }
+
+        // Append remainder (i.e. error correction bits) to version
+        var version_and_err_corr = (this.version << 12) | remainder;
+
+        // Place version info modules in matrix
+        for (var i = 0; i < 6; i++)
+        {
+            for (var j = this.matrix_width - 11; j < this.matrix_width - 8; j++)
+            {
+                var bit_val = version_and_err_corr & 0x1 | this.functional_module_flag_mask;
+                version_and_err_corr >>= 1;
+                this.module_matrix[i][j] = bit_val;
+                this.module_matrix[j][i] = bit_val;
+            }
+        }
+    }
+}
+
+QRCode.prototype.place_modules = function()
+{
+    // Clear module matrix in preparation for placement of modules/bits
+    for (var i = 0; i < this.matrix_width; i++)
+    {
+        for (var j = 0; j < this.matrix_width; j++)
+        {
+            this.module_matrix[i][j] = 0;
+        }
+    }
+
+    // Place 3 finder patterns (and separators)
+    for (var i = 0; i < 8; i++)
+    {
+        for (var j = 0; j < 8; j++)
+        {
+            var bit_val = Math.max(Math.abs(i - 3), Math.abs(j - 3)) & 1 | (i == 3 & j == 3) |
+                this.functional_module_flag_mask;
+            this.module_matrix[i][j] = bit_val;
+            this.module_matrix[this.matrix_width - 1 - i][j] = bit_val;
+            this.module_matrix[i][this.matrix_width - 1 - j] = bit_val;
+        }
+    }
+
+    // Place alignment patterns
+    if (this.version > 1)
+    {
+        var positions = this.get_alignment_pattern_positions(this.version);
+        var n_patterns = positions.length;
+        for (var k = 0; k < n_patterns; k++)
+        {
+            for (var m = 0; m < n_patterns; m++)
+            {
+                if (k == 0 && (m == 0 || m == n_patterns - 1) || k == n_patterns - 1 && m == 0)
+                {
+                    continue;
+                }
+                var x = positions[m];
+                var y = positions[k];
+                for (var i = -2; i <= 2; i++)
+                {
+                    for (var j = -2; j <= 2; j++)
+                    {
+                        var bit_val = 1 - (Math.max(Math.abs(i), Math.abs(j)) & 1) +
+                            this.functional_module_flag_mask;
+                        this.module_matrix[y + i][x + j] = bit_val;
+                    }
+                }
+            }
+        }
+    }
+
+    // Place timing patterns
+    for (var i = 8; i < this.matrix_width - 8; i++)
+    {
+        var bit_val = 1 - (i & 1) + this.functional_module_flag_mask;
+        this.module_matrix[6][i] = bit_val;
+        this.module_matrix[i][6] = bit_val;
+    }
+
+    // Place dark module
+    this.module_matrix[this.matrix_width - 8][8] = 1 + this.functional_module_flag_mask;
+
+    // Reserve format info areas (fill with light modules for now)
+    this.place_format_info(0, this.module_matrix);
+
+    // Calculate and place version info modules
+    this.calc_and_place_version_info();
+
+    // Place data bits
+    var i = 0;
+    var d = -1;
+    var v = this.matrix_width - 1;
+    for (var h1 = this.matrix_width - 2; h1 >= 0; h1 = (h1 == 7) ? 4 : h1 - 2)
+    {
+        while (v >= 0 && v < this.matrix_width)
+        {
+            for (var h2 = 1; h2 >= 0; h2--)
+            {
+                if (!(this.module_matrix[v][h1 + h2] & this.functional_module_flag_mask))
+                {
+                    this.module_matrix[v][h1 + h2] = +this.final_bits[i++];
+                }
+            }
+            v += d;
+        }
+        d = -d;
+        v += d;
+    }
+    if (i != this.final_bits.length)
+    {
+        this.error = 'Data module placement failed (' + this.final_bits.length +
+            ' modules don\'t match ' + i + ' spaces)!';
+    }
+}
+
+QRCode.prototype.apply_mask = function()
+{
+    // Try 8 different masks and find the one that gives the lowest penalty
+    var minimum_penalty = Infinity;
+    for (var mask_id = this.n_masks - 1; mask_id >= 0; mask_id--)
+    {
+        // Prepare copy of module matrix for masking (but no need to copy for last mask 0,
+        // because module matrix is already at index 0 and will be overwritten by last masked
+        // module matrix)
+        var masked_module_matrix = this.masked_module_matrices[mask_id];
+        if (mask_id > 0)
+        {
+            for (var i = 0; i < this.matrix_width; i++)
+            {
+                for (var j = 0; j < this.matrix_width; j++)
+                {
+                    masked_module_matrix[i][j] = this.module_matrix[i][j];
+                }
+            }
+        }
+
+        // Calculate and place format info for this mask
+        this.calc_and_place_format_info(masked_module_matrix, mask_id);
+
+        // Apply mask
+        var mask_formula = this.mask_formulas[mask_id];
+        for (var row = 0; row < this.matrix_width; row++)
+        {
+            for (var column = 0; column < this.matrix_width; column++)
+            {
+                // If this is not a functional module and mask requires bit inversion, then invert
+                if (!(masked_module_matrix[row][column] & this.functional_module_flag_mask) &&
+                    mask_formula(row, column))
+                {
+                    masked_module_matrix[row][column] ^= this.module_val_mask;
+                }
+            }
+        }
+
+        // Evaluate masked matrix
+        var penalty = 0;
+        var same_color_count;
+        // Check for 5 or more same-colored modules in all rows
+        for (var row = 0; row < this.matrix_width; row++)
+        {
+            var last_color = -1;
+            for (var column = 0; column < this.matrix_width; column++)
+            {
+                var color = masked_module_matrix[row][column] & this.module_val_mask;
+                if (color != last_color)
+                {
+                    same_color_count = 0;
+                    last_color = color;
+                }
+                same_color_count++;
+                penalty += (same_color_count == 5) ? 3 : (same_color_count > 5) ? 1 : 0;
+            }
+        }
+        // Check for 5 or more same-colored modules in all columns
+        for (var column = 0; column < this.matrix_width; column++)
+        {
+            var last_color = -1;
+            for (var row = 0; row < this.matrix_width; row++)
+            {
+                var color = masked_module_matrix[row][column] & this.module_val_mask;
+                if (color != last_color)
+                {
+                    same_color_count = 0;
+                    last_color = color;
+                }
+                same_color_count++;
+                penalty += (same_color_count == 5) ? 3 : (same_color_count > 5) ? 1 : 0;
+            }
+        }
+        // Check for same-colored 2x2 blocks in entire matrix
+        for (var row = 0; row < this.matrix_width - 1; row++)
+        {
+            for (var column = 0; column < this.matrix_width - 1; column++)
+            {
+                // If all 4 modules in the current 2x2 block have the same color, the sum of their
+                // colors will be 0 or 4, i.e. bits 1:0 of the sum will be 0
+                if ((((masked_module_matrix[row][column] & this.module_val_mask) +
+                    (masked_module_matrix[row][column + 1] & this.module_val_mask) +
+                    (masked_module_matrix[row + 1][column] & this.module_val_mask) +
+                    (masked_module_matrix[row + 1][column + 1] & this.module_val_mask)) &
+                    (3 * this.module_val_mask)) == 0)
+                {
+                    penalty += 3;
+                }
+            }
+        }
+        // Check for fake finder patterns in all rows
+        // (Question: Shouldn't this pattern also apply when some of the zeros lie in the quiet
+        // zone?)
+        var finder_pattern = this.mask_eval_finder_pattern;
+        for (var row = 0; row < this.matrix_width; row++)
+        {
+            for (var column = 0; column <= this.matrix_width - finder_pattern.length; column++)
+            {
+                // Select direction (+1 or -1) to read finder pattern depending on color of first
+                // module (because finder pattern has a 1 at one end and a 0 at the other)
+                var d = 2 * (masked_module_matrix[row][column] & this.module_val_mask) - 1;
+                // Start from second (or second last) position in finder pattern, as 1st (or last)
+                // position is already handled
+                var i = 1;
+                var j = (d > 0) ? 1 : finder_pattern.length - 2;
+                // Compare patterns until a mismatch is found
+                while (i < finder_pattern.length &&
+                    (masked_module_matrix[row][column + i] & this.module_val_mask) ==
+                        finder_pattern[j])
+                {
+                    i++;
+                    j += d;
+                }
+                // If finder pattern was found, add penalty
+                if (i == finder_pattern.length)
+                {
+                    penalty += 40;
+                }
+            }
+        }
+        // Check for fake finder patterns in all columns
+        for (var column = 0; column < this.matrix_width; column++)
+        {
+            for (var row = 0; row <= this.matrix_width - finder_pattern.length; row++)
+            {
+                // Select direction (+1 or -1) to read finder pattern depending on color of first
+                // module
+                var d = 2 * (masked_module_matrix[row][column] & this.module_val_mask) - 1;
+                // Start from second (or second last) position in finder pattern, as 1st (or last)
+                // position is already handled
+                var i = 1;
+                var j = (d > 0) ? 1 : finder_pattern.length - 2;
+                // Compare patterns until a mismatch is found
+                while (i < finder_pattern.length &&
+                    (masked_module_matrix[row + i][column] & this.module_val_mask) ==
+                        finder_pattern[j])
+                {
+                    i++;
+                    j += d;
+                }
+                // If finder pattern was found, add penalty
+                if (i == finder_pattern.length)
+                {
+                    penalty += 40;
+                }
+            }
+        }
+        // Check for uneven light/dark balance
+        var n_dark_modules = 0;
+        for (var i = 0; i < this.matrix_width; i++)
+        {
+            for (var j = 0; j < this.matrix_width; j++)
+            {
+                n_dark_modules += masked_module_matrix[i][j] & this.module_val_mask;
+            }
+        }
+        penalty += 10 * Math.floor(Math.abs(
+            20 * n_dark_modules / (this.matrix_width * this.matrix_width) - 10));
+        // If this mask gives a lower penalty than previous masks, select it as the best mask so far
+        if (penalty < minimum_penalty)
+        {
+            minimum_penalty = penalty;
+            this.mask_id = mask_id;
+        }
+    }
+
+    // Select best matrix (the one with minimum penalty)
+    this.module_matrix = this.masked_module_matrices[this.mask_id];
+}
+
+QRCode.prototype.calc_and_place_format_info = function(masked_module_matrix, mask_id)
+{
+    var format = (this.err_corr_level_indicator[this.error_corr_level] << 3) + mask_id;
+
+    // Divide format polynomial by generator polynomial to get error correction bits
+    var remainder = format << 5;
+    for (var i = 0; i < 5; i++)
+    {
+        remainder <<= 1;
+        if (remainder & (1 << 10))
+        {
+            remainder ^= this.format_err_corr_generator_polynomial;
+        }
+    }
+
+    // Append remainder (i.e. error correction bits) to format, and xor with special mask
+    format = ((format << 10) | remainder) ^ this.format_xor_mask;
+
+    // Do the actual module placement
+    this.place_format_info(format, masked_module_matrix);
+}
+
+QRCode.prototype.place_format_info = function(format_and_err_corr, module_matrix)
+{
+    // Place format modules in matrix
+    var x = this.matrix_width - 1;
+    var y = 0;
+    for (var i = 0; i < 15; i++)
+    {
+        var bit_val = format_and_err_corr & 0x1 | this.functional_module_flag_mask;
+        format_and_err_corr >>= 1;
+        module_matrix[8][x] = bit_val;
+        module_matrix[y][8] = bit_val;
+        x = (i == 7) ? 7 : x - 1 - (x == 7);
+        y = (i == 7) ? this.matrix_width - 7 : y + 1 + (y == 5);
+    }
+}
+
+QRCode.prototype.create = function(data, version, error_corr_level, prefer_utf8_to_8859)
+{
+    this.data = data;
+    this.version = version;
+    this.error_corr_level = error_corr_level;
+    this.prefer_utf8_to_8859 = prefer_utf8_to_8859;
+
+    this.error = null;
+    this.info1 = '';
+    this.info2 = '';
+    // Ensure that unmasked module matrix ends up in space allocated for first masked module matrix
+    this.module_matrix = this.masked_module_matrices[0];
+
+    this.select_mode();
+    this.extract_data_values();
+    if (this.error) return;
+    this.info1 += 'Text length: ' + this.data_values.length +
+        (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
+    this.calc_misc_parameters();
+    this.info1 += '<br>Max text length: ' + this.max_char_count +
+        (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
+    this.info1 += '<br>Mode: ' + this.mode + (this.is_utf8 ? ' (UTF-8)' : '');
+    if (this.error) return;
+    if (version == 'auto')
+    {
+        this.info2 += '<br>Version: ' + this.version +
+            ' (' + this.matrix_width + 'x' + this.matrix_width + ')';
+    }
+    this.encode();
+    if (this.error) return;
+    //console.log(this.data_codeword_blocks);
+    this.calc_error_correction();
+    //console.log(this.error_correction_codeword_blocks);
+    this.combine_data_and_error_correction();
+    if (this.error) return;
+    //console.log(this.final_bits);
+    this.place_modules();
+    if (this.error) return;
+    //console.log(this.module_matrix);
+    this.apply_mask();
+    this.info2 += '<br>Mask: ' + this.mask_id;
+}
+
+QRCode.prototype.draw_on_canvas = function(canvas_context)
+{
+    var module_width = Math.floor(Math.min(canvas_context.canvas.width, canvas_context.canvas.height) / this.total_width);
+    var top = this.quiet_zone_width * module_width;
+    var left = Math.floor((canvas_context.canvas.width - this.matrix_width * module_width) / 2);
+    var y = top;
+    for (var i = 0; i < this.matrix_width; i++)
+    {
+        var x = left;
+        for (var j = 0; j < this.matrix_width; j++)
+        {
+            if (this.module_matrix[i][j] & this.module_val_mask)
+            {
+                canvas_context.fillRect(x, y, module_width, module_width);
+            }
+            x += module_width;
+        }
+        y += module_width;
+    }
+}
+
+QRCode.prototype.to_svg = function()
+{
+    var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg width="10cm" height="10cm" viewBox="0 0 ' +
+        this.total_width + ' ' + this.total_width +'" version="1.1" xmlns="http://www.w3.org/2000/svg">\n' +
+        '<rect style="fill:white" x="0" y="0" width="100%" height="100%"/>\n';
+    for (var i = 0; i < this.matrix_width; i++)
+    {
+        for (var j = 0; j < this.matrix_width; j++)
+        {
+            if (this.module_matrix[i][j] & this.module_val_mask)
+            {
+                svg += '<rect x="' + (this.quiet_zone_width + j) + '" y="' + (this.quiet_zone_width + i) +
+                    '" width="1" height="1"/>\n';
+            }
+        }
+    }
+    svg += '</svg>';
+    return svg;
+}
+
+function input_focus_handler()
+{
+    input_elem.select();
+}
+
+function png_download_link_click_handler(ev)
+{
+    png_download_link_elem.href = barcode_canvas_elem.toDataURL();
+    png_download_link_elem.download = 'qrcode.png';
+}
+
+function svg_download_link_click_handler(ev)
+{
+    svg_download_link_elem.href = 'data:image/svg+xml,' + encodeURIComponent(code.to_svg());
+    svg_download_link_elem.download = 'qrcode.svg';
+}
+
+function show_code()
+{
+    input_elem.focus();
+    code.create(input_elem.value, version_elem.value, error_corr_level_elem.value);
+    info1_elem.innerHTML = code.info1;
+    info2_elem.innerHTML = code.info2;
+    if (code.error)
+    {
+        barcode_output_elem.style.display = 'none';
+        error_msg_elem.innerHTML = 'ERROR: ' + code.error;
+        error_msg_elem.style.display = 'block';
+        return;
+    }
+    error_msg_elem.style.display = 'none';
+    barcode_output_elem.style.display = 'block';
+    var canvas_width = code.total_width * 3;
+    barcode_canvas_elem.width = canvas_width;
+    barcode_canvas_elem.height = canvas_width;
+    canvas_context.fillStyle = '#FFFFFF';
+    canvas_context.fillRect(0, 0, barcode_canvas_elem.width, barcode_canvas_elem.height);
+    canvas_context.fillStyle = '#000000';
+    code.draw_on_canvas(canvas_context);
+}
+
+var self_tests = [
+    {
+        args: ['HELLO WORLD', 1, 'Q'],
+        data_codeword_blocks: [[32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236]],
+        error_correction_codeword_blocks: [[168, 72, 22, 82, 217, 54, 156, 0, 46, 15, 180, 122, 16]],
+        mask_id: 6,
+    },
+];
+
+function self_test_error(test_idx, property)
+{
+    return 'Test ' + test_idx + ': ' + property + ': Mismatch:' +
+        '<br>Expected: ' + self_tests[test_idx][property] +
+        '<br>Received: ' + code[property];
+}
+
+function run_self_test()
+{
+    for (var test_idx = 0; test_idx < self_tests.length; test_idx++)
+    {
+        var test_data = self_tests[test_idx];
+        code.create(test_data.args[0], test_data.args[1], test_data.args[2]);
+        if (code.error) return 'Test ' + test_idx + ': ' + code.error;
+        for (var property in test_data)
+        {
+            if (property == 'args') continue;
+            var ref_val = test_data[property];
+            if (Array.isArray(ref_val))
+            {
+                if (!Array.isArray(code[property]) || code[property].length != ref_val.length)
+                {
+                    return self_test_error(test_idx, property);
+                }
+                for (var i = 0; i < ref_val.length; i++)
+                {
+                    if (Array.isArray(ref_val[i]))
+                    {
+                        if (!Array.isArray(code[property][i]) ||
+                            code[property][i].length != ref_val[i].length)
+                        {
+                            return self_test_error(test_idx, property);
+                        }
+                        for (var j = 0; j < ref_val[i].length; j++)
+                        {
+                            if (code[property][i][j] != ref_val[i][j])
+                            {
+                                return self_test_error(test_idx, property);
+                            }
+                        }
+                    }
+                    else if (code[property][i] != ref_val[i])
+                    {
+                        return self_test_error(test_idx, property);
+                    }
+                }
+            }
+            else if (code[property] != ref_val)
+            {
+                return self_test_error(test_idx, property);
+            }
+        }
+    }
+    return 'OK';
+}
+
+var input_elem;
+var version_elem;
+var error_corr_level_elem;
+var generate_button_elem;
+var info1_elem;
+var info2_elem;
+var barcode_output_elem;
+var barcode_canvas_elem;
+var png_download_link_elem;
+var svg_download_link_elem;
+var error_msg_elem;
+var canvas_context;
+// Instantiate QRCode (and reuse this instance for all codes)
+var code = new QRCode();
+
+function init()
+{
+    var result;
+    if ((result = run_self_test()) != 'OK')
+    {
+        document.getElementById('main').innerHTML =
+            'Self-test failed! Page will be disabled!<br>' + result;
+        return;
+    }
+    input_elem = document.getElementById('input');
+    input_elem.addEventListener('keyup', show_code, false);
+    input_elem.addEventListener('focus', input_focus_handler, false);
+    version_elem = document.getElementById('version');
+    for (var v = 1, size = 21; v <= 40; v++, size += 4)
+    {
+        var option = document.createElement('option');
+        option.text = v + ' (' + size + 'x' + size + ')';
+        option.value = v;
+        version_elem.add(option);
+    }
+    version_elem.addEventListener('change', show_code, false);
+    error_corr_level_elem = document.getElementById('error_corr_level');
+    error_corr_level_elem.addEventListener('change', show_code, false);
+    generate_button_elem = document.getElementById('generate_button');
+    generate_button_elem.addEventListener('click', show_code, false);
+    info1_elem = document.getElementById('info1');
+    info2_elem = document.getElementById('info2');
+    barcode_output_elem = document.getElementById('output');
+    barcode_canvas_elem = document.getElementById('canvas');
+    png_download_link_elem = document.getElementById('png_download_link');
+    svg_download_link_elem = document.getElementById('svg_download_link');
+    error_msg_elem = document.getElementById('error_msg');
+    canvas_context = barcode_canvas_elem.getContext("2d");
+    show_code();
+    png_download_link_elem.addEventListener('click', png_download_link_click_handler, false);
+    svg_download_link_elem.addEventListener('click', svg_download_link_click_handler, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+<body>
+
+<div class="hcontainer">
+
+<h1>QR Code Generator</h1>
+
+<div id="main" class="box">
+Input text:
+<textarea id="input">HELLO WORLD</textarea>
+<div id="info1"></div>
+Version (size):
+<select id="version">
+    <option value="auto" selected>Auto
+</select>
+<br>
+Error correction level:
+<select id="error_corr_level">
+    <option value="L">Low (7%)</option>
+    <option value="M">Medium (15%)</option>
+    <option value="Q" selected>Quartile (25%)</option>
+    <option value="H">High (30%)</option>
+</select>
+<br>
+<button id="generate_button" type="button">Generate</button>
+<div id="info2"></div>
+</div>
+
+<div class="box imgbox">
+<div id="output">
+<canvas id="canvas" width=400 height=400><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+<a id="png_download_link" class="navbut downloadbut" href="">Download PNG</a>
+<a id="svg_download_link" class="navbut downloadbut" href="">Download SVG</a>
+</div>
+<div id="error_msg"></div>
+</div>
+
+</div>
+
+</body>
+</html>
