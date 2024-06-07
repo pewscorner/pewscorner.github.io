@@ -1,0 +1,501 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Giant Kangaroo</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.box#canvas {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+}
+
+div.box#description {
+    -webkit-flex: 1 1 50%;
+    flex: 1 1 50%;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var radians_per_degree = Math.PI/180;
+
+// class color
+
+function color(r, g, b)
+  {
+  this.r = r;
+  this.g = g;
+  this.b = b;
+  }
+
+color.prototype.toString = function ()
+  {
+  return "rgb(" + this.r + "," + this.g + "," + this.b + ")";
+  }
+
+// class rotation_matrix
+
+function rotation_matrix()
+  {
+  this.elem = [new Array(3), new Array(3), new Array(3)];
+  }
+
+rotation_matrix.prototype.calculate = function (rot_angle)
+  {
+  var k_c11,k_s11,k_1c1,k_1s1,k_11c,k_11s,k_c1c,k_s1c,k_c1s,k_s1s;
+  var angle0,angle1,angle2;
+
+  angle0 = rot_angle[0] * radians_per_degree;
+  angle1 = rot_angle[1] * radians_per_degree;
+  angle2 = rot_angle[2] * radians_per_degree;
+
+  k_c11 = Math.cos(angle0);
+  k_s11 = Math.sin(angle0);
+  k_1c1 = Math.cos(angle1);
+  k_1s1 = Math.sin(angle1);
+  k_11c = Math.cos(angle2);
+  k_11s = Math.sin(angle2);
+  k_c1c = k_c11 * k_11c;
+  k_s1c = k_s11 * k_11c;
+  k_c1s = k_c11 * k_11s;
+  k_s1s = k_s11 * k_11s;
+
+  this.elem[0][0] = k_s1s * k_1s1 + k_c1c;
+  this.elem[0][1] = k_c1s * k_1s1 - k_s1c;
+  this.elem[0][2] = k_1c1 * k_11s;
+
+  this.elem[1][0] = k_s11 * k_1c1;
+  this.elem[1][1] = k_c11 * k_1c1;
+  this.elem[1][2] = -k_1s1;
+
+  this.elem[2][0] = k_s1c * k_1s1 - k_c1s;
+  this.elem[2][1] = k_c1c * k_1s1 + k_s1s;
+  this.elem[2][2] = k_1c1 * k_11c;
+  }
+
+// class point
+
+function point(x, y, z)
+  {
+  this.xyz = [x, y, z];         // Intrinsic coordinates
+  this.xyz_plac = new Array(3); // Coordinates after rotation and placement in universe
+  this.xy_proj = new Array(2);  // Coordinates after projection onto image plane
+  }
+
+point.prototype.rotate_and_place = function (rot_matrix, position)
+  {
+  this.xyz_plac[0] = Math.round(
+    rot_matrix.elem[0][0] * this.xyz[0] +
+    rot_matrix.elem[0][1] * this.xyz[1] +
+    rot_matrix.elem[0][2] * this.xyz[2]) +
+    position[0];
+  this.xyz_plac[1] = Math.round(
+    rot_matrix.elem[1][0] * this.xyz[0] +
+    rot_matrix.elem[1][1] * this.xyz[1] +
+    rot_matrix.elem[1][2] * this.xyz[2]) +
+    position[1];
+  this.xyz_plac[2] = Math.round(
+    rot_matrix.elem[2][0] * this.xyz[0] +
+    rot_matrix.elem[2][1] * this.xyz[1] +
+    rot_matrix.elem[2][2] * this.xyz[2]) +
+    position[2];
+  }
+
+point.prototype.project = function (image_z, image_ctr)
+  {
+  this.xy_proj[0] =
+    image_z * this.xyz_plac[0] / this.xyz_plac[2] + image_ctr[0];
+  this.xy_proj[1] =
+    image_z * this.xyz_plac[1] / this.xyz_plac[2] + image_ctr[1];
+  }
+
+// class shape
+
+function shape(p1, p2, p3, p4, c)
+  {
+  this.points = [p1, p2, p3, p4];
+  this.color = c;
+  this.light_vector = new Array(3);
+  this.minimum_light_fraction;
+  //this.set_light([0, 10, 10], 0.15);
+  }
+
+shape.prototype.visible = function ()
+  {
+  return (
+    (this.points[1].xy_proj[0] - this.points[0].xy_proj[0]) *
+    (this.points[2].xy_proj[1] - this.points[1].xy_proj[1]) -
+    (this.points[1].xy_proj[1] - this.points[0].xy_proj[1]) *
+    (this.points[2].xy_proj[0] - this.points[1].xy_proj[0])
+    > 0);
+  }
+
+shape.prototype.set_light = function (vector, minimum_light_frac)
+  {
+  var a = new Array(3);
+  var b = new Array(3);
+  var cross_prod = new Array(3);
+  var scaler;
+  var i;
+
+  this.minimum_light_fraction = minimum_light_frac;
+  for (i = 0; i < 3; i++)
+    {
+    a[i] = this.points[1].xyz[i] - this.points[0].xyz[i];
+    b[i] = this.points[2].xyz[i] - this.points[0].xyz[i];
+    }
+  cross_prod[0] = a[1] * b[2] - a[2] * b[1];
+  cross_prod[1] = a[2] * b[0] - a[0] * b[2];
+  cross_prod[2] = a[0] * b[1] - a[1] * b[0];
+  scaler = (1 - minimum_light_frac) / Math.sqrt(
+    (cross_prod[0] * cross_prod[0] +
+     cross_prod[1] * cross_prod[1] +
+     cross_prod[2] * cross_prod[2]) *
+    (vector[0] * vector[0] +
+     vector[1] * vector[1] +
+     vector[2] * vector[2]));
+  for (i = 0; i < 3; i++)
+    {
+    this.light_vector[i] = scaler * vector[i];
+    }
+  }
+
+shape.prototype.seen_color = function ()
+  {
+  var a = new Array(3);
+  var b = new Array(3);
+  var factor;
+  var i;
+
+  for (i = 0; i < 3; i++)
+    {
+    a[i] = this.points[1].xyz_plac[i] - this.points[0].xyz_plac[i];
+    b[i] = this.points[2].xyz_plac[i] - this.points[0].xyz_plac[i];
+    }
+  factor = Math.max(0,
+    this.light_vector[0] * (a[1] * b[2] - a[2] * b[1]) +
+    this.light_vector[1] * (a[2] * b[0] - a[0] * b[2]) +
+    this.light_vector[2] * (a[0] * b[1] - a[1] * b[0])
+    ) + this.minimum_light_fraction;
+  return new color(
+    Math.round(this.color.r * factor),
+    Math.round(this.color.g * factor),
+    Math.round(this.color.b * factor));
+  }
+
+// Coordinate conventions:
+// Observer is at (0,0,0) with x-axis pointing to the right, y-axis pointing
+// up, and z-axis pointing backwards. Image plane is at (0,0,zp), where
+// zp<0 (so plane is in front of observer).
+
+//-------------------------------------------------------------------------
+// Object data
+//-------------------------------------------------------------------------
+
+// Object size constant
+var a = 500;
+
+// Number of visible street blocks
+var max_street_blocks = 30;
+
+// Object points relative to object origin
+var max_points = max_street_blocks * 2 * 7;
+var points = new Array(max_points);
+var n_points = 0;
+
+// Shapes/polygons (each polygon is a list of references to points)
+var max_shapes = max_street_blocks * 2 * 3;
+var shapes = new Array(max_shapes);
+var n_shapes = 0;
+
+// Max number of vertices per shape
+var maxvertices = 4;
+
+var global_light_vector = [20,100,10];
+
+function define_new_block(block_nr)
+  {
+  var x,y,z,h,w,d,r,g,b;
+  var i,j;
+
+  for (i = 0; i < 2; i++)
+    {
+    x = a/4 + Math.round(a * Math.random());
+    y = 0;
+    z = 0;
+    h = a/4 + Math.round(a * Math.random());
+    w = a;
+    d = a/4 + Math.round(0.75 * a * Math.random());
+    r = 100 + Math.round(100 * Math.random());
+    g = 100 + Math.round(100 * Math.random());
+    b = 100 + Math.round(100 * Math.random());
+    if (i == 0)
+      {
+      x = -x;
+      w = -w;
+      }
+    j = (block_nr * 2 + i) * 7;
+    points[j+0].xyz[0] = x;
+    points[j+0].xyz[1] = y+h;
+    points[j+0].xyz[2] = z;
+    points[j+1].xyz[0] = x+w;
+    points[j+1].xyz[1] = y+h;
+    points[j+1].xyz[2] = z;
+    points[j+2].xyz[0] = x;
+    points[j+2].xyz[1] = y;
+    points[j+2].xyz[2] = z;
+    points[j+3].xyz[0] = x+w;
+    points[j+3].xyz[1] = y;
+    points[j+3].xyz[2] = z;
+    points[j+4].xyz[0] = x;
+    points[j+4].xyz[1] = y+h;
+    points[j+4].xyz[2] = z-d;
+    points[j+5].xyz[0] = x+w;
+    points[j+5].xyz[1] = y+h;
+    points[j+5].xyz[2] = z-d;
+    points[j+6].xyz[0] = x;
+    points[j+6].xyz[1] = y;
+    points[j+6].xyz[2] = z-d;
+    for (j = (block_nr * 2 + i) * 3; j < (block_nr * 2 + i) * 3 + 3; j++)
+      {
+      shapes[j].color.r = r;
+      shapes[j].color.g = g;
+      shapes[j].color.b = b;
+      shapes[j].set_light(global_light_vector, 0.15);
+      }
+    }
+  }
+
+function init_street()
+  {
+  var i;
+
+
+  for (i = 0; i < max_points; i++)
+    {
+    points[i] = new point(0,0,0);
+    }
+  for (i = 0; i < max_street_blocks; i++)
+    {
+    shapes[(i*2+0)*3+0] = new shape(points[(i*2+0)*7+0],
+                                    points[(i*2+0)*7+1],
+                                    points[(i*2+0)*7+3],
+                                    points[(i*2+0)*7+2],
+                                    new color(0,0,0));
+    shapes[(i*2+0)*3+1] = new shape(points[(i*2+0)*7+0],
+                                    points[(i*2+0)*7+2],
+                                    points[(i*2+0)*7+6],
+                                    points[(i*2+0)*7+4],
+                                    new color(0,0,0));
+    shapes[(i*2+0)*3+2] = new shape(points[(i*2+0)*7+0],
+                                    points[(i*2+0)*7+4],
+                                    points[(i*2+0)*7+5],
+                                    points[(i*2+0)*7+1],
+                                    new color(0,0,0));
+    shapes[(i*2+1)*3+0] = new shape(points[(i*2+1)*7+0],
+                                    points[(i*2+1)*7+2],
+                                    points[(i*2+1)*7+3],
+                                    points[(i*2+1)*7+1],
+                                    new color(0,0,0));
+    shapes[(i*2+1)*3+1] = new shape(points[(i*2+1)*7+0],
+                                    points[(i*2+1)*7+4],
+                                    points[(i*2+1)*7+6],
+                                    points[(i*2+1)*7+2],
+                                    new color(0,0,0));
+    shapes[(i*2+1)*3+2] = new shape(points[(i*2+1)*7+0],
+                                    points[(i*2+1)*7+1],
+                                    points[(i*2+1)*7+5],
+                                    points[(i*2+1)*7+4],
+                                    new color(0,0,0));
+    define_new_block(i);
+    }
+  }
+
+//-------------------------------------------------------------------------
+// End of object data
+//-------------------------------------------------------------------------
+
+//-------------------------------------------------------------------------
+// Sky data
+//-------------------------------------------------------------------------
+
+var sky_colors =
+  [
+  new color(180,220,255)
+  ];
+
+var max_sky_polygons = sky_colors.length;
+var sky_polygons = new Array(max_sky_polygons);
+
+function init_sky()
+  {
+  var i;
+
+  for (i = 0; i < max_sky_polygons; i++)
+    {
+    sky_polygons[i] =
+      [
+      [0, 0],
+      [0, canvasElem.height - 1 - (image_ctr[1] + i)],
+      [canvasElem.width - 1, canvasElem.height - 1 - (image_ctr[1] + i)],
+      [canvasElem.width - 1, 0]
+      ];
+    }
+  }
+
+//-------------------------------------------------------------------------
+// End of sky data
+//-------------------------------------------------------------------------
+
+var canvasElem;
+var g;
+var image_ctr;                   // Center of image window
+var image_z = -400;              // z-coord of image plane
+var bg_color = new color(40,70,40); // Background color
+var obj_pos = [0, -a/10, 0];     // Location of object in universe
+var rot_angle = [0, 0, 0];       // Object rotation angles in degrees:
+                                 // (xy_angle, yz_angle, zx_angle)
+var rot_matrix = new rotation_matrix();
+var sh;
+var xs = new Array(maxvertices);
+var ys = new Array(maxvertices);
+var time;
+var t1 = 0;
+var t2 = 0;
+var first_block = 0;
+var events = 0;
+var target_delta_t = 20;
+
+function update()
+  {
+  var i,j,b;
+
+  events++;
+  if (events > 1) return;
+
+  // Start new delay
+
+  setTimeout(update, target_delta_t);
+
+  var new_time = (new Date()).valueOf();
+  var delta_t = Math.min(2 * target_delta_t, new_time - time);
+  time = new_time;
+  //console.log(t1);
+
+  // Set background color
+
+  g.fillStyle = bg_color.toString();
+  g.fillRect(0, 0, canvasElem.width, canvasElem.height);
+
+  // Draw sky
+
+  for (i = 0; i < max_sky_polygons; i++)
+    {
+    g.fillStyle = sky_colors[i].toString();
+    g.beginPath();
+    g.moveTo(sky_polygons[i][0][0], sky_polygons[i][0][1]);
+    for (j = 1; j < sky_polygons[i].length; j++)
+      {
+      g.lineTo(sky_polygons[i][j][0], sky_polygons[i][j][1]);
+      }
+    g.closePath();
+    g.fill();
+    }
+
+  // Move object
+
+  t1 += a * delta_t/100;
+  if (t1 >= a)
+    {
+    t1 -= a;
+    define_new_block(first_block);
+    first_block = (first_block + 1) % max_street_blocks;
+    }
+  t2 = (t2 + delta_t/10) % 360;
+  obj_pos[1] = -a/10 - Math.abs(Math.round(a * Math.sin(t2 * radians_per_degree)));
+
+  // Calculate rotation matrix
+
+  rot_matrix.calculate(rot_angle);
+
+  // Draw shapes
+
+  for (b = max_street_blocks - 1; b >= 0; b--)
+    {
+    var p_i = (first_block + b) % max_street_blocks * 2 * 7;
+    for (i = p_i; i < p_i + 2 * 7; i++)
+      {
+      obj_pos[2] = t1 - b * a - 500;
+      points[i].rotate_and_place(rot_matrix, obj_pos);
+      points[i].project(image_z, image_ctr);
+      }
+
+    var sh_i = (first_block + b) % max_street_blocks * 2 * 3;
+    for (i = sh_i; i < sh_i + 2 * 3; i++)
+      {
+      sh = shapes[i];
+      if (sh.visible())
+        {
+        g.fillStyle = sh.seen_color().toString();
+        g.beginPath();
+        g.moveTo(
+          sh.points[0].xy_proj[0],
+          canvasElem.height - 1 - sh.points[0].xy_proj[1]);
+        for (j = 1; j < sh.points.length; j++)
+          {
+          g.lineTo(
+            sh.points[j].xy_proj[0],
+            canvasElem.height - 1 - sh.points[j].xy_proj[1]);
+          }
+        g.closePath();
+        g.fill();
+        }
+      }
+    }
+
+  events--;
+  if (events > 0)
+    {
+    events = 0;
+    setTimeout(update, 1);
+    }
+  }
+
+function init()
+  {
+  canvasElem = document.getElementById("canvas");
+  g = canvasElem.getContext("2d");
+  image_ctr = [canvasElem.width/2, canvasElem.height/2];
+  init_street();
+  init_sky();
+
+  time = (new Date()).valueOf();
+  update();
+  }
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Giant Kangaroo</h1>
+
+<div class="box imgbox" id="canvas_box">
+<canvas id="canvas" width=350 height=250><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+</div>
+
+<div class="box" id="description">
+This is javascript drawing on an HTML5 canvas in real time.
+</div>
+
+</div>
+
+</body>
+</html>

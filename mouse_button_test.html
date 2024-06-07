@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Mouse Button Test</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 8em;
+    padding: 0.2em;
+    border: 1px solid #000000;
+    background-color: #FFFFEE;
+}
+
+#input p {
+    text-align: center;
+    pointer-events: none;
+    touch-action: none;
+}
+
+#output {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 20em;
+    padding: 0.2em;
+    background-color: #F4FFF0;
+}
+</style>
+<script type="text/javascript">
+var inputElem;
+var outputElem;
+
+var button_event_count = [0, 0, 0];
+var timer_id;
+
+function timertick()
+{
+    if (button_event_count.every(function(x){return x == 0})) return;
+    outputElem.value += button_event_count.toString() + '\n';
+    outputElem.scrollTop = outputElem.scrollHeight;
+    button_event_count = [0, 0, 0];
+}
+
+function handle_event(e)
+{
+    var btn = e.button;
+    button_event_count[btn] = (button_event_count[btn] || 0) + 1;
+    if (e.type == 'mousedown');
+    if (timer_id) clearTimeout(timer_id);
+    timer_id = setTimeout(timertick, 500);
+    e.preventDefault();
+    return false;
+}
+
+function ignore_event(e)
+{
+    e.preventDefault();
+    return false;
+}
+
+function init()
+{
+    inputElem = document.getElementById('input');
+    outputElem = document.getElementById('output');
+
+    inputElem.addEventListener('mousedown', handle_event, false);
+    inputElem.addEventListener('mouseup', handle_event, false);
+    inputElem.addEventListener('contextmenu', ignore_event, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Mouse Button Test</h1>
+
+<div class="box">
+
+<div id='input'><p>Click left/middle/right mouse button in this box</p></div>
+
+<p>Number of button press/release events (left, middle, right):</p>
+<textarea id='output' name='output' rows="10" readonly></textarea>
+</div>
+
+</div>
+
+</body>
+</html>
