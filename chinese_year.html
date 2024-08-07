@@ -1,0 +1,677 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Chinese Year</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+button#optiontext {
+    display: block;
+    margin: 0.1em auto;
+}
+
+div#frame {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 30em;
+    height: 30em;
+    padding: 0px;
+    margin: 0px auto;
+    border: none;
+    background-color: #A8D888;
+    overflow: hidden;
+}
+
+div#frame_shadow {
+    position: absolute;
+    left: 0px; top: 0px;
+    width: 100%;
+    height: 100%;
+    box-shadow: inset 0em 0em 0.6em 0.1em rgba(0,0,0,1);
+    pointer-events: none;
+}
+
+div.stemgroup, div.branchgroup {
+    -webkit-transition: -webkit-transform 1s ease-in-out;
+    transition: transform 1s ease-in-out;
+}
+
+div.stemgroup, div.branchgroup, div.controls {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin: 0px -50% 0px 0px;
+    padding: 0px;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+div.yangstem, div.yinstem, div.branch {
+    position: absolute;
+    left: 0px; top: 0px;
+    border: 0px;
+}
+
+div.yangstem {
+    color: rgba(32, 80, 144, 1);
+    font: bold 100% sans-serif;
+}
+
+div.yinstem {
+    color: rgba(160, 200, 255, 1);
+    font: bold 100% sans-serif;
+}
+
+div.branch {
+    color: #804020;
+    font: bold 100% sans-serif;
+}
+
+input#year {
+    font: 150% sans-serif;
+    text-align: center;
+    vertical-align: middle;
+    background-color: #FFF0D0;
+}
+
+span#dates {
+    font: 100% sans-serif;
+    color: #807060;
+}
+
+button {
+    vertical-align: middle;
+}
+
+button span.leftptr {
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0px;
+    border-top: 0.5rem solid transparent;
+    border-right: 0.7rem solid #884400;
+    border-bottom: 0.5rem solid transparent;
+    border-left: 0px;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+button span.rightptr {
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0px;
+    border-top: 0.5rem solid transparent;
+    border-right: 0px;
+    border-bottom: 0.5rem solid transparent;
+    border-left: 0.7rem solid #884400;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+svg.pointer {
+    position: absolute;
+    left: 50%; top: 25%;
+    width: 15rem; height: 15rem;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+#ptrshape1, #ptrshape2, #ptrshape3 {
+    fill: none;
+    stroke-width: 5px;
+}
+
+#ptrshape1 {
+    stroke: rgba(255,190,190,0.5);
+}
+
+#ptrshape2 {
+    stroke: rgba(255,255,200,0.5);
+}
+
+#ptrshape3 {
+    stroke: rgba(200,200,255,0.5);
+}
+
+svg.controls {
+    position: absolute;
+    left: 50%; top: 50%;
+    width: 200%; height: 200%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+#controlsshape {
+    fill: #80C080;
+    stroke: none;
+}
+
+svg.stems {
+    position: absolute;
+    left: 0px; top: 0px;
+    width: 22rem; height: 22rem;
+    -webkit-transform: translate3d(-50%, -50%, 0); /* Use 3d to force HW acceleration */
+    transform: translate3d(-50%, -50%, 0);
+}
+
+polygon#stempoly {
+    fill: rgba(192,128,240,1);
+    fill-rule: nonzero;
+    stroke: none;
+}
+
+svg.branches {
+    position: absolute;
+    left: 0px; top: 0px;
+    width: 30rem; height: 30rem;
+    -webkit-transform: translate3d(-50%, -50%, 0); /* Use 3d to force HW acceleration */
+    transform: translate3d(-50%, -50%, 0);
+}
+
+#branchshape1 {
+    fill: rgba(255,140,128,1);
+    fill-rule: nonzero;
+    stroke: none;
+}
+
+#branchshape2 {
+    fill: rgba(255,192,0,1);
+    fill-rule: nonzero;
+    stroke: none;
+}
+
+circle#pericircle, circle#yincircle {
+    opacity: 1;
+    fill-opacity: 1;
+    stroke: none;
+    fill: rgba(160, 200, 255, 1);
+}
+
+path#yinpath, circle#yangcircle {
+    opacity: 1;
+    fill-opacity: 1;
+    stroke: none;
+    fill: rgba(32, 80, 144, 1);
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var twoPI = 2 * Math.PI;
+var Jan = 0;
+var Feb = 31;
+
+var newyear = {
+    1912 : Feb + 17,
+    1913 : Feb + 6,
+    1914 : Jan + 26,
+    1915 : Feb + 14,
+    1916 : Feb + 3,
+    1917 : Jan + 23,
+    1918 : Feb + 11,
+    1919 : Feb + 1,
+    1920 : Feb + 20,
+    1921 : Feb + 8,
+    1922 : Jan + 28,
+    1923 : Feb + 16,
+    1924 : Feb + 5,
+    1925 : Jan + 24,
+    1926 : Feb + 13,
+    1927 : Feb + 2,
+    1928 : Jan + 23,
+    1929 : Feb + 10,
+    1930 : Jan + 30,
+    1931 : Feb + 17,
+    1932 : Feb + 6,
+    1933 : Jan + 26,
+    1934 : Feb + 14,
+    1935 : Feb + 4,
+    1936 : Jan + 24,
+    1937 : Feb + 11,
+    1938 : Jan + 31,
+    1939 : Feb + 19,
+    1940 : Feb + 8,
+    1941 : Jan + 27,
+    1942 : Feb + 15,
+    1943 : Feb + 5,
+    1944 : Jan + 25,
+    1945 : Feb + 13,
+    1946 : Feb + 2,
+    1947 : Jan + 22,
+    1948 : Feb + 10,
+    1949 : Jan + 29,
+    1950 : Feb + 17,
+    1951 : Feb + 6,
+    1952 : Jan + 27,
+    1953 : Feb + 14,
+    1954 : Feb + 3,
+    1955 : Jan + 24,
+    1956 : Feb + 12,
+    1957 : Jan + 31,
+    1958 : Feb + 18,
+    1959 : Feb + 8,
+    1960 : Jan + 28,
+    1961 : Feb + 15,
+    1962 : Feb + 5,
+    1963 : Jan + 25,
+    1964 : Feb + 13,
+    1965 : Feb + 2,
+    1966 : Jan + 21,
+    1967 : Feb + 9,
+    1968 : Jan + 30,
+    1969 : Feb + 17,
+    1970 : Feb + 6,
+    1971 : Jan + 27,
+    1972 : Feb + 15,
+    1973 : Feb + 3,
+    1974 : Jan + 23,
+    1975 : Feb + 11,
+    1976 : Jan + 31,
+    1977 : Feb + 18,
+    1978 : Feb + 7,
+    1979 : Jan + 28,
+    1980 : Feb + 16,
+    1981 : Feb + 5,
+    1982 : Jan + 25,
+    1983 : Feb + 13,
+    1984 : Feb + 2,
+    1985 : Feb + 20,
+    1986 : Feb + 9,
+    1987 : Jan + 29,
+    1988 : Feb + 17,
+    1989 : Feb + 6,
+    1990 : Jan + 27,
+    1991 : Feb + 15,
+    1992 : Feb + 4,
+    1993 : Jan + 23,
+    1994 : Feb + 10,
+    1995 : Jan + 31,
+    1996 : Feb + 19,
+    1997 : Feb + 7,
+    1998 : Jan + 28,
+    1999 : Feb + 16,
+    2000 : Feb + 5,
+    2001 : Jan + 24,
+    2002 : Feb + 12,
+    2003 : Feb + 1,
+    2004 : Jan + 22,
+    2005 : Feb + 9,
+    2006 : Jan + 29,
+    2007 : Feb + 18,
+    2008 : Feb + 7,
+    2009 : Jan + 26,
+    2010 : Feb + 14,
+    2011 : Feb + 3,
+    2012 : Jan + 23,
+    2013 : Feb + 10,
+    2014 : Jan + 31,
+    2015 : Feb + 19,
+    2016 : Feb + 8,
+    2017 : Jan + 28,
+    2018 : Feb + 16,
+    2019 : Feb + 5,
+    2020 : Jan + 25,
+    2021 : Feb + 12,
+    2022 : Feb + 1,
+    2023 : Jan + 22,
+    2024 : Feb + 10,
+    2025 : Jan + 29,
+    2026 : Feb + 17,
+    2027 : Feb + 6,
+    2028 : Jan + 26,
+    2029 : Feb + 13,
+    2030 : Feb + 3,
+    2031 : Jan + 23,
+    2032 : Feb + 11,
+    2033 : Jan + 31,
+    2034 : Feb + 19,
+    2035 : Feb + 8,
+    2036 : Jan + 28,
+    2037 : Feb + 15,
+    2038 : Feb + 4,
+    2039 : Jan + 24,
+    2040 : Feb + 12,
+    2041 : Feb + 1,
+    2042 : Jan + 22,
+    2043 : Feb + 10,
+    2044 : Jan + 30,
+    2045 : Feb + 17,
+    2046 : Feb + 6,
+    2047 : Jan + 26,
+    2048 : Feb + 14,
+    2049 : Feb + 2,
+    2050 : Jan + 23,
+    2051 : Feb + 11,
+    2052 : Feb + 1,
+    2053 : Feb + 19,
+    2054 : Feb + 8,
+    2055 : Jan + 28,
+    2056 : Feb + 15,
+    2057 : Feb + 4,
+    2058 : Jan + 24,
+    2059 : Feb + 12,
+    2060 : Feb + 2,
+    2061 : Jan + 21,
+    2062 : Feb + 9,
+    2063 : Jan + 29,
+    2064 : Feb + 17,
+    2065 : Feb + 5,
+    2066 : Jan + 26,
+    2067 : Feb + 14,
+    2068 : Feb + 3,
+    2069 : Jan + 23,
+    2070 : Feb + 11,
+    2071 : Jan + 31,
+    2072 : Feb + 19,
+    2073 : Feb + 7,
+    2074 : Jan + 27,
+    2075 : Feb + 15,
+    2076 : Feb + 5,
+    2077 : Jan + 24,
+    2078 : Feb + 12,
+    2079 : Feb + 2,
+    2080 : Jan + 22,
+    2081 : Feb + 9,
+    2082 : Jan + 29,
+    2083 : Feb + 17,
+    2084 : Feb + 6,
+    2085 : Jan + 26,
+    2086 : Feb + 14,
+    2087 : Feb + 3,
+    2088 : Jan + 24,
+    2089 : Feb + 10,
+    2090 : Jan + 30,
+    2091 : Feb + 18,
+    2092 : Feb + 7,
+    2093 : Jan + 27,
+    2094 : Feb + 15,
+    2095 : Feb + 5,
+    2096 : Jan + 25,
+    2097 : Feb + 12,
+    2098 : Feb + 1,
+    2099 : Jan + 21,
+    2100 : Feb + 9,
+    2101 : Jan + 28,
+};
+
+// Sanity checks for newyear list
+var min_d = Jan + 21;
+var max_d = Feb + 20;
+var min_y = Infinity;
+var max_y = -Infinity;
+for(var y in newyear) {
+    min_y = Math.min(min_y, y);
+    max_y = Math.max(max_y, y);
+    var d = newyear[y];
+    if (d < min_d || d > max_d)
+        alert('Sanity check failed:\nYear ' + y + ' date outside global range!');
+    var d_prev19 = newyear[y - 19];
+    if (d_prev19 !== undefined) {
+        var err = Math.abs(d - d_prev19);
+        if (err > 2 && err < max_d - min_d - 1)
+            alert('Sanity check failed:\nYear ' + y + ' date outside typical range!');
+    }
+}
+if (Object.keys(newyear).length != max_y - min_y + 1)
+    alert('Sanity check failed:\nMissing years!');
+
+var this_year;
+
+var stem_data = {
+    name          : "stem",
+    nbr_of_items  : 10,
+    radius        : 7.4,
+    radius_delta  : 0.6,
+    year_0_offset : 6,
+    styl          : null
+};
+
+var branch_data = {
+    name          : "branch",
+    nbr_of_items  : 12,
+    radius        : 12,
+    radius_delta  : 0,
+    year_0_offset : 8,
+    styl          : null
+};
+
+function init_items(item_data)
+{
+    var i,r,x,y,styl,angle,transformString;
+    item_data.styl = document.getElementById(item_data.name + "group").style;
+    for (i = 0; i < item_data.nbr_of_items; i++) {
+        styl = document.getElementById(item_data.name + i).style;
+        angle = i * twoPI / item_data.nbr_of_items;
+        r = item_data.radius + ((i & 1) ? item_data.radius_delta : -item_data.radius_delta); 
+        x = (r * Math.sin(angle)).toFixed(6);
+        y = (-r * Math.cos(angle)).toFixed(6);
+        transformString = "translate(-50%, -50%) translate(" + x + "rem, " + y + "rem) rotate(" + angle.toFixed(6) + "rad)";
+        styl.webkitTransform = transformString;
+        styl.transform = transformString;
+    }
+}
+
+function set_target(item_data, y)
+{
+    var n,i,angle,transformString;
+    n = item_data.nbr_of_items;
+    i = -(y + item_data.year_0_offset);
+    angle = i * 360 / item_data.nbr_of_items;
+    transformString = "translate(-50%, -50%) rotate(" + angle + "deg)";
+    item_data.styl.webkitTransform = transformString;
+    item_data.styl.transform = transformString;
+}
+
+function date2str(d, y)
+{
+    if (d)
+        if (d > Feb)
+            return y + "-02-" + (d - Feb + 100).toString().slice(-2);
+        else
+            return y + "-01-" + (d + 100).toString().slice(-2);
+    else
+        return y + "-??-??";
+}
+
+function remove_fancy_effects()
+{
+    var elems = document.getElementsByClassName('shadowed');
+    for (var i = 0; i < elems.length; i++) {
+        elems[i].removeAttribute('filter');
+    }
+    var elems = document.getElementsByClassName('blurred');
+    for (var i = 0; i < elems.length; i++) {
+        elems[i].removeAttribute('filter');
+    }
+    var actionElem = document.getElementById('optiontext');
+    actionElem.innerHTML = 'Fast browser? Click to add fancy effects';
+    actionElem.onclick = add_fancy_effects;
+}
+
+function add_fancy_effects()
+{
+    var elems = document.getElementsByClassName('shadowed');
+    for (var i = 0; i < elems.length; i++) {
+        elems[i].setAttribute('filter', 'url(#shadow)');
+    }
+    var elems = document.getElementsByClassName('blurred');
+    for (var i = 0; i < elems.length; i++) {
+        elems[i].setAttribute('filter', 'url(#blur)');
+    }
+    var actionElem = document.getElementById('optiontext');
+    actionElem.innerHTML = 'Slow browser? Click to remove fancy effects';
+    actionElem.onclick = remove_fancy_effects;
+}
+
+function update(inc)
+{
+    var y = 1 * document.getElementById("year").value;
+    if (inc != 0)
+        y += inc;
+    if (isNaN(y))
+        y = this_year;
+    if (y < 0)
+        y = 0;
+    document.getElementById("year").value = y;
+    set_target(stem_data, y);
+    set_target(branch_data, y);
+    var start = date2str(newyear[y], y);
+    var end = date2str(newyear[y+1] - 1, y+1);
+    document.getElementById("dates").innerHTML = "start: " + start + "<br>end: " + end;
+}
+
+function init()
+{
+    var now = new Date();
+    this_year = now.getFullYear();
+    document.getElementById("year").value = this_year;
+    init_items(stem_data);
+    init_items(branch_data);
+    update(0);
+    add_fancy_effects();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Chinese Year</h1>
+
+<div class="box">
+<button id="optiontext"></button>
+<div id="frame">
+<div class="branchgroup" id="branchgroup">
+    <svg class="branches" viewBox="-102 -102 204 204">
+        <defs>
+            <filter id="shadow">
+                <feGaussianBlur in="SourceAlpha" stdDeviation="2" />
+                <feMerge>
+                    <feMergeNode />
+                    <feMergeNode in="SourceGraphic" />
+                </feMerge>
+            </filter>
+            <filter id="blur">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="2" />
+            </filter>
+        </defs>
+        <g class="shadowed">
+            <path id="branchshape1" d="
+                M 0,100
+                A 50,50 0 0 0 -50 86.60254
+                50,50 0 0 0 -86.60254 50
+                50,50 0 0 0 -100 0
+                50,50 0 0 0 -86.60254 -50
+                50,50 0 0 0 -50 -86.60254
+                50,50 0 0 0 0 -100
+                50,50 0 0 0 50 -86.60254
+                50,50 0 0 0 86.60254 -50
+                50,50 0 0 0 100 0
+                50,50 0 0 0 86.60254 50
+                50,50 0 0 0 50 86.60254
+                50,50 0 0 0 0 100
+                z" />
+            <polygon id="branchshape2" points="
+                0 100
+                -50 -86.60254
+                86.60254 50
+                -100 0
+                86.60254 -50
+                -50 86.60254
+                0 -100
+                50 86.60254
+                -86.60254 -50
+                100 0
+                -86.60254 50
+                50 -86.60254
+                " />
+        </g>
+    </svg>
+    <div class="branch" id="branch0">Rat</div>
+    <div class="branch" id="branch1">Ox</div>
+    <div class="branch" id="branch2">Tiger</div>
+    <div class="branch" id="branch3">Rabbit</div>
+    <div class="branch" id="branch4">Dragon</div>
+    <div class="branch" id="branch5">Snake</div>
+    <div class="branch" id="branch6">Horse</div>
+    <div class="branch" id="branch7">Goat/<br>Sheep</div>
+    <div class="branch" id="branch8">Monkey</div>
+    <div class="branch" id="branch9">Rooster</div>
+    <div class="branch" id="branch10">Dog</div>
+    <div class="branch" id="branch11">Pig</div>
+</div>
+<div class="stemgroup" id="stemgroup">
+    <svg class="stems" viewBox="-100 -100 200 200">
+        <symbol id="yinyang" viewBox="-100 -100 200 200" preserveAspectRatio="none">
+            <g transform="rotate(40 0 0)">
+                <circle id="pericircle" r="100" cx="0" cy="0" />
+                <path id="yinpath" d="m 100,0 a 100,100 0 0 0 -200,0 50,50 0 0 1 100,0 50,50 0 0 0 100,0 z" />
+                <circle id="yincircle" r="15" cx="50" cy="0" />
+                <circle id="yangcircle" r="15" cx="-50" cy="0" />
+            </g>
+        </symbol>
+        <g class="shadowed">
+            <polygon id="stempoly" points="
+                -29.356614 90.350369
+                -29.356614 -90.350369
+                76.856614 55.839599
+                -95 0
+                76.856614 -55.839599
+                " />
+            <use xlink:href="#yinyang" x="-40" y="-97" width="80" height="65" transform="rotate(18 0 0)" />
+            <use xlink:href="#yinyang" x="-40" y="-97" width="80" height="65" transform="rotate(90 0 0)" />
+            <use xlink:href="#yinyang" x="-40" y="-97" width="80" height="65" transform="rotate(162 0 0)" />
+            <use xlink:href="#yinyang" x="-40" y="-97" width="80" height="65" transform="rotate(234 0 0)" />
+            <use xlink:href="#yinyang" x="-40" y="-97" width="80" height="65" transform="rotate(306 0 0)" />
+        </g>
+    </svg>
+    <div class="yangstem" id="stem0">Yang<br>Wood</div>
+    <div class="yinstem" id="stem1">Yin<br>Wood</div>
+    <div class="yangstem" id="stem2">Yang<br>Fire</div>
+    <div class="yinstem" id="stem3">Yin<br>Fire</div>
+    <div class="yangstem" id="stem4">Yang<br>Earth</div>
+    <div class="yinstem" id="stem5">Yin<br>Earth</div>
+    <div class="yangstem" id="stem6">Yang<br>Metal</div>
+    <div class="yinstem" id="stem7">Yin<br>Metal</div>
+    <div class="yangstem" id="stem8">Yang<br>Water</div>
+    <div class="yinstem" id="stem9">Yin<br>Water</div>
+</div>
+<svg class="pointer" viewBox="-100 -100 200 200">
+    <g class="blurred">
+        <ellipse id="ptrshape1" rx="50" ry="70" cx="0" cy="-20" />
+        <ellipse id="ptrshape2" rx="55" ry="75" cx="0" cy="-20" />
+        <ellipse id="ptrshape3" rx="60" ry="80" cx="0" cy="-20" />
+    </g>
+</svg>
+<div class="controls" id="controls">
+    <svg class="controls" viewBox="-100 -100 200 200" preserveAspectRatio="none">
+        <g class="shadowed">
+            <path id="controlsshape" d="m -55,-20 A 100,100 0 0 0 0,-70 100,100 0 0 0 55,-20 L 55,20 45,50 -45,50 -55,20 -55,-20 z" />
+        </g>
+    </svg>
+    <div style="position:relative;">
+    &nbsp;<br>
+    &nbsp;<br>
+    <button type="button" name="prev" onclick="update(-1);"><span class="leftptr"></span></button><input type="text" id="year" name="year" size="4" maxlength="4" onchange="update(0);"><button type="button" name="next" onclick="update(1);"><span class="rightptr"></span></button><br>
+    <span id="dates"></span>
+    </div>
+</div>
+<div id="frame_shadow">
+</div>
+</div>
+</div>
+
+</div>
+
+</body>
+</html>
+

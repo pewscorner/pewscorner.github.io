@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Screen Size Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+.in_field {
+    background-color: #FFFFEE !important;
+}
+
+.out_field {
+    background-color: #F4FFF0 !important;
+}
+
+table.main {
+    margin: auto;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var approxRatioElem;
+var fieldElems = {};
+
+// All input fields ordered by time of last click with the first one being the most recently clicked one
+// (the values of the fields specified by the last 2 items will be calculated from the values of the fields specified
+// by the first 2 items)
+var last_clicked_fields = [];
+
+var nbr_in_fields = 2;
+
+function update_in_out_field_styles()
+{
+    for (var i = 0; i < nbr_in_fields; i++)
+    {
+        fieldElems[last_clicked_fields[i]].className = 'in_field';
+    }
+    for (var i = nbr_in_fields; i < last_clicked_fields.length; i++)
+    {
+        fieldElems[last_clicked_fields[i]].className = 'out_field';
+    }
+}
+
+function update_last_clicked_field_list(ev)
+{
+    // Move the clicked field to the start of the last clicked field list to indicate that it is the most recently
+    // clicked field
+    last_clicked_fields.unshift(last_clicked_fields.splice(last_clicked_fields.indexOf(ev.target.id), 1)[0]);
+    update_in_out_field_styles();
+    ev.target.select();
+}
+
+function round_float(val)
+{
+    return Number(val.toFixed(3));
+}
+
+function get_field_val(field_id)
+{
+    var val_str = fieldElems[field_id].value.trim();
+    if (val_str == '') return NaN;
+    var val = Number(val_str);
+    return (val >= 0) ? val : NaN;
+}
+
+function set_field_val(field_id, val)
+{
+    fieldElems[field_id].value = round_float(val);
+}
+
+function get_diag()
+{
+    return get_field_val('diag') * 2.54;    // inches -> cm
+}
+
+function set_diag(diag)
+{
+    fieldElems.diag.value = round_float(diag / 2.54);
+}
+
+function get_ratio()
+{
+    var ratio_parts = fieldElems.ratio.value.split(':');
+    if (ratio_parts.length > 2) return NaN;
+    if (ratio_parts.length == 1) ratio_parts.push('1');
+    var numerator_str = ratio_parts[0].trim();
+    var denominator_str = ratio_parts[1].trim();
+    if (numerator_str == '' || denominator_str == '') return NaN;
+    var numerator = Number(numerator_str);
+    var denominator = Number(denominator_str);
+    return (numerator >= 0 && denominator >= 0) ? numerator / denominator : NaN;
+}
+
+function set_approx_ratio()
+{
+    var ratio = get_ratio();
+    if (isFinite(ratio) && ratio)
+    {
+        var inverted = (ratio < 1);
+        if (inverted)
+        {
+            ratio = 1 / ratio;
+        }
+        var approximations = [];
+        for (var denominator = 1; denominator < 50; denominator++)
+        {
+            var numerator = Math.round(ratio * denominator);
+            var error = Math.abs(numerator / denominator - ratio);
+            approximations.push({error: error, fraction: [numerator, denominator]});
+        }
+        approximations.sort(function(a, b)
+        {
+            return (a.error - b.error) || (a.fraction[0] - b.fraction[0]);
+        });
+        var ratios = [];
+        var prev_error = undefined;
+        for (var i = 0; i < approximations.length && ratios.length < 3; i++)
+        {
+            if (approximations[i].error != prev_error)
+            {
+                ratios.push(approximations[i].fraction[+inverted] + ':' + approximations[i].fraction[1 - inverted]);
+                prev_error = approximations[i].error;
+            }
+        }
+    }
+    else
+    {
+        ratios = [
+            (ratio == 0) ? ' 1:Infinity' :
+            (ratio == Infinity) ? ' Infinity:1' :
+            ratio
+        ];
+    }
+    approxRatioElem.innerHTML = '&nbsp;&nbsp;-&nbsp;approx: ' + ratios.join(', ');
+}
+
+function set_ratio(ratio)
+{
+    fieldElems.ratio.value =
+        (ratio >= 1) ? round_float(ratio) + ':1' :
+        (ratio < 1) ? '1:' + round_float(1 / ratio) :
+        ratio;
+}
+
+function update_vals()
+{
+    var width, height, diag, ratio, t;
+    // Use the 2 most recently clicked fields as inputs to the calculation, and the rest as outputs
+    switch(last_clicked_fields[0] + ' ' + last_clicked_fields[1])
+    {
+        case 'diag ratio':
+        case 'ratio diag':
+            diag = get_diag();
+            ratio = get_ratio();
+            set_field_val('width', diag / Math.sqrt(1 + 1 / (ratio * ratio)));
+            set_field_val('height', diag / Math.sqrt(ratio * ratio + 1));
+            break;
+
+        case 'diag width':
+        case 'width diag':
+            diag = get_diag();
+            width = get_field_val('width');
+            set_field_val('height', Math.sqrt(diag * diag - width * width));
+            t = diag / width;
+            set_ratio(1 / Math.sqrt(t * t - 1));
+            break;
+
+        case 'diag height':
+        case 'height diag':
+            diag = get_diag();
+            height = get_field_val('height');
+            set_field_val('width', Math.sqrt(diag * diag - height * height));
+            t = diag / height;
+            set_ratio(Math.sqrt(t * t - 1));
+            break;
+
+        case 'ratio width':
+        case 'width ratio':
+            ratio = get_ratio();
+            width = get_field_val('width');
+            set_field_val('height', width / ratio);
+            set_diag(width * Math.sqrt(1 + 1 / (ratio * ratio)));
+            break;
+
+        case 'ratio height':
+        case 'height ratio':
+            ratio = get_ratio();
+            height = get_field_val('height');
+            set_field_val('width', height * ratio);
+            set_diag(height * Math.sqrt(ratio * ratio + 1));
+            break;
+
+        case 'width height':
+        case 'height width':
+            width = get_field_val('width');
+            height = get_field_val('height');
+            set_diag(Math.sqrt(width * width + height * height));
+            set_ratio(width / height);
+            break;
+    }
+    set_approx_ratio();
+}
+
+function init()
+{
+    approxRatioElem = document.getElementById('approx_ratio');
+    var inputElems = document.getElementsByTagName('input');
+    for (var i = 0; i < inputElems.length; i++)
+    {
+        var fieldElem = inputElems[i];
+        fieldElems[fieldElem.id] = fieldElem;
+        last_clicked_fields.push(fieldElem.id);
+        fieldElem.addEventListener('input', update_vals, false);
+        fieldElem.addEventListener('focus', update_last_clicked_field_list, false);
+    }
+    update_in_out_field_styles();
+    update_vals();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Screen Size Converter</h1>
+
+<div class="box">
+
+<table class="main"><tr>
+
+<td>Diagonal size (inches):
+<td><input type="text" id="diag" value="40" size=10>
+
+<tr>
+
+<td>Ratio (width:height):
+<td><input type="text" id="ratio" value="16:9" size=10>
+
+<tr>
+
+<td colspan="2" id="approx_ratio">
+
+<tr>
+
+<td>Width (cm):
+<td><input type="text" id="width" size=10>
+
+<tr>
+
+<td>Height (cm):
+<td><input type="text" id="height" size=10>
+
+</table>
+
+</div>
+
+<p>
+Green fields are calculated from yellow ones; select a field to make it yellow.
+
+</div>
+
+</body>
+</html>

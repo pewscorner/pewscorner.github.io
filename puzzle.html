@@ -1,0 +1,523 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Puzzle</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.box {
+    text-align: center;
+    margin: auto;
+    overflow: hidden;
+}
+
+div.box#board {
+    min-width: 60%;
+    -webkit-flex: 4 1 auto;
+    flex: 4 1 auto;
+}
+
+div.frame {
+    position: relative;
+    touch-action: none;
+    box-sizing: content-box;
+    width: calc(100% - 0.6em);
+    padding: calc(100% - 0.6em) 0px 0px 0px; /* padding-top is relative to parent width, so this assures fixed width/height ratio */
+    height: 0px;
+    margin: 0px auto;
+    border: 0.3em solid;
+    border-color: #899983 #CEE5C5 #CEE5C5 #899983;
+    background-color: #B7CCAF;
+}
+
+div.elem {
+    position: absolute;
+    touch-action: none;
+    box-sizing: border-box;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+    font-weight: bold;
+    margin: 0px;
+    padding: 0px;
+    border: 0.3em solid;
+    -webkit-transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out,
+        -webkit-transform 0.2s ease-out;
+    transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out,
+        transform 0.2s ease-out;
+}
+
+div.elem p {
+    position: absolute;
+    pointer-events: none;
+    touch-action: none;
+    top: 50%;
+    left: 50%;
+    margin: 0px -50% 0px 0px;
+    padding: 0px;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+}
+
+div.elem_placed {
+    background-color: #BBDDFF;
+    border-color:     #DDEEFF #88BBEE #88BBEE #DDEEFF;
+    color: #FFFF00;
+}
+
+div.elem_unplaced {
+    background-color: #90CCB0;
+    border-color:     #B0DDCC #66AA90 #66AA90 #B0DDCC;
+    color: #EEEE00;
+}
+
+div.elem_hover {
+    color: #FFFFFF;
+    background-color: #FFDDBB;
+    border-color:     #FFEEDD #EEBB88 #EEBB88 #FFEEDD;
+    -webkit-transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out;
+    transition: color 0.2s ease-out, background-color 0.2s ease-out, border-color 0.2s ease-out;
+}
+
+@keyframes blink {
+    0% { opacity: 0; }
+    33% { opacity: 1; }
+    67% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@-webkit-keyframes blink {
+    0% { opacity: 0; }
+    33% { opacity: 1; }
+    67% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+div#msg {
+    visibility: hidden;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    -webkit-transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%);
+    margin: 0px -50% 0px 0px;
+    font-weight: bold;
+    font-size: 200%;
+    color: #BB0000;
+    text-shadow: 0.2em 0.2em 0.1em rgba(0, 0, 0, 0.4);
+    -webkit-animation: blink 2s infinite;
+    animation: blink 2s infinite;
+}
+
+#moves_display {
+    margin-bottom: 1em;
+    font-weight: bold;
+    font-size: 150%;
+    color: #0000FF;
+    text-shadow: 0px 0px 0.2em #FF0000;
+}
+
+</style>
+<script type="text/javascript">
+"use strict";
+
+var columns = 5;
+var rows = 5;
+var cells = columns * rows;
+var maxcolumns = 6;
+var maxrows = 6;
+var maxcells = maxcolumns * maxrows;
+var elems_in_place = 0;
+var moves = 0;
+var shuffle_moves = 100;
+var playing = false;
+var w_px, h_px;
+var matrix = new Array(maxrows);
+
+var frame_elem;
+var hole_elem;
+var moves_display_elem;
+var msg_elem;
+
+function set_elem_pos(elem, i, j) {
+    var transformString = "translate(" + (j * 100) + "%, " + (i * 100) + "%)";
+    elem.style.webkitTransform = transformString;
+    elem.style.transform = transformString;
+}
+
+var Pointerinfo = function() {
+    this.identifier = null;
+    this.startx = 0;
+    this.starty = 0;
+    this.end_di = 0;
+    this.end_dj = 0;
+    this.elem_list = [];
+};
+
+Pointerinfo.prototype.start = function(identifier, startx, starty, end_di, end_dj) {
+    this.identifier = identifier;
+    this.startx = startx;
+    this.starty = starty;
+    this.end_di = end_di;
+    this.end_dj = end_dj;
+    this.elem_list = [];
+};
+
+Pointerinfo.prototype.get_dj = function(currentx) {
+    var dj = (currentx - this.startx) / w_px;
+    if (this.end_dj == 0 || (this.end_dj > 0) != (dj > 0)) {
+        dj = 0;
+    } else if (dj > 1) {
+        dj = 1;
+    } else if (dj < -1) {
+        dj = -1;
+    }
+    return dj;
+};
+
+Pointerinfo.prototype.get_di = function(currenty) {
+    var di = (currenty - this.starty) / h_px;
+    if (this.end_di == 0 || (this.end_di > 0) != (di > 0)) {
+        di = 0;
+    } else if (di > 1) {
+        di = 1;
+    } else if (di < -1) {
+        di = -1;
+    }
+    return di;
+};
+
+Pointerinfo.prototype.end = function() {
+    this.identifier = null;
+};
+
+Pointerinfo.prototype.is_active = function() {
+    return this.identifier !== null;
+};
+
+var pointerinfo = new Pointerinfo();
+
+function pointer_down(x, y, target, pointer_id) {
+    var i0 = hole_elem.extra.i;
+    var j0 = hole_elem.extra.j;
+    var i1 = target.extra.i;
+    var j1 = target.extra.j;
+    if ((i1 == i0) != (j1 == j0) && !pointerinfo.is_active()) {
+        var end_di = (i0 > i1 ? 1 : (i0 < i1 ? -1 : 0));
+        var end_dj = (j0 > j1 ? 1 : (j0 < j1 ? -1 : 0));
+        pointerinfo.start(pointer_id, x, y, end_di, end_dj);
+        for (var i = i1, j = j1; (i != i0) || (j != j0); i += end_di, j += end_dj) {
+            var elem = matrix[i][j];
+            elem.extra.class_list[2] = "elem_hover";
+            elem.className = elem.extra.class_list.join(" ");
+            pointerinfo.elem_list.push(elem);
+        }
+    }
+}
+
+function pointer_move(x, y) {
+    var di = pointerinfo.get_di(y);
+    var dj = pointerinfo.get_dj(x);
+    for (var i = 0; i < pointerinfo.elem_list.length; i++) {
+        var elem = pointerinfo.elem_list[i];
+        set_elem_pos(elem, elem.extra.i + di, elem.extra.j + dj);
+    }
+}
+
+function pointer_up(x, y) {
+    var di = pointerinfo.get_di(y);
+    var dj = pointerinfo.get_dj(x);
+    var complete_move = (Math.abs(di) >= 0.5 || Math.abs(dj) >= 0.5);
+    if (complete_move) {
+        hole_elem.extra.i = pointerinfo.elem_list[0].extra.i;
+        hole_elem.extra.j = pointerinfo.elem_list[0].extra.j;
+        matrix[hole_elem.extra.i][hole_elem.extra.j] = hole_elem;
+    }
+    for (var i = 0; i < pointerinfo.elem_list.length; i++) {
+        var elem = pointerinfo.elem_list[i];
+        if (complete_move) {
+            elem.extra.i += pointerinfo.end_di;
+            elem.extra.j += pointerinfo.end_dj;
+            matrix[elem.extra.i][elem.extra.j] = elem;
+            if ((elem.extra.i == elem.extra.placed_i) && (elem.extra.j == elem.extra.placed_j)) {
+                elem.extra.class_list[1] = "elem_placed";
+                elems_in_place++;
+            } else {
+                if (elem.extra.class_list[1] == "elem_placed")
+                    elems_in_place--;
+                elem.extra.class_list[1] = "elem_unplaced";
+            }
+        }
+        elem.extra.class_list[2] = "";
+        elem.className = elem.extra.class_list.join(" ");
+        set_elem_pos(elem, elem.extra.i, elem.extra.j); 
+    }
+    if (complete_move) {
+        moves += pointerinfo.elem_list.length;
+        moves_display_elem.innerHTML = String(moves);
+        if (elems_in_place == cells - 1) {
+            playing = false;
+            msg_elem.style.visibility = "visible";
+        }
+    }
+    pointerinfo.end();
+}
+
+function pointer_hover(target, is_over) {
+    var i0 = hole_elem.extra.i;
+    var j0 = hole_elem.extra.j;
+    var i1 = target.extra.i;
+    var j1 = target.extra.j;
+    if ((i1 == i0) != (j1 == j0)) {
+        var end_di = (i0 > i1 ? 1 : (i0 < i1 ? -1 : 0));
+        var end_dj = (j0 > j1 ? 1 : (j0 < j1 ? -1 : 0));
+        for (var i = i1, j = j1; (i != i0) || (j != j0); i += end_di, j += end_dj) {
+            var elem = matrix[i][j];
+            elem.extra.class_list[2] = is_over ? "elem_hover" : "";
+            elem.className = elem.extra.class_list.join(" ");
+        }
+    }
+}
+
+function event_handler(ev) {
+    if (!playing) return false;
+    var touchobj;
+    switch (ev.type) {
+        case "mousedown":
+            pointer_down(ev.clientX, ev.clientY, ev.target, 0);
+            break;
+        
+        case "mousemove":
+            if (pointerinfo.is_active()) {
+                pointer_move(ev.clientX, ev.clientY);
+            } 
+            break;
+
+        case "mouseout":        
+        case "mouseup":
+            if (pointerinfo.is_active()) {
+                pointer_up(ev.clientX, ev.clientY);
+            } else {
+                pointer_hover(ev.target, false);
+            }
+            break;
+
+        case "mouseover":
+            pointer_hover(ev.target, true);
+            break;
+
+        case "touchstart":
+            touchobj = ev.changedTouches[0];
+            pointer_down(touchobj.clientX, touchobj.clientY, touchobj.target, touchobj.identifier);
+            break;
+
+        case "touchmove":
+            if (pointerinfo.is_active()) {
+                for(var i = 0; i < ev.changedTouches.length; i++) {
+                    touchobj = ev.changedTouches[i];
+                    if (touchobj.identifier == pointerinfo.identifier) {
+                        pointer_move(touchobj.clientX, touchobj.clientY);
+                        break;
+                    }
+                } 
+            } 
+            break;
+
+        case "touchcancel":
+        case "touchend":
+            if (pointerinfo.is_active()) {
+                for(var i = 0; i < ev.changedTouches.length; i++) {
+                    touchobj = ev.changedTouches[i];
+                    if (touchobj.identifier == pointerinfo.identifier) {
+                        pointer_up(touchobj.clientX, touchobj.clientY);
+                        break;
+                    }
+                }
+            }
+            break;
+    }
+    ev.preventDefault();
+    ev.stopPropagation();
+    return false;
+}
+
+function resize_event_handler(ev) {
+    var rect = hole_elem.getBoundingClientRect();
+    w_px = rect.width;
+    h_px = rect.height;
+    frame_elem.style.fontSize = h_px/3 + "px";
+}
+
+function default_event_handler(ev) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    return false;
+}
+
+function reset() {
+    var n,i,j,i0,j0,i1,j1,end_di,end_dj,x,elem,gridsize_elem;
+
+    playing = false;
+    msg_elem.style.visibility = "hidden";
+    moves = 0;
+    moves_display_elem.innerHTML = String(moves);
+    gridsize_elem = document.getElementById("gridsize");
+    x = gridsize_elem.options[gridsize_elem.selectedIndex].text.replace(/ /g,"").split("x");
+    columns = x[0];
+    rows = x[1];
+    cells = columns * rows;
+
+    // Put all used elements (including hole element) in place
+
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < columns; j++) {
+            elem = matrix[i][j] = document.getElementById("elem" + ((i*columns + j + 1) % cells));
+            if (elem != hole_elem) {
+                elem.style.visibility = "visible";
+            }
+            elem.style.width = (100 / columns) + "%";
+            elem.style.height = (100 / rows) + "%";
+            elem.extra.placed_i = i;
+            elem.extra.placed_j = j;
+            elem.extra.i = i;
+            elem.extra.j = j;
+            elem.extra.class_list[1] = "elem_placed";
+            elem.extra.class_list[2] = "";
+            elem.className = elem.extra.class_list.join(" ");
+        }
+    }
+
+    // Make all unused elements invisible    
+
+    for (i = cells; i < maxcells; i++) {
+        elem = document.getElementById("elem" + i);
+        elem.style.visibility = "hidden";
+        set_elem_pos(elem, 0, 0);
+    }
+
+    // Shuffle
+
+    i0 = hole_elem.extra.i;
+    j0 = hole_elem.extra.j;
+    for (n = 0; n < shuffle_moves; n++) {
+        if (n & 1) {
+            i1 = Math.floor(Math.random() * (rows - 1));
+            if (i1 >= i0) i1++;
+            j1 = j0;
+        } else {
+            i1 = i0;
+            j1 = Math.floor(Math.random() * (columns - 1));
+            if (j1 >= j0) j1++;
+        }
+        end_di = (i0 > i1 ? 1 : (i0 < i1 ? -1 : 0));
+        end_dj = (j0 > j1 ? 1 : (j0 < j1 ? -1 : 0));
+        for (i = i0, j = j0; (i != i1) || (j != j1); i -= end_di, j -= end_dj) {
+            elem = matrix[i][j] = matrix[i - end_di][j - end_dj];
+            elem.extra.i = i;
+            elem.extra.j = j;
+        }
+        i0 = i1;
+        j0 = j1;
+    }
+    matrix[i0][j0] = hole_elem;
+    hole_elem.extra.i = i0;
+    hole_elem.extra.j = j0;
+
+    // Update properties
+
+    elems_in_place = 0;
+    for (i = 0; i < rows; i++) {
+        for (j = 0; j < columns; j++) {
+            elem = matrix[i][j]; 
+            if (elem != hole_elem) {
+                set_elem_pos(elem, i, j);
+                if ((elem.extra.i == elem.extra.placed_i) && (elem.extra.j == elem.extra.placed_j)) {
+                    elem.extra.class_list[1] = "elem_placed";
+                    elems_in_place++;
+                } else {
+                    elem.extra.class_list[1] = "elem_unplaced";
+                }
+                elem.className = elem.extra.class_list.join(" ");
+            }
+        }
+    }
+
+    // Call resize event handler to update actual size values, but wait for a short while to allow
+    // the changes done here to take effect first.
+    setTimeout(resize_event_handler, 1);
+    playing = true;
+}
+
+function init() {
+    var i;
+    var elem_i;
+
+    for (i = 0; i < maxrows; i++)
+        matrix[i] = new Array(maxcolumns);
+    frame_elem = document.getElementById("frame");
+    hole_elem = document.getElementById("elem0");
+    hole_elem.style.visibility = "hidden";
+    moves_display_elem = document.getElementById("moves_display");
+    msg_elem = document.getElementById("msg");
+    for (i = 0; i < maxcells; i++) {
+        elem_i = document.getElementById("elem" + i);
+        elem_i.extra = new Object;
+        elem_i.extra.class_list = new Array("elem","elem_placed","");
+        elem_i.addEventListener('mousedown', event_handler, false);
+        elem_i.addEventListener('mousemove', event_handler, false);
+        elem_i.addEventListener('mouseup', event_handler, false);
+        elem_i.addEventListener('mouseover', event_handler, false);
+        elem_i.addEventListener('mouseout', event_handler, false);
+        elem_i.addEventListener('touchstart', event_handler, false);
+        elem_i.addEventListener('touchmove', event_handler, false);
+        elem_i.addEventListener('touchend', event_handler, false);
+        elem_i.addEventListener('touchcancel', event_handler, false);
+        elem_i.addEventListener('selectstart', default_event_handler, false); // disable text selection in MSIE
+        elem_i.addEventListener('click', default_event_handler, false);
+        elem_i.addEventListener('scroll', default_event_handler, false);
+    }
+    reset();
+    document.getElementById("new_game_but").addEventListener('click', reset);
+    window.addEventListener('resize', resize_event_handler, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer vcenter">
+
+<h1>Puzzle</h1>
+
+<div class="box" id="board">
+<div id="frame" class="frame">
+<script type="text/javascript">
+for (var i = 0; i < maxcells; i++) {
+    document.writeln("<div id='elem" + i + "' class='elem elem_placed'><p>" + i + "<\/p><\/div>");
+}
+</script>
+<div id="msg">Game Over!</div>
+</div>
+</div>
+
+<div class="box" id="control">
+Your Moves: <span id="moves_display">0</span>
+<p>
+<button id="new_game_but" type="button" value="New Game">New Game</button>
+<select id="gridsize">
+<option>4 x 4
+<option selected>5 x 5
+<option>6 x 6
+</select>
+</div>
+
+</div>
+
+</body>
+</html>
