@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Katakana</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+table {
+    margin: auto;
+    border-spacing: 0.2em;
+}
+
+table td {
+    background-color: #BBFFBB;
+    padding: 0.2em;
+    vertical-align: top;
+}
+
+span.kana {
+    font-size: 300%;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var chars = [
+    "\u30a2","\u30a4","\u30a6","\u30a8","\u30aa",
+    "\u30ab","\u30ad","\u30af","\u30b1","\u30b3",
+    "\u30ac","\u30ae","\u30b0","\u30b2","\u30b4",
+    "\u30b5","\u30b7","\u30b9","\u30bb","\u30bd",
+    "\u30b6","\u30b8","\u30ba","\u30bc","\u30be",
+    "\u30bf","\u30c1","\u30c4","\u30c6","\u30c8",
+    "\u30c0","\u30c2","\u30c5","\u30c7","\u30c9",
+    "\u30ca","\u30cb","\u30cc","\u30cd","\u30ce",
+    "\u30cf","\u30d2","\u30d5","\u30d8","\u30db",
+    "\u30d0","\u30d3","\u30d6","\u30d9","\u30dc",
+    "\u30d1","\u30d4","\u30d7","\u30da","\u30dd",
+    "\u30de","\u30df","\u30e0","\u30e1","\u30e2",
+    "\u30e4","","\u30e6","","\u30e8",
+    "\u30e9","\u30ea","\u30eb","\u30ec","\u30ed",
+    "\u30ef","","","","\u30f2"];
+
+var charsounds = [
+    "a","i","u","e","o",
+    "k","k","k","k","k",
+    "g","g","g","g","g",
+    "s","sh","s","s","s",
+    "z","j","z","z","z",
+    "t","ch","ts","t","t",
+    "d","j","z","d","d",
+    "n","n","n","n","n",
+    "h","h","f","h","h",
+    "b","b","b","b","b",
+    "p","p","p","p","p",
+    "m","m","m","m","m",
+    "y","-","y","-","y",
+    "r","r","r","r","r",
+    "w","-","-","-","w"];
+
+function init()
+{
+    var hs = '<table>';
+    for (var i = 0; i < 15; i++)
+    {
+        hs += '<tr>';
+        for (var j = 0; j < 5; j++)
+        {
+            hs += '<td>' + charsounds[i*5+j];
+            if (i >= 1) hs += charsounds[j];
+            hs += '<br><span class="kana">' + chars[i*5+j] + '<\/span>';
+        }
+    }
+    hs += '<tr><td>n<br><span class="kana">\u30f3<\/span><td><td><td><td><\/table>';
+    document.getElementById('contentbox').innerHTML = hs;
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Katakana</h1>
+
+<div id="contentbox" class="box">
+</div>
+
+</div>
+
+</body>
+</html>

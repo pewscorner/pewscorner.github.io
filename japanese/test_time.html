@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Translation Practice: Time</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var hoursJp = ["ichi","ni","san","yo","go","roku","shichi","hachi","ku","juu","juuichi","juuni"];
+var minutesJp = ["","ippun","ni-fun","sampun","yompun","go-fun","roppun","nana-fun","happun","kyuu-fun"];
+var minutes10Jp = ["","","ni","san","yon","go"];
+
+var hour = 0;
+var minute = 0;
+var output = "";
+var result = "";
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+    hour = Math.floor(Math.random()*12);
+    minute = Math.floor(Math.random()*60);
+
+    output = "Translate the following time into Japanese:<br>" +
+        (hour+1) + ":" + (minute+100).toString().substr(1,2);
+    document.getElementById('output').innerHTML = output;
+    result = hoursJp[hour] + "-ji";
+    if (minute == 30) {
+        result += " han";
+    } else if (minute > 0) {
+        result += " " + minutes10Jp[Math.floor(minute/10)];
+        if (minute % 10 == 0) {
+        result += "juppun"
+        } else if (minute > 10) {
+        result += "juu"
+        }
+        result += minutesJp[minute % 10]
+    }
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Translation Practice:<br>Time</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button>
+
+</div>
+
+</div>
+
+</body>
+</html>

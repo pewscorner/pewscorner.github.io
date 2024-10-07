@@ -1,0 +1,275 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Digital Clock</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.box#clock {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    text-align: center;
+}
+
+div.box#description {
+    -webkit-flex: 1 1 50%;
+    flex: 1 1 50%;
+}
+
+div.frame {
+    display: inline-block;
+    background-color: #000088;
+    padding: 0.4em 0.4em;
+    border: 1px solid;
+    border-color: #FF7F7F #994C4C #663333 #CC6666;
+}
+
+div.seg {
+    position:absolute;
+    transition: all 0.2s ease-in-out;
+}
+</style>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Digital Clock</h1>
+
+<div class="box" id="clock">
+<div class="frame">
+<script type="text/javascript">
+var digitpitch = 20;
+var digitgrouppitch = 60;
+var digitwidth = 16;
+var digitheight = 28;
+var halfsegwidth = 2;
+
+var bgcolor = "#000088";
+var topcolor = "#7FFF7F";
+var leftcolor = "#66CC66";
+var rightcolor = "#4C994C";
+var bottomcolor = "#336633";
+
+var tseg = 0x01;
+var tlseg = 0x02;
+var trseg = 0x04;
+var cseg = 0x08;
+var blseg = 0x10;
+var brseg = 0x20;
+var bseg = 0x40;
+var val2segs = new Array(0x77,0x24,0x5d,0x6d,0x2e,0x6b,0x7b,0x25,0x7f,0x6f);
+
+var time = "888888";
+var oldtime = time;
+var fadeticks = 5;
+var ticksleft = 0;
+var events = 0;
+
+var tfadecolors = new Array(fadeticks+1);
+var lfadecolors = new Array(fadeticks+1);
+var rfadecolors = new Array(fadeticks+1);
+var bfadecolors = new Array(fadeticks+1);
+
+var toncolor = "";
+var toffcolor = "";
+var loncolor = "";
+var loffcolor = "";
+var roncolor = "";
+var roffcolor = "";
+var boncolor = "";
+var boffcolor = "";
+
+function drawdiv(id,x,y,w,h,btw,blw,brw,bbw,btc,blc,brc,bbc) {
+    w -= blw + brw;
+    h -= bbw + btw;
+    document.write("<div id='"+id+"' class='seg' style='top:"+y+"px;left:"+x+
+        "px;width:"+w+"px;height:"+h+"px;font-size:0px;line-height:0%;border-top:"+btw+
+        "px solid "+btc+";border-left:"+blw+"px solid "+blc+";border-right:"+brw+
+        "px solid "+brc+";border-bottom:"+bbw+"px solid "+bbc+"'><\/div>");
+}
+
+function drawdigit(id,x,y) {
+    drawdiv("dtc"+id,x+halfsegwidth,y+halfsegwidth,digitwidth-2*halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,halfsegwidth,halfsegwidth,halfsegwidth,
+            bottomcolor,rightcolor,leftcolor,topcolor);
+    drawdiv("dbc"+id,x+halfsegwidth,y+digitheight/2,digitwidth-2*halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,halfsegwidth,halfsegwidth,halfsegwidth,
+            bottomcolor,rightcolor,leftcolor,topcolor);
+    drawdiv("dtt"+id,x+halfsegwidth,y,digitwidth-2*halfsegwidth,halfsegwidth,
+            0,halfsegwidth,halfsegwidth,halfsegwidth,
+            bgcolor,bgcolor,bgcolor,topcolor);
+    drawdiv("dtl"+id,x,y+halfsegwidth,halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,0,halfsegwidth,halfsegwidth,
+            bgcolor,bgcolor,leftcolor,bgcolor);
+    drawdiv("dtr"+id,x+digitwidth-halfsegwidth,y+halfsegwidth,halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,halfsegwidth,0,halfsegwidth,
+            bgcolor,rightcolor,bgcolor,bgcolor);
+    drawdiv("dbl"+id,x,y+digitheight/2,halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,0,halfsegwidth,halfsegwidth,
+            bgcolor,bgcolor,leftcolor,bgcolor);
+    drawdiv("dbr"+id,x+digitwidth-halfsegwidth,y+digitheight/2,halfsegwidth,digitheight/2-halfsegwidth,
+            halfsegwidth,halfsegwidth,0,halfsegwidth,
+            bgcolor,rightcolor,bgcolor,bgcolor);
+    drawdiv("dbb"+id,x+halfsegwidth,y+digitheight-halfsegwidth,digitwidth-2*halfsegwidth,halfsegwidth,
+            halfsegwidth,halfsegwidth,halfsegwidth,0,
+            bottomcolor,bgcolor,bgcolor,bgcolor);
+}
+
+function drawcolon(id,x,y) {
+    drawdiv("ct"+id,x-halfsegwidth,y+Math.floor(digitheight/3)-halfsegwidth,
+            2*halfsegwidth,2*halfsegwidth,
+            halfsegwidth,halfsegwidth,halfsegwidth,halfsegwidth,
+            topcolor,leftcolor,rightcolor,bottomcolor);
+    drawdiv("cb"+id,x-halfsegwidth,y+digitheight-Math.floor(digitheight/3)-halfsegwidth,
+            2*halfsegwidth,2*halfsegwidth,
+            halfsegwidth,halfsegwidth,halfsegwidth,halfsegwidth,
+            topcolor,leftcolor,rightcolor,bottomcolor);
+}
+
+function updatedigit(digit) {
+    var segs = val2segs[time.substr(digit,1)];
+    var oldsegs = val2segs[oldtime.substr(digit,1)];
+    var segdiff = (segs ^ val2segs[oldtime.substr(digit,1)])
+    if (segdiff & tseg) {
+        document.getElementById("dtt"+digit).style.borderBottomColor =
+            (segs & tseg) ? toncolor : toffcolor;
+        document.getElementById("dtc"+digit).style.borderTopColor =
+            (segs & tseg) ? boncolor : boffcolor;
+    }
+    if (segdiff & tlseg) {
+        document.getElementById("dtl"+digit).style.borderRightColor =
+            (segs & tlseg) ? loncolor : loffcolor;
+        document.getElementById("dtc"+digit).style.borderLeftColor =
+            (segs & tlseg) ? roncolor : roffcolor;
+    }
+    if (segdiff & trseg) {
+        document.getElementById("dtc"+digit).style.borderRightColor =
+            (segs & trseg) ? loncolor : loffcolor;
+        document.getElementById("dtr"+digit).style.borderLeftColor =
+            (segs & trseg) ? roncolor : roffcolor;
+    }
+    if (segdiff & cseg) {
+        document.getElementById("dtc"+digit).style.borderBottomColor =
+            (segs & cseg) ? toncolor : toffcolor;
+        document.getElementById("dbc"+digit).style.borderTopColor =
+            (segs & cseg) ? boncolor : boffcolor;
+    }
+    if (segdiff & blseg) {
+        document.getElementById("dbl"+digit).style.borderRightColor =
+            (segs & blseg) ? loncolor : loffcolor;
+        document.getElementById("dbc"+digit).style.borderLeftColor =
+            (segs & blseg) ? roncolor : roffcolor;
+    }
+    if (segdiff & brseg) {
+        document.getElementById("dbc"+digit).style.borderRightColor =
+            (segs & brseg) ? loncolor : loffcolor;
+        document.getElementById("dbr"+digit).style.borderLeftColor =
+            (segs & brseg) ? roncolor : roffcolor;
+    }
+    if (segdiff & bseg) {
+        document.getElementById("dbc"+digit).style.borderBottomColor =
+            (segs & bseg) ? toncolor : toffcolor;
+        document.getElementById("dbb"+digit).style.borderTopColor =
+            (segs & bseg) ? boncolor : boffcolor;
+    }
+}
+
+function update() {
+    if (!ticksleft) {
+        var d = new Date();
+        var t = (100+d.getHours()).toString().substr(1,2) +
+                (100+d.getMinutes()).toString().substr(1,2) +
+                (100+d.getSeconds()).toString().substr(1,2);
+        if (t != time) {
+            oldtime = time;
+            time = t;
+            ticksleft = fadeticks;
+        }
+    }
+    if (ticksleft > 0) {
+        ticksleft--;
+        toffcolor = tfadecolors[ticksleft];
+        toncolor = tfadecolors[fadeticks-ticksleft];
+        loffcolor = lfadecolors[ticksleft];
+        loncolor = lfadecolors[fadeticks-ticksleft];
+        roffcolor = rfadecolors[ticksleft];
+        roncolor = rfadecolors[fadeticks-ticksleft];
+        boffcolor = bfadecolors[ticksleft];
+        boncolor = bfadecolors[fadeticks-ticksleft];
+        for (var i = 0; i < 6; i++) updatedigit(i);
+    }
+    events--;
+}
+
+function timer() {
+    if (events < ticksleft || !events) {
+        events++;
+        setTimeout(update,1);
+    }
+}
+
+function fadecolor(startred,startgreen,startblue,endred,endgreen,endblue,step,maxstep) {
+    return "#" +
+        (Math.round((step*endred+(maxstep-step)*startred)/maxstep)+0x100).toString(16).substr(1,2) +
+        (Math.round((step*endgreen+(maxstep-step)*startgreen)/maxstep)+0x100).toString(16).substr(1,2) +
+        (Math.round((step*endblue+(maxstep-step)*startblue)/maxstep)+0x100).toString(16).substr(1,2);
+}
+
+function init() {
+    var bgred = parseInt(bgcolor.substr(1,2),16);
+    var bggreen = parseInt(bgcolor.substr(3,2),16);
+    var bgblue = parseInt(bgcolor.substr(5,2),16);
+    var topred = parseInt(topcolor.substr(1,2),16);
+    var topgreen = parseInt(topcolor.substr(3,2),16);
+    var topblue = parseInt(topcolor.substr(5,2),16);
+    var leftred = parseInt(leftcolor.substr(1,2),16);
+    var leftgreen = parseInt(leftcolor.substr(3,2),16);
+    var leftblue = parseInt(leftcolor.substr(5,2),16);
+    var rightred = parseInt(rightcolor.substr(1,2),16);
+    var rightgreen = parseInt(rightcolor.substr(3,2),16);
+    var rightblue = parseInt(rightcolor.substr(5,2),16);
+    var bottomred = parseInt(bottomcolor.substr(1,2),16);
+    var bottomgreen = parseInt(bottomcolor.substr(3,2),16);
+    var bottomblue = parseInt(bottomcolor.substr(5,2),16);
+  
+    for(var i = 0; i <= fadeticks; i++) {
+        tfadecolors[i] = fadecolor(bgred,bggreen,bgblue,topred,topgreen,topblue,i,fadeticks);
+        lfadecolors[i] = fadecolor(bgred,bggreen,bgblue,leftred,leftgreen,leftblue,i,fadeticks);
+        rfadecolors[i] = fadecolor(bgred,bggreen,bgblue,rightred,rightgreen,rightblue,i,fadeticks);
+        bfadecolors[i] = fadecolor(bgred,bggreen,bgblue,bottomred,bottomgreen,bottomblue,i,fadeticks);
+    }
+  
+    setInterval(timer,100);
+}
+
+document.write("<div style='position:relative;width:"+
+    (2*digitgrouppitch+digitpitch+digitwidth)+"px;height:"+
+    digitheight+"px'>");
+drawdigit(0,0,0);
+drawdigit(1,digitpitch,0);
+drawcolon(12,(digitgrouppitch+digitpitch+digitwidth)/2,0);
+drawdigit(2,digitgrouppitch,0);
+drawdigit(3,digitgrouppitch+digitpitch,0);
+drawcolon(34,(digitgrouppitch+digitpitch+digitwidth)/2+digitgrouppitch,0);
+drawdigit(4,2*digitgrouppitch,0);
+drawdigit(5,2*digitgrouppitch+digitpitch,0);
+document.write("<\/div>");
+
+window.addEventListener('load', init, false);
+</script>
+</div>
+</div>
+
+<div class="box" id="description">
+This is javascript changing the colors of HTML DIV borders.
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,221 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Random Code Generator</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+#alphabet {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+#codesize {
+    text-align: right;
+}
+
+#code {
+    background-color: transparent;
+    font: bold 100% 'Courier New', monospace;
+    box-sizing: border-box;
+    word-break: break-all;
+    width: 100%;
+    height: 4em;
+    resize: none;
+    border: 1px solid;
+    padding: 0.2em;
+    margin: 0.2em 0px;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var codeformat_elem;
+var alphabet_elem;
+var alphabet_nchars_elem;
+var alphabet_nbits_elem;
+var codesize_elem;
+var code_nbits_elem;
+var code_elem;
+
+const alphabets = {
+    hex: '0123456789ABCDEF',
+    dec: '0123456789',
+    bin: '01',
+    mime64: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/',
+    unambig_ascii: 'ABCDEFGHJKLMNPQRSTUVXYZabcdefghijkmnopqrstuvxyz23456789!#$%&*+-./:;=?@[\]{}',
+    unambig_alphanum: 'ABCDEFGHJKLMNPQRSTUVXYZabcdefghijkmnopqrstuvxyz23456789'
+};
+
+var current_alphabet_codepoints;
+
+function utf16_string_to_unicode_list(s)
+{
+    var unicode_list = [];
+    for (var i = 0; i < s.length; i++) {
+        // Get next UTF-16 value (this is the final Unicode codepoint if not part of a
+        // surrogate pair)
+        var unicode_code = s.charCodeAt(i);
+        if (unicode_code >= 0xD800 && unicode_code < 0xDC00 && i < s.length - 1) {
+            // The UTF-16 value was part of a surrogate pair (high surrogate) so get 2nd
+            // part (low surrogate)
+            var utf16_2nd_code = s.charCodeAt(++i);
+            if (utf16_2nd_code < 0xDC00 || utf16_2nd_code >= 0xE000) {
+                // Low surrogate is invalid, so just keep both surrogates as separate code points
+                i--;
+            } else {
+                // Combine high and low surrogates to form final Unicode codepoint
+                unicode_code = (((unicode_code - 0xD800) << 10) | (utf16_2nd_code - 0xDC00)) +
+                    0x10000;
+            }
+        }
+        unicode_list.push(unicode_code);
+    }
+    return unicode_list;
+}
+
+function codepoint_to_utf16_string(code)
+{
+    if (code < 0x10000) {
+        return String.fromCharCode(code);
+    } else if (code >= 0x110000) {
+        // Code is out of range, so use replacement character instead
+        return '\uFFFD';
+    } else {
+        // Convert to high and low UTF-16 surrogates
+        code -= 0x10000;
+        return String.fromCharCode((code >> 10) + 0xD800, (code & 0x3FF) + 0xDC00);
+    }
+}
+
+function unicode_list_to_utf16_string(unicode_list)
+{
+    return unicode_list.map(codepoint_to_utf16_string).join('');
+}
+
+function generate_code()
+{
+    const nchars = +codesize_elem.value;
+    if (isNaN(nchars) || (nchars < 1) || (nchars > 1000)) {
+        code_elem.value = 'Invalid code size! Must be 1 - 1000.';
+        return;
+    }
+    const format = codeformat_elem.value;
+    const is_unambig = format.startsWith('unambig');
+    const alphlen = current_alphabet_codepoints.length;
+    code_nbits_elem.innerText = (nchars * Math.log2(alphlen)).toFixed(2);
+    let code = '';
+    let last_ch = '';
+    for (let i = 0; i < nchars; i++) {
+        let ch;
+        do {
+            const codepoint = current_alphabet_codepoints[Math.floor(Math.random() * alphlen)];
+            ch = codepoint_to_utf16_string(codepoint);
+        } while (is_unambig && ['vv', 'VV', 'rn', 'rm'].includes(last_ch + ch));
+        code = code + ch;
+        last_ch = ch;
+    }
+    code_elem.value = code;
+    code_elem.focus();
+    code_elem.select();
+}
+
+function generate_code_with_new_alphabet(use_predefined)
+{
+    if (use_predefined) {
+        const format = codeformat_elem.value;
+        const alphabet = alphabets[format];
+        if (alphabet) {
+            alphabet_elem.value = alphabet;
+        } else {
+            codeformat_elem.value = 'user';
+        }
+        // Convert the alphabet string to Unicode codepoints (which are assumed to be unique already)
+        current_alphabet_codepoints = utf16_string_to_unicode_list(alphabet_elem.value);
+    } else {
+        // Convert the alphabet string to Unicode codepoints
+        current_alphabet_codepoints = utf16_string_to_unicode_list(alphabet_elem.value);
+        // Ensure the codepoints are unique (by converting to set and back to array)
+        current_alphabet_codepoints = Array.from(new Set(current_alphabet_codepoints));
+        // Convert the codepoints back to an alphabet string and update the UI with it
+        alphabet_elem.value = unicode_list_to_utf16_string(current_alphabet_codepoints);
+        // Check if the alphabet matches any predefined alphabet and update the UI format if so
+        codeformat_elem.value = 'user';
+        for (const format in alphabets) {
+            if (alphabet_elem.value == alphabets[format]) {
+                codeformat_elem.value = format;
+                break;
+            }
+        }
+    }
+    alphabet_nchars_elem.innerText = current_alphabet_codepoints.length
+    alphabet_nbits_elem.innerText = Math.log2(current_alphabet_codepoints.length).toFixed(2);
+    generate_code();
+}
+
+function init()
+{
+    codeformat_elem = document.getElementById('codeformat')
+    alphabet_elem = document.getElementById('alphabet');
+    alphabet_nchars_elem = document.getElementById('alph_nchars');
+    alphabet_nbits_elem = document.getElementById('alph_nbits');
+    codesize_elem = document.getElementById('codesize')
+    code_nbits_elem = document.getElementById('code_nbits')
+    code_elem = document.getElementById('code');
+
+    // Handle URL arguments
+    const page_settings_spec = {
+        alphabet: {obj: alphabet_elem},
+        codesize: {obj: codesize_elem},
+    };
+    genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+    // Use the default predefined alphabet if the URL did not set an alphabet
+    generate_code_with_new_alphabet(alphabet_elem.value.length == 0);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Random Code Generator</h1>
+
+<div class="box">
+Code format:
+<select id="codeformat" onChange="generate_code_with_new_alphabet(true)">
+    <option value="hex">Hex
+    <option value="dec">Decimal
+    <option value="bin">Binary
+    <option value="mime64">MIME base64
+    <option value="unambig_ascii">Unambiguous ASCII
+    <option value="unambig_alphanum" selected>Unambiguous alphanumeric
+    <option value="user">User defined
+</select>
+
+<p>
+Alphabet:
+<input type="text" id="alphabet" onFocus="this.select()" onChange="generate_code_with_new_alphabet(false)">
+Alphabet size: <span id="alph_nchars">0</span>&nbsp;characters (=&nbsp;<span id="alph_nbits">0</span>&nbsp;bits)
+</p>
+
+<p>
+Code size:
+<input type="text" id="codesize" value="8" size=4 maxlength=4 onFocus="this.select()" onChange="generate_code()"> characters
+(=&nbsp;<span id="code_nbits">0</span>&nbsp;bits)
+</p>
+
+<button type="button" onClick="generate_code()">Generate new code</button>
+<textarea id="code" readonly onFocus="this.select()"></textarea>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<link rel="stylesheet" type="text/css" href="lte_style.css">
+<title>LTE PDSCH Allocation Calculator</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+table.result th, table.result td {
+  text-align: right;
+}
+table.result td.total {
+  font-weight: bold;
+}
+.error {
+  color: #FF0000;
+}
+.center_prb_partial {
+  color: #808080;
+  background-color: #E0E0E0;
+}
+.center_prb_full {
+  color: #FFFFFF;
+  background-color: #A0A0A0;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [
+    ['up_button', 'Back to overview', 'location.href="index.html"']
+    ];
+
+var duplexCommentElem;
+var tddUlDlCfgRowElem;
+var tddUlDlCfgCommentElem;
+var tddSpecSubfCfgRowElem;
+var tddSpecSubfCfgCommentElem;
+var bwCommentElem;
+var cpCommentElem;
+var txPortCommentElem;
+var layerCommentElem;
+var cfiCommentElem;
+var modulationCommentElem;
+var prbAllocBitsSlot0Elem;
+var prbAllocBitsSlot1Elem;
+var resultElem;
+
+var binDigits = new Array("0000","0001","0010","0011","0100","0101","0110","0111",
+                          "1000","1001","1010","1011","1100","1101","1110","1111");
+
+var modulation_table = new Array("?", "?", "QPSK", "?", "16QAM", "?", "64QAM");
+
+var frameStructType;
+var tddUlDlCfgs = new Array(
+  ["D","S","U","U","U","D","S","U","U","U"],
+  ["D","S","U","U","D","D","S","U","U","D"],
+  ["D","S","U","D","D","D","S","U","D","D"],
+  ["D","S","U","U","U","D","D","D","D","D"],
+  ["D","S","U","U","D","D","D","D","D","D"],
+  ["D","S","U","D","D","D","D","D","D","D"],
+  ["D","S","U","U","U","D","S","U","U","D"]
+  );
+var tddUlDlCfgDescriptions =
+  [
+  "DL subframes: 0,5",
+  "DL subframes: 0,4-5,9",
+  "DL subframes: 0,3-5,8-9",
+  "DL subframes: 0,5-9",
+  "DL subframes: 0,4-9",
+  "DL subframes: 0,3-9",
+  "DL subframes: 0,5,9"
+  ];
+var tddUlDlCfg;
+var tddSpecSubfDlSyms = new Array(
+  // Extended CP
+  [3,8,9,10,3,8,9],
+  // Normal CP
+  [3,9,10,11,12,3,9,10,11]
+  );
+var tddSpecSubfUlSyms = new Array(
+  // Extended CP
+  [1,1,1,1,2,2,2],
+  // Normal CP
+  [1,1,1,1,1,2,2,2,2]
+  );
+var tddSpecSubfCfg;
+var bw_index;
+var nprbsList = new Array(6, 15, 25, 50, 75, 100);
+var n_prbs;
+var subcarriers;
+var cp_index;
+var symbolsPerSlotList = new Array(7, 6);
+var symbolsPerSlot;
+var n_tx_ports_index;
+var n_tx_ports;
+var n_layers;
+var n_REs_per_half_prb =
+  [
+    [ // Normal CP
+    [5, 6, 6, 6, 5, 6, 6, 5, 6, 6, 6, 5, 6, 6], // 1 Tx
+    [4, 6, 6, 6, 4, 6, 6, 4, 6, 6, 6, 4, 6, 6], // 2 Tx
+    [4, 4, 6, 6, 4, 6, 6, 4, 4, 6, 6, 4, 6, 6]  // 4 Tx
+    ],
+    [ // Extended CP
+    [5, 6, 6, 5, 6, 6, 5, 6, 6, 5, 6, 6], // 1 Tx
+    [4, 6, 6, 4, 6, 6, 4, 6, 6, 4, 6, 6], // 2 Tx
+    [4, 4, 6, 4, 6, 6, 4, 4, 6, 4, 6, 6]  // 4 Tx
+    ]
+  ];
+
+var subframe;
+var cfi;
+var n_pdcch_syms;
+var bitsPerReList = new Array(2, 4, 6);
+var bitsPerRe;
+var prb_alloc_is_right_justified;
+var read_prb_alloc_bits_from_right;
+
+function hex2bin(h, nbits)
+  {
+  if (h == "") return "No PRB allocation specified!";
+  h = h.toLowerCase();
+  var b = "";
+  for (var i = 0; i < h.length; i++)
+    {
+    var d = "0123456789abcdef".indexOf(h.charAt(i));
+    if (d < 0) return "PRB allocation contains invalid hex digit!";
+    b += binDigits[d];
+    }
+
+  if (prb_alloc_is_right_justified)
+    {
+    if (b.length < nbits)
+      {
+      b = (new Array(nbits - b.length + 1)).join("0") + b;
+      }
+    else if (b.length > nbits)
+      {
+      if (b.slice(0, b.length - nbits).indexOf("1") >= 0) return "PRB allocation exceeds available PRBs!";
+      b = b.slice(b.length - nbits);
+      }
+    }
+  else
+    {
+    if (b.length < nbits)
+      {
+      b += (new Array(nbits - b.length + 1)).join("0");
+      }
+    else if (b.length > nbits)
+      {
+      if (b.slice(nbits - b.length).indexOf("1") >= 0) return "PRB allocation exceeds available PRBs!";
+      b = b.slice(0, nbits);
+      }
+    }
+
+  b = b.split("");
+  if (read_prb_alloc_bits_from_right) return b.reverse();
+  return b;
+  }
+
+function set_all_prbs()
+  {
+  var n_full_nibbles = n_prbs >> 2;
+  var n_remaining_bits = n_prbs & 0x3;
+  var h = (new Array(n_full_nibbles + 1)).join("F");
+  if (n_remaining_bits > 0)
+    {
+    if (prb_alloc_is_right_justified)
+      {
+      h = "137".charAt(n_remaining_bits - 1) + h;
+      }
+    else
+      {
+      h = h + "8CE".charAt(n_remaining_bits - 1);
+      }
+    }
+  document.frm.prb_alloc_slot0.value = h;
+  document.frm.prb_alloc_slot1.value = h;
+  }
+
+function set_same_prbs()
+  {
+  if (document.frm.same_alloc_chkbox.checked)
+    {
+    document.frm.prb_alloc_slot1.disabled = true;
+    }
+  else
+    {
+    document.frm.prb_alloc_slot1.disabled = false;
+    }
+  }
+
+function calc()
+  {
+  frameStructType = document.frm.duplex_mode.selectedIndex + 1;
+  bw_index = document.frm.bw.selectedIndex;
+  cp_index = document.frm.cp.selectedIndex;
+  symbolsPerSlot = symbolsPerSlotList[cp_index];
+  if (frameStructType == 1)
+    {
+    tddUlDlCfgRowElem.style.display = "none";
+    tddSpecSubfCfgRowElem.style.display = "none";
+    }
+  else
+    {
+    tddUlDlCfgRowElem.style.display = "table-row";
+    tddSpecSubfCfgRowElem.style.display = "table-row";
+    tddUlDlCfg = document.frm.tdd_ul_dl_cfg.selectedIndex;
+    tddSpecSubfCfg = document.frm.tdd_spec_subf_cfg.selectedIndex;
+    if (symbolsPerSlot == 7)
+      {
+      document.frm.tdd_spec_subf_cfg.options[7].disabled = false;
+      document.frm.tdd_spec_subf_cfg.options[8].disabled = false;
+      }
+    else
+      {
+      document.frm.tdd_spec_subf_cfg.options[7].disabled = true;
+      document.frm.tdd_spec_subf_cfg.options[8].disabled = true;
+      if (tddSpecSubfCfg > 6)
+        {
+        tddSpecSubfCfg == 6;
+        document.frm.tdd_spec_subf_cfg.selectedIndex = 6;
+        }
+      }
+    tddUlDlCfgCommentElem.innerHTML = '(' + tddUlDlCfgDescriptions[tddUlDlCfg] + ')';
+    var dwPtsSyms = tddSpecSubfDlSyms[symbolsPerSlot - 6][tddSpecSubfCfg];
+    var upPtsSyms = tddSpecSubfUlSyms[symbolsPerSlot - 6][tddSpecSubfCfg];
+    tddSpecSubfCfgCommentElem.innerHTML = '(' + dwPtsSyms + ' DwPTS symbols, '
+      + upPtsSyms + ' UpPTS symbol' + ((upPtsSyms == 1) ? '' : 's') + ')<br><span class="note">'
+      + ((dwPtsSyms <= 3) ? '(Note: No PDSCH allowed in DwPTS of this duration)' : '&nbsp;') + '<\/span>';
+    }
+  n_tx_ports_index = document.frm.n_tx_ports.selectedIndex;
+  n_tx_ports = n_tx_ports_index + 1;
+  if (n_tx_ports == 3) n_tx_ports = 4;
+  n_layers = document.frm.n_layers.selectedIndex + 1;
+  for (var i = document.frm.n_layers.options.length + 1; i <= n_tx_ports; i++)
+    {
+    document.frm.n_layers.options[i - 1] = new Option(i,i);
+    }
+  document.frm.n_layers.options.length = n_tx_ports;
+  if (n_layers > n_tx_ports) n_layers = n_tx_ports;
+  document.frm.n_layers.selectedIndex = n_layers - 1;
+
+  cfi = document.frm.cfi.selectedIndex + 1;
+  subframe = document.frm.subframe.selectedIndex;
+  bitsPerRe = bitsPerReList[document.frm.modulation.selectedIndex];
+  prb_alloc_is_right_justified = (document.frm.prb_alloc_justify.selectedIndex == 1);
+  read_prb_alloc_bits_from_right = (document.frm.prb_alloc_prb0_end.selectedIndex == 1);
+  n_prbs = nprbsList[bw_index];
+  subcarriers = n_prbs * 12;
+  var n_dl_syms = 2 * symbolsPerSlot;
+  var cfi_max = 3;
+  if (frameStructType == 2)
+    {
+    if (subframe == 1 || subframe == 6)
+      {
+      cfi_max = 2 - (n_prbs <= 10);
+      }
+    if (tddUlDlCfgs[tddUlDlCfg][subframe] == "S")
+      {
+      n_dl_syms = dwPtsSyms > 3 ? dwPtsSyms : 0;
+      }
+    else if (tddUlDlCfgs[tddUlDlCfg][subframe] == "U")
+      {
+      n_dl_syms = 0;
+      }
+    }
+  if (cfi > cfi_max)
+    {
+    cfi = cfi_max;
+    document.frm.cfi.selectedIndex = cfi - 1;
+    }
+  var cfi_options = document.frm.cfi.options;
+  for (var i = 0; i < cfi_options.length; i++)
+    {
+    cfi_options[i].disabled = (i + 1 > cfi_max);
+    }
+  n_pdcch_syms = cfi + (n_prbs <= 10);
+  duplexCommentElem.innerHTML = "(Frame structure type " + frameStructType + ")";
+  bwCommentElem.innerHTML = "(" + n_prbs + " PRBs, " + subcarriers + " subcarriers)";
+  cpCommentElem.innerHTML = "(" + symbolsPerSlot + " symbols per slot)";
+  cfiCommentElem.innerHTML = "(" + n_pdcch_syms + " PDCCH symbol" + ((n_pdcch_syms > 1) ? "s)" : ")");
+  modulationCommentElem.innerHTML = "(" + bitsPerRe + " bits per RE)";
+
+  // Assume no center exclusion
+  var center_syms = 0;
+  // Exclude PBCH
+  if (subframe == 0) center_syms |= 0x0780 >> cp_index;
+  if (frameStructType == 1)
+    {
+    // Exclude PSCH and SSCH
+    if (subframe == 0 || subframe == 5) center_syms |= 0x0060 >> cp_index;
+    }
+  else
+    {
+    // Exclude SSCH
+    if (subframe == 0 || subframe == 5) center_syms |= 0x2000 >> (cp_index * 2);
+    // Exclude PSCH
+    if (subframe == 1 || subframe == 6) center_syms |= 0x0004;
+    }
+
+  var first_center_half_prb = n_prbs - 6;
+  var last_center_half_prb = n_prbs + 5;
+  var center_partial_start_prb = first_center_half_prb >> 1;
+  var center_full_start_prb = (first_center_half_prb + 1) >> 1;
+  var center_full_end_prb = (last_center_half_prb + 1) >> 1;
+  var center_partial_end_prb = (last_center_half_prb + 2) >> 1;
+
+  if (document.frm.prb_alloc_slot0.value == "all")
+    {
+    set_all_prbs();
+    }
+  if (document.frm.same_alloc_chkbox.checked)
+    {
+    document.frm.prb_alloc_slot1.value = document.frm.prb_alloc_slot0.value;
+    }
+  var prb_alloc_slot0 = hex2bin(document.frm.prb_alloc_slot0.value, n_prbs);
+  var prb_alloc_slot1 = hex2bin(document.frm.prb_alloc_slot1.value, n_prbs);
+  if (typeof prb_alloc_slot0 == "string")
+    {
+    prbAllocBitsSlot0Elem.innerHTML = "<span class='error'>ERROR! " + prb_alloc_slot0 + "<\/span>";
+    }
+  else
+    {
+    if (center_syms)
+      {
+      prbAllocBitsSlot0Elem.innerHTML =
+        prb_alloc_slot0.slice(0, center_partial_start_prb).concat(
+          ["<span class='center_prb_partial'>" + prb_alloc_slot0[center_partial_start_prb]].slice(0, center_full_start_prb - center_partial_start_prb),
+          ["<span class='center_prb_full'>" + prb_alloc_slot0.slice(center_full_start_prb, center_full_end_prb).join(" ") + "<\/span>"],
+          [prb_alloc_slot0[center_full_end_prb] + "<\/span>"].slice(0, center_full_start_prb - center_partial_start_prb),
+          prb_alloc_slot0.slice(center_partial_end_prb)).join(" ");
+      }
+    else
+      {
+      prbAllocBitsSlot0Elem.innerHTML = prb_alloc_slot0.join(" ");
+      }
+    }
+  if (typeof prb_alloc_slot1 == "string")
+    {
+    prbAllocBitsSlot1Elem.innerHTML = "<span class='error'>ERROR! " + prb_alloc_slot1 + "<\/span>";
+    }
+  else
+    {
+    if (center_syms)
+      {
+      prbAllocBitsSlot1Elem.innerHTML =
+        prb_alloc_slot1.slice(0, center_partial_start_prb).concat(
+          ["<span class='center_prb_partial'>" + prb_alloc_slot1[center_partial_start_prb]].slice(0, center_full_start_prb - center_partial_start_prb),
+          ["<span class='center_prb_full'>" + prb_alloc_slot1.slice(center_full_start_prb, center_full_end_prb).join(" ") + "<\/span>"],
+          [prb_alloc_slot1[center_full_end_prb] + "<\/span>"].slice(0, center_full_start_prb - center_partial_start_prb),
+          prb_alloc_slot1.slice(center_partial_end_prb)).join(" ");
+      }
+    else
+      {
+      prbAllocBitsSlot1Elem.innerHTML = prb_alloc_slot1.join(" ");
+      }
+    }
+  if (typeof prb_alloc_slot0 == "string" || typeof prb_alloc_slot1 == "string")
+    {
+    resultElem.innerHTML = "<span class='error'>ERROR! Invalid PRB allocation value!<\/span>";
+    return;
+    }
+
+  var n_half_prbs_full_sym = [0, 0];
+  var n_half_prbs_in_center = [0, 0];
+
+  for (var half_prb = 0; half_prb < 2 * n_prbs; half_prb++)
+    {
+    var prb = half_prb >> 1;
+    if (prb_alloc_slot0[prb] != 0) n_half_prbs_full_sym[0]++;
+    if (prb_alloc_slot1[prb] != 0) n_half_prbs_full_sym[1]++;
+    }
+
+  for (var half_prb = first_center_half_prb; half_prb <= last_center_half_prb; half_prb++)
+    {
+    var prb = half_prb >> 1;
+    if (prb_alloc_slot0[prb] != 0) n_half_prbs_in_center[0]++;
+    if (prb_alloc_slot1[prb] != 0) n_half_prbs_in_center[1]++;
+    }
+
+  var n_REs;
+  var n_total_REs = 0;
+  var result_html = "<table class='result'><tr><th>Symbol<th>RS/<br>PRB<th>Center<br>blocked<th>REs<th>bits";
+
+  for (var sym = n_pdcch_syms; sym < n_dl_syms; sym++)
+    {
+    var slot = +(sym >= symbolsPerSlot);
+    var n_half_prbs = n_half_prbs_full_sym[slot];
+    if (center_syms & (1 << sym)) n_half_prbs -= n_half_prbs_in_center[slot];
+    var n_REs_per_half_prb_final = n_REs_per_half_prb[cp_index][n_tx_ports_index][sym];
+    n_total_REs += n_REs =
+      n_layers * n_half_prbs * n_REs_per_half_prb_final;
+    result_html +=
+      "<tr><td>" + sym +
+      "<td>" + (n_REs_per_half_prb_final < 6 ? (6 - n_REs_per_half_prb_final) * 2 : "&nbsp;") +
+      "<td>" + (center_syms & (1 << sym) ? "X" : "&nbsp;") +
+      "<td>" + n_REs +
+      "<td>" + (n_REs * bitsPerRe);
+    }
+
+  result_html += "<tr><td class='total'>Total<td class='total'>&nbsp;<td class='total'>&nbsp;<td class='total'>" + n_total_REs + "<td class='total'>" + (n_total_REs * bitsPerRe) + "<\/table>";
+
+  resultElem.innerHTML = result_html;
+  }
+
+function calc_if_enter(e)
+  {
+  if (e.key == 'Enter')
+    {
+    calc();
+    return true;
+    }
+  return false;
+  }
+
+function init()
+  {
+  document.getElementById("noscript").style.display = "none";
+  duplexCommentElem = document.getElementById("duplex_comment_div");
+  tddUlDlCfgRowElem = document.getElementById("tdd_ul_dl_cfg_row");
+  tddUlDlCfgCommentElem = document.getElementById("tdd_ul_dl_cfg_comment_div");
+  tddSpecSubfCfgRowElem = document.getElementById("tdd_spec_subf_cfg_row");
+  tddSpecSubfCfgCommentElem = document.getElementById("tdd_spec_subf_cfg_comment_div");
+  bwCommentElem = document.getElementById("bw_comment_div");
+  cpCommentElem = document.getElementById("cp_comment_div");
+  txPortCommentElem = document.getElementById("tx_port_comment_div");
+  layerCommentElem = document.getElementById("layer_comment_div");
+  cfiCommentElem = document.getElementById("cfi_comment_div");
+  modulationCommentElem = document.getElementById("modulation_comment_div");
+  prbAllocBitsSlot0Elem = document.getElementById("prb_alloc_bits_slot0");
+  prbAllocBitsSlot1Elem = document.getElementById("prb_alloc_bits_slot1");
+  resultElem = document.getElementById("result");
+
+  // Handle URL arguments
+  const page_settings_spec = {
+    duplex_mode: {obj: document.frm['duplex_mode']},
+    tdd_ul_dl_cfg: {obj: document.frm['tdd_ul_dl_cfg']},
+    tdd_spec_subf_cfg: {obj: document.frm['tdd_spec_subf_cfg']},
+    bw: {obj: document.frm['bw']},
+    cp: {obj: document.frm['cp']},
+    n_tx_ports: {obj: document.frm['n_tx_ports']},
+    n_layers: {obj: document.frm['n_layers']},
+    cfi: {obj: document.frm['cfi']},
+    subframe: {obj: document.frm['subframe']},
+    modulation: {obj: document.frm['modulation']},
+    prb_alloc_slot0: {obj: document.frm['prb_alloc_slot0']},
+    prb_alloc_slot1: {obj: document.frm['prb_alloc_slot1']},
+    prb_alloc_justify: {obj: document.frm['prb_alloc_justify']},
+    prb_alloc_prb0_end: {obj: document.frm['prb_alloc_prb0_end']},
+  };
+  genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+  calc();
+  }
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>LTE PDSCH Allocation Calculator</h1>
+<p class="page_subtitle">(3GPP Rel-8)</p>
+
+<p id="noscript" style="color:red"><b>WARNING: If this text is still visible when the page is fully loaded, scripts are disabled in your browser and this page will not work properly!</b></p>
+
+<div class="box">
+
+<form name="frm" onsubmit="calc(); return false;">
+<table class="form">
+<tr>
+  <td>Duplexing mode:
+  <td><select name="duplex_mode" onChange="calc();">
+      <option value="fdd" selected>FDD
+      <option value="tdd">TDD
+      </select>
+  <td><span id="duplex_comment_div" style="position:relative;width:20em"></span>
+<tr id="tdd_ul_dl_cfg_row">
+  <td>TDD uplink/downlink configuration:<br>
+      <span class="note">&nbsp;</span>
+  <td><select name="tdd_ul_dl_cfg" onChange="calc();">
+        <option value="0" selected>0
+        <option value="1">1
+        <option value="2">2
+        <option value="3">3
+        <option value="4">4
+        <option value="5">5
+        <option value="6">6
+      </select><br>
+      <span class="note">&nbsp;</span>
+  <td><span id="tdd_ul_dl_cfg_comment_div"></span><br>
+      <span class="note">&nbsp;</span>
+<tr id="tdd_spec_subf_cfg_row">
+  <td>TDD special subframe configuration:<br>
+      <span class="note">&nbsp;</span>
+  <td><select name="tdd_spec_subf_cfg" onChange="calc();">
+        <option value="0">0
+        <option value="1" selected>1
+        <option value="2">2
+        <option value="3">3
+        <option value="4">4
+        <option value="5">5
+        <option value="6">6
+        <option value="7">7
+        <option value="8">8
+      </select><br>
+      <span class="note">&nbsp;</span>
+  <td><span id="tdd_spec_subf_cfg_comment_div"><br>
+      <span class="note">&nbsp;</span></span>
+<tr>
+  <td>Channel bandwidth:
+  <td><select name="bw" onChange="calc();">
+        <option value="1.4" selected>1.4 MHz
+        <option value="3">3 MHz
+        <option value="5">5 MHz
+        <option value="10">10 MHz
+        <option value="15">15 MHz
+        <option value="20">20 MHz
+      </select>
+  <td><span id="bw_comment_div" style="position:relative;width:20em"></span>
+<tr>
+  <td>Cyclic prefix:
+  <td><select name="cp" onChange="calc();">
+        <option value="norm" selected>Normal
+        <option value="ext">Extended
+      </select>
+  <td><span id="cp_comment_div"></span>
+<tr>
+  <td>Number of Tx antenna ports:
+  <td><select name="n_tx_ports" onChange="calc();">
+        <option value="1" selected>1
+        <option value="2">2
+        <option value="4">4
+      </select>
+  <td><span id="tx_port_comment_div"></span>
+<tr>
+  <td>Number of spatially multiplexed layers:
+  <td><select name="n_layers" onChange="calc();">
+        <option value="1" selected>1
+        <option value="2">2
+        <option value="3">3
+        <option value="4">4
+      </select>
+  <td><span id="layer_comment_div"></span>
+<tr>
+  <td>Control format indicator (CFI):
+  <td><select name="cfi" onChange="calc();">
+        <option value="1" selected>1
+        <option value="2">2
+        <option value="3">3
+      </select>
+  <td><span id="cfi_comment_div"></span>
+<tr>
+  <td>Subframe:
+  <td><select name="subframe" onChange="calc();">
+        <option value="0" selected>0
+        <option value="1">1
+        <option value="2">2
+        <option value="3">3
+        <option value="4">4
+        <option value="5">5
+        <option value="6">6
+        <option value="7">7
+        <option value="8">8
+        <option value="9">9
+      </select>
+  <td>
+<tr>
+  <td>Modulation:
+  <td><select name="modulation" onChange="calc();">
+        <option value="qpsk" selected>QPSK
+        <option value="16qam">16QAM
+        <option value="64qam">64QAM
+      </select>
+  <td><span id="modulation_comment_div"></span>
+<tr>
+  <td class="no_bottom_border">Slot 0 PRB allocation hex value:
+  <td class="no_bottom_border"><input type="text" name="prb_alloc_slot0" value="all" size=30 maxlength=32 onfocus="this.select();" onblur="calc();" onkeydown="if (calc_if_enter(event)) this.select();">
+  <td class="no_bottom_border"><input type="button" name="set_all_prbs_button" value="Allocate all PRBs" onclick="set_all_prbs();calc();">
+<tr>
+  <td class="note no_top_border" style="text-align:right">Bit string (PRB 0 first):
+  <td class="note no_top_border" style="width:10em" colspan="2"><span id="prb_alloc_bits_slot0"></span>
+<tr>
+  <td class="no_bottom_border">Slot 1 PRB allocation hex value:
+  <td class="no_bottom_border"><input type="text" name="prb_alloc_slot1" value="" size=30 maxlength=32 onfocus="this.select();" onblur="calc();" onkeydown="if (calc_if_enter(event)) this.select();">
+  <td class="no_bottom_border"><input type="checkbox" name="same_alloc_chkbox" value="yes" onclick="set_same_prbs();calc();">Same allocation as slot 0
+<tr>
+  <td class="note no_top_border" style="text-align:right">Bit string (PRB 0 first):
+  <td class="note no_top_border" style="width:10em" colspan="2"><span id="prb_alloc_bits_slot1"></span>
+<tr>
+  <td>Allocation value format:
+  <td colspan="2">
+      <select name="prb_alloc_justify" onChange="calc();">
+        <option value="left">Left-aligned
+        <option value="right" selected>Right-aligned
+      </select>
+      <select name="prb_alloc_prb0_end" onChange="calc();">
+        <option value="left">Left-most bit is PRB 0
+        <option value="right" selected>Right-most bit is PRB 0
+      </select>
+<tr>
+  <td class="no_bottom_border" colspan="3">Resulting allocated PDSCH resources (for given number of layers):
+<tr>
+  <td id="result" class="no_top_border" colspan="3">
+</table>
+</form>
+
+</div>
+
+</div>
+
+</body>
+</html>
