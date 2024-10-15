@@ -1,0 +1,922 @@
+<!doctype html>
+<html lang="da-DK">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<title>Julegaveplan</title>
+<style type="text/css">
+body {
+    text-align: center;
+    background-color: white;
+    background-image: url("parcels_bg.png");
+    color: black;
+    font-family: Arial, sans-serif
+}
+
+hr {
+    width: 90%;
+    height: 0.2em;
+    background-color: #A0A0C0;
+    margin-top: 2em;
+}
+
+table.one_solution {
+    border-collapse: separate;
+    border: 1px solid #606080;
+    padding: 0px;
+    border-spacing: 0px;
+    border-radius: 0.5em;
+    background-color: #FFFFE0;
+}
+
+table.selected_solution {
+    background-color: #FF8080;
+}
+
+table.one_solution td, table.one_solution th {
+    border: 0px solid #000000;
+    padding: 0px 0.3em;
+    text-align: left;
+}
+
+table.one_solution th {
+    text-align: center;
+    background-color: #E0E0E0;
+    color: #000000;
+    font-size: 1em;
+    border-radius: 0.5em;
+}
+
+span.leftptr {
+    float: right;
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0rem;
+    border-top: 0.4rem solid transparent;
+    border-right: 0.8rem solid black;
+    border-bottom: 0.4rem solid transparent;
+    border-left: 0px;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+span.rightptr {
+    float: left;
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0rem;
+    border-top: 0.4rem solid transparent;
+    border-right: 0px;
+    border-bottom: 0.4rem solid transparent;
+    border-left: 0.8rem solid black;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+div.selected_solution_info {
+    display: inline-block;
+    background-color: rgba(255,255,255,0.5);
+    padding: 0.3em;
+    margin-bottom: 0.5em;
+}
+
+#selected_solution_idx {
+    font-weight: bold;
+}
+
+div#solution_tbl_wait {
+    font-weight: bold;
+    margin-bottom: 3em;
+}
+
+div#solution_tbl {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-flow: row wrap;
+    flex-flow: row wrap;
+    -webkit-justify-content: center;
+    justify-content: center;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+div#solution_tbl > div {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    border-radius: 0.5em;
+    box-shadow: 0.5em 0.5em 0.2em rgba(0,0,0,0.5);
+}
+
+button {
+    margin: 0 0 1em 0;
+    padding: 0.7em;
+    border: 1px solid black;
+    border-radius: 0.5em;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    background: linear-gradient(#FFFAF4, #DDBB99);
+    color: #550000;
+}
+
+button#prev_year_btn, button#next_year_btn {
+    vertical-align: bottom;
+    padding: 1em;
+    margin-left: 0.5em;
+    margin-right: 0.5em;
+}
+
+button:hover {
+    background: linear-gradient(#FFFFFF, #EEEEAA);
+    color: #554400;
+}
+
+button:active {
+    background: linear-gradient(#A4CC99, #E8FFDD);
+    color: #000000;
+}
+
+div#graphic_frame {
+    display: inline-block;
+    width: 20em;
+    max-width: 100%;
+    margin: 1em 0em 0em 0em;
+}
+
+div#graphic {
+    position: relative;
+    box-sizing: content-box;
+    width: 100%;
+    height: 0%;
+    padding: 100% 0% 0% 0%; /* padding-top is relative to parent width, so this assures fixed width/height ratio */
+    margin: 0px;
+}
+
+svg#graphic_svg {
+    position: absolute;
+    box-sizing: border-box;
+    left: 0px;
+    top: 0px;
+    width: 100%;
+    height: 100%;
+}
+
+svg .shadowed {
+    filter: url(#shadow);
+}
+
+.shadow_flood {
+    flood-color: black;
+    flood-opacity: 0.6;
+}
+
+.arrow {
+    stroke: #CC0000;
+    stroke-width: 1px;
+    marker-end: url(#arrowhead);
+}
+
+#arrowhead {
+    fill: #CC0000;
+}
+
+.gradient_stop0 {
+    stop-color: #FFFFFF;
+}
+
+.gradient_stop1 {
+    stop-color: #99FF99;
+}
+
+.gradient_stop2 {
+    stop-color: #77BB77;
+}
+
+text {
+    font-weight: bold;
+    font-size: 4px;
+    font-family: sans-serif;
+    text-anchor: middle;
+    fill:#000000;
+}
+
+input[type="text"] {
+    text-align: center;
+    font-family: Arial, sans-serif;
+    background-color: #FFFFEE;
+    padding: 0.3rem;
+}
+
+</style>
+<script type="text/javascript">
+"use strict";
+
+var rand;
+
+var debug = false;
+
+class Rand
+{
+    state;
+
+    constructor(seed)
+    {
+        // Set generator state (64-bit unsigned integer split into 32 + 32 bits in little-endian order, due to
+        // JavaScript's 32-bit limit for bitwise operations) - must be non-zero
+        this.state = (seed && seed.length == 2 && (seed[0] | seed[1]) != 0) ? seed : [0x89ABCDEF, 0x01234567];
+    }
+
+    // Static method that tests the generator and returns true if OK
+    static test()
+    {
+        // Create new Rand instance with seed 0x0123456789ABCDEF
+        var rand = new Rand([0x89ABCDEF, 0x01234567]);
+        var expected_rand_output_32768 = [
+            15946, 27320, 17499, 12078, 24034, 30362, 5544, 19182, 24276, 4562, 9095, 14290, 5228, 20410, 19394, 28005,
+        ];
+        var expected_rand_output_13 = [
+            10, 3, 2, 5, 4, 2, 4, 2, 3, 4, 4, 7, 3, 5, 7, 6,
+        ];
+        var is_ok = expected_rand_output_32768.every(elem => rand.generate(32768) == elem)
+                && expected_rand_output_13.every(elem => rand.generate(13) == elem);
+        return is_ok;
+    }
+
+    // Returns a random number in the range 0..(n-1), where n <= 32768 (this uses Sebastiano Vigna's xorshift64*
+    // algorithm (from "An experimental exploration of Marsaglia's xorshift generators, scrambled") modified to work
+    // within JavaScript's limitations and to return a value in a specified range)
+    generate(n)
+    {
+        // A note on JavaScript behavior: Bitwise operations work only on the 32 LSBs, throw away higher bits, and make
+        // the value negative if bit 31 is set. The right-shift operation is arithmetic (retains the sign). The output
+        // of a bitwise operation can be "cast" to an unsigned value by doing (x ^ 0x80000000) + 0x80000000.
+        // For non-bitwise operations, integer values have 53 bits of precision (excluding the sign).
+
+        // Set 64-bit state ^= state >> 12
+        this.state[0] ^= (this.state[0] >> 12) & 0xFFFFF | (this.state[1] << 20);
+        this.state[1] ^= (this.state[1] >> 12) & 0xFFFFF;
+        // Set 64-bit state ^= state << 25
+        this.state[1] ^= (this.state[1] << 25) | ((this.state[0] >> 7) & 0x1FFFFFF);
+        this.state[0] ^= this.state[0] << 25;
+        // Set 64-bit state ^= state >> 27
+        this.state[0] ^= (this.state[0] >> 27) & 0x1F | (this.state[1] << 5);
+        this.state[1] ^= (this.state[1] >> 27) & 0x1F;
+        // Calculate 64-bit temp = state * 0x2545F4914F6CDD1D
+        var state_w0 = this.state[0] & 0xFFFF;
+        var state_w1 = (this.state[0] >> 16) & 0xFFFF;
+        var temp_w0 = 0xDD1D * state_w0;
+        var temp_w1 = 0xDD1D * state_w1 + ((temp_w0 >> 16) & 0xFFFF);
+        var temp_w3_w2 = 0xDD1D * this.state[1] + ((temp_w1 >> 16) & 0xFFFF);
+        temp_w1 = (temp_w1 & 0xFFFF) + 0x4F6C * state_w0;
+        temp_w3_w2 += 0x4F6C * (state_w1 + (this.state[1] << 16)) + ((temp_w1 >> 16) & 0xFFFF) +
+                        0xF491 * this.state[0] + 0x2545 * (this.state[0] << 16);
+        temp_w0 &= 0xFFFF;
+        temp_w1 &= 0xFFFF;
+        var temp_w2 = temp_w3_w2 & 0xFFFF;
+        var temp_w3 = (temp_w3_w2 >> 16) & 0xFFFF;
+        // Calculate result = (n * temp) >> 64, assuming n <= 32768 (so products are always positive)
+        var result_w0 = n * temp_w0;
+        var result_w1 = n * temp_w1 + (result_w0 >> 16);
+        var result_w2 = n * temp_w2 + (result_w1 >> 16);
+        var result_w3 = n * temp_w3 + (result_w2 >> 16);
+        return result_w3 >> 16;
+    }
+}
+
+class TransactionScores
+{
+    static idle_score = 0;
+    static penalty_score = -1 << 16;
+
+    scores = {};
+
+    constructor()
+    {
+        if (debug) this.counts = {};
+    }
+
+    block(giver, recipient)
+    {
+        // Prevent this giver from giving to this recipient
+        this.scores[giver + '_' + recipient] = -Infinity;
+    }
+
+    unblock(giver, recipient)
+    {
+        if (this.is_blocked(giver, recipient))
+        {
+            // Allow this giver to give to this recipient
+            this.scores[giver + '_' + recipient] = TransactionScores.idle_score;
+        }
+    }
+
+    is_blocked(giver, recipient)
+    {
+        // Check whether this giver is allowed to give to this recipient
+        var giver_recipient = giver + '_' + recipient;
+        return this.scores.hasOwnProperty(giver_recipient) && this.scores[giver_recipient] == -Infinity;
+    }
+
+    new_transaction(giver, recipient)
+    {
+        // Add penalty for this giver/recipient transaction to minimize likelihood that it will reoccur soon
+        this.scores[giver + '_' + recipient] = this.get_score(giver, recipient) + TransactionScores.penalty_score;
+        if (debug) this.counts[giver + '_' + recipient] = (this.counts[giver + '_' + recipient] || 0) + 1;
+    }
+
+    get_score(giver, recipient)
+    {
+        return this.scores[giver + '_' + recipient] || TransactionScores.idle_score;
+    }
+
+    update()
+    {
+        // Make all scores decay upwards to the maximum (zero), thus reducing previous penalties
+        for (var giver_recipient in this.scores)
+        {
+            if (this.scores.hasOwnProperty(giver_recipient))
+            {
+                var score = this.scores[giver_recipient];
+                // Only consider transactions that aren't blocked
+                if (score != -Infinity)
+                {
+                    if (debug) console.log(giver_recipient + ': ' + ('0000000000000000' + (-score).toString(2)).slice(-17));
+                    // Divide score by 2 and round towards zero (so negative values will eventually reach zero)
+                    this.scores[giver_recipient] = (score + (score < 1)) >> 1;
+                }
+            }
+        }
+    }
+}
+
+class YearInfo
+{
+    names = [];
+    solutions;
+    transaction_scores;
+    selected_solution_idx;
+
+    constructor()
+    {
+        if (debug) this.solution_counts = [];
+    }
+
+    commit(selected_solution_idx)
+    {
+        if (!this.transaction_scores)
+        {
+            this.transaction_scores = new TransactionScores();
+        }
+        if (this.solutions === undefined)
+        {
+            this.find_solutions();
+        }
+        this.selected_solution_idx = selected_solution_idx;
+        this.select_best_solution();
+        if (debug) this.solution_counts[this.selected_solution_idx] = (this.solution_counts[this.selected_solution_idx] || 0) + 1;
+        return this;
+    }
+
+    clone()
+    {
+        var new_year_info = new YearInfo();
+        new_year_info.names = this.names;
+        new_year_info.solutions = this.solutions;
+        if (debug) new_year_info.solution_counts = this.solution_counts;
+        new_year_info.transaction_scores = this.transaction_scores;
+        return new_year_info;
+    }
+
+    add_names(new_names)
+    {
+        this.solutions = undefined;
+        if (debug) this.solution_counts = [];
+        this.names = this.names.slice();
+        for (var i = 0; i < new_names.length; i++)
+        {
+            if (this.names.indexOf(new_names[i]) == -1)
+            {
+                this.names.push(new_names[i]);
+            }
+        }
+        return this;
+    }
+
+    remove_names(obsolete_names)
+    {
+        this.solutions = undefined;
+        if (debug) this.solution_counts = [];
+        this.names = this.names.slice();
+        for (var i = 0; i < obsolete_names.length; i++)
+        {
+            var idx = this.names.indexOf(obsolete_names[i]);
+            if (idx != -1)
+            {
+                this.names.splice(idx, 1);
+            }
+        }
+        return this;
+    }
+
+    block(giver, recipient)
+    {
+        this.solutions = undefined;
+        if (debug) this.solution_counts = [];
+        if (!this.transaction_scores)
+        {
+            this.transaction_scores = new TransactionScores();
+        }
+        this.transaction_scores.block(giver, recipient);
+        return this;
+    }
+
+    unblock(giver, recipient)
+    {
+        this.solutions = undefined;
+        if (debug) this.solution_counts = [];
+        this.transaction_scores.unblock(giver, recipient);
+        return this;
+    }
+
+    // Recursively find a recipient for each giver, starting from giver_idx and recipient_idx, until recipients have
+    // been found for all remaining givers, or no recipient could be found for a giver. To find the first full solution,
+    // set giver_idx = recipient_idx = 0.
+    find_first_solution(giver_idx, recipient_idx)
+    {
+        if (giver_idx >= this.names.length)
+        {
+            // No more givers to consider (valid recipients have been found for all givers), so return success from this
+            // recursion level
+            return true;
+        }
+        // Find the first valid recipient for this giver (a recipient is only valid if it is also possible to find valid
+        // recipients for all subsequent givers)
+        while (recipient_idx < this.names.length)
+        {
+            if (recipient_idx != giver_idx && this.inverse_map[recipient_idx] == undefined &&
+                !this.transaction_scores.is_blocked(this.names[giver_idx], this.names[recipient_idx]))
+            {
+                // This recipient meets all the requirements (is not the giver, has not yet been assigned, and is
+                // allowed to receive from this giver), so assign the recipient to the giver
+                this.map[giver_idx] = recipient_idx;
+                this.inverse_map[recipient_idx] = giver_idx;
+                // Recursively find recipients for the next givers
+                if (this.find_first_solution(giver_idx + 1, 0))
+                {
+                    // Valid recipients were found for all subsequent givers, so return success from this recursion
+                    // level
+                    return true;
+                }
+                // Valid recipients could not be found for all subsequent givers, so discard the assignment (no need to
+                // clear this.map[giver_idx] as it will anyway be overwritten by the next attempted recipient)
+                this.inverse_map[recipient_idx] = undefined;
+            }
+            recipient_idx++;
+        }
+        // Valid recipients could not be found for this giver and/or subsequent givers, so this recursion level fails
+        return false;
+    }
+
+    // Modify the previously found solution to produce the next possible solution
+    find_next_solution()
+    {
+        // Find the last possible giver whose current recipient can be replaced by one of the next recipients in line
+        // in such a way that valid recipients can be found for this and all subsequent givers
+        for (var giver_idx = this.names.length - 1; giver_idx >= 0; giver_idx--)
+        {
+            var recipient_idx = this.map[giver_idx];
+            this.inverse_map[recipient_idx] = undefined;
+            recipient_idx++;
+            if (this.find_first_solution(giver_idx, recipient_idx))
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Find all possible solutions
+    find_solutions()
+    {
+        // Temporary instance variables
+        this.map = new Array(this.names.length);
+        this.inverse_map = new Array(this.names.length);
+
+        // Find all valid combinations of givers and recipients by first calling find_first_solution to find one valid
+        // combination, and then repeatedly calling find_next_solution to produce the next valid combinations (each new
+        // combination is derived from the previous combination by making a single reassignment of a giver to the next
+        // recipient in line, and adjusting the assignments of other givers accordingly)
+        this.solutions = [];
+        if (this.find_first_solution(0, 0))
+        {
+            do
+            {
+                this.solutions.push(this.map.slice());
+            } while (this.find_next_solution())
+        }
+        delete this.map;
+        delete this.inverse_map;
+    }
+
+    // Select the best solution from the list of possible solutions
+    select_best_solution()
+    {
+        if (this.selected_solution_idx === undefined)
+        {
+            // Find top-scoring solution(s) for this year
+            var top_score = -Infinity
+            var top_score_solution_idxs = [];
+            var scores = [];
+            for (var solution_idx = 0; solution_idx < this.solutions.length; solution_idx++)
+            {
+                var score = 0;
+                for (var giver_idx = 0; giver_idx < this.names.length; giver_idx++)
+                {
+                    var recipient_idx = this.solutions[solution_idx][giver_idx];
+                    score += this.transaction_scores.get_score(this.names[giver_idx], this.names[recipient_idx]);
+                    // Add a small penalty if giver and recipient swap gifts in this solution
+                    if (this.solutions[solution_idx][recipient_idx] == giver_idx)
+                    {
+                        score += TransactionScores.penalty_score >> 3;
+                    }
+                }
+                if (score > top_score)
+                {
+                    top_score = score;
+                    top_score_solution_idxs = [solution_idx];
+                }
+                else if (score == top_score)
+                {
+                    top_score_solution_idxs.push(solution_idx);
+                }
+                scores.push(score);
+            }
+
+            // If only 1 top-scorer, then pick that one as the selected solution, else pick a pseudo-random one of the
+            // top-scorers
+            var n_top_scorers = top_score_solution_idxs.length;
+            var selected_top_scorer_idx = (n_top_scorers == 1) ? 0 : rand.generate(n_top_scorers);
+            this.selected_solution_idx = top_score_solution_idxs[selected_top_scorer_idx];
+        }
+        if (debug) console.log('scores=' + scores + '\nselected=' + this.selected_solution_idx + ' top=' + top_score_solution_idxs);
+
+        // Update transaction scores based on the selected solution
+        this.transaction_scores.update();
+        var solution = this.solutions[this.selected_solution_idx];
+        for (var giver_idx = 0; giver_idx < this.names.length; giver_idx++)
+        {
+            var recipient_idx = solution[giver_idx];
+            this.transaction_scores.new_transaction(this.names[giver_idx], this.names[recipient_idx]);
+        }
+    }
+}
+
+class History
+{
+    first_added_year;
+    last_added_year;
+
+    add_year(year)
+    {
+        if (this.first_added_year === undefined)
+        {
+            this.first_added_year = year;
+        }
+        if (this.last_added_year === undefined)
+        {
+            // Create info for first year
+            this[year] = new YearInfo();
+        }
+        else
+        {
+            // Create info for all years since last added year
+            for (var y = this.last_added_year + 1; y < year; y++)
+            {
+                this[y] = this[y - 1].clone().commit();
+            }
+            this[year] = this[year - 1].clone();
+        }
+        this.last_added_year = year;
+        return this[year];
+    }
+}
+
+class FromTo
+{
+    history = new History();
+    year = 0;
+    has_year_changed = true;
+
+    select_year(year)
+    {
+        this.year = year;
+        this.has_year_changed = true;
+    }
+
+    make_one_solution_table_html(year_info, solution_idx)
+    {
+        var hs = "<table class='one_solution";
+        if (solution_idx == year_info.selected_solution_idx)
+        {
+            hs += " selected_solution";
+        }
+        hs += "'><tr><th colspan='3'>L&oslash;sning " + solution_idx;
+        for (var j = 0; j < year_info.names.length; j++)
+        {
+            hs += "<tr><td>" + year_info.names[j] +
+                "<td><span class='rightptr'><\/span><td>" + year_info.names[year_info.solutions[solution_idx][j]];
+        }
+        hs += "<\/table>";
+        return hs;
+    }
+
+    make_solutions_table_html()
+    {
+        var hs = "";
+        var year_info = this.history[this.year];
+
+        for (var i = 0; i < year_info.solutions.length; i++)
+        {
+            hs += "<div class='one_solution'>" + this.make_one_solution_table_html(year_info, i) + "<\/div>";
+        }
+
+        return hs;
+    }
+
+    make_graphic_html()
+    {
+        var hs = "<svg id='graphic_svg' viewBox='0 0 100 100'><g class='shadowed'>";
+        var year_info = this.history[this.year];
+
+        for (var i = 0; i < year_info.names.length; i++)
+        {
+            var j = year_info.solutions[year_info.selected_solution_idx][i]
+            hs += "<path id='arrow_from_" + year_info.names[i] + "' class='arrow' d='M 0,0 0,0' \/>";
+        }
+        for (var i = 0; i < year_info.names.length; i++)
+        {
+            hs += "<g id='" + year_info.names[i] + "'>";
+            hs += "<use xlink:href='#psym' x='-5' y='-5' width='10' height='10' \/>";
+            hs += "<text x='0' y='0' dy='0.4em'>" + year_info.names[i] + "<\/text>";
+            hs += "<\/g>";
+        }
+
+        hs += "<\/g><\/svg>";
+        return hs;
+    }
+
+    update_graphic(grph_elem, time)
+    {
+        var year_info = this.history[this.year];
+        if (this.has_year_changed)
+        {
+            grph_elem.innerHTML = this.make_graphic_html();
+            this.has_year_changed = false;
+        }
+        var r = 40;
+        var c = 50;
+        var sep_angle = 2 * Math.PI / year_info.names.length;
+        var pos = new Array(year_info.names.length);
+        for (var i = 0; i < year_info.names.length; i++)
+        {
+            var time_angle = (2 * (i % 2) - 1) * (time * 2 * Math.PI / (50 + 11 * i) - i);
+            var dx = Math.cos(time_angle);
+            var dy = Math.sin(time_angle);
+            var x = c + r * Math.cos(i * sep_angle) + dx;
+            var y = c + r * Math.sin(i * sep_angle) + dy;
+            pos[i] = [x, y];
+        }
+        for (var i = 0; i < year_info.names.length; i++)
+        {
+            var j = year_info.solutions[year_info.selected_solution_idx][i]
+            var arrow_elem = document.getElementById('arrow_from_' + year_info.names[i]);
+            arrow_elem.setAttribute('d', 'M ' + pos[i][0] + ',' + pos[i][1] + ' ' + pos[j][0] + ',' + pos[j][1]);
+        }
+        for (var i = 0; i < year_info.names.length; i++)
+        {
+            var psym_elem = document.getElementById(year_info.names[i]);
+            psym_elem.setAttribute('transform', 'translate(' + pos[i][0] + ',' + pos[i][1] + ')');
+        }
+    }
+}
+
+let grph_elem;
+let year_input_elem;
+let year_output_elem;
+let n_solutions_elem;
+let selected_solution_idx_elem;
+let solution_tbl_wrapper_elem;
+let solution_tbl_wait_elem;
+let solution_tbl_elem;
+let solution_tbl_btn_elem;
+let solution_tbl_visible = false;
+let solution_table_requested = false;
+let from_to;
+let time = 0;
+
+function timer_tick()
+{
+    setTimeout(timer_tick, 30);
+    from_to.update_graphic(grph_elem, time);
+    time++;
+    if (solution_tbl_visible && solution_table_requested)
+    {
+        solution_tbl_elem.innerHTML = from_to.make_solutions_table_html();
+        solution_tbl_elem.removeAttribute('hidden');
+        solution_tbl_wait_elem.setAttribute('hidden', '');
+        solution_table_requested = false;
+    }
+}
+
+function request_solution_table_update()
+{
+    if (solution_tbl_visible)
+    {
+        solution_tbl_elem.setAttribute('hidden', '');
+        solution_tbl_wait_elem.removeAttribute('hidden');
+        solution_table_requested = true;
+    }
+}
+
+function solution_tbl_click_hndlr()
+{
+    solution_tbl_visible = !solution_tbl_visible;
+    solution_tbl_btn_elem.innerHTML = solution_tbl_visible ? 'Skjul' : 'Vis';
+    if (solution_tbl_visible)
+    {
+        request_solution_table_update();
+        solution_tbl_wrapper_elem.removeAttribute('hidden');
+    }
+    else
+    {
+        solution_tbl_wrapper_elem.setAttribute('hidden', '');
+    }
+}
+
+function change_year()
+{
+    var selected_year = Math.floor(year_input_elem.value) || 0;
+    selected_year = Math.min(from_to.history.last_added_year,
+                             Math.max(from_to.history.first_added_year, selected_year));
+    year_input_elem.value = selected_year;
+    year_output_elem.innerHTML = selected_year;
+    from_to.select_year(selected_year);
+    var year_info = from_to.history[selected_year];
+    n_solutions_elem.innerHTML = year_info.solutions.length;
+    selected_solution_idx_elem.innerHTML = year_info.selected_solution_idx;
+    request_solution_table_update();
+}
+
+function select_current_year()
+{
+    var current_year = (new Date()).getFullYear();
+    year_input_elem.value = current_year;
+    change_year();
+}
+
+function select_next_year()
+{
+    var selected_year = year_input_elem.value;
+    year_input_elem.value = +selected_year + 1;
+    change_year();
+}
+
+function select_prev_year()
+{
+    var selected_year = year_input_elem.value;
+    year_input_elem.value = +selected_year - 1;
+    change_year();
+}
+
+function init()
+{
+    if (!Rand.test())
+    {
+        var msg = 'ERROR: Rand test failed!';
+        document.body.innerHTML = msg;
+        throw msg;
+    }
+    rand = new Rand();
+    grph_elem = document.getElementById('graphic');
+    year_input_elem = document.getElementById('year_input');
+    year_input_elem.addEventListener('focus', () => year_input_elem.select(), false);
+    year_input_elem.addEventListener('change', change_year, false);
+    year_output_elem = document.getElementById('year_output');
+
+    document.getElementById('prev_year_btn').addEventListener('click', select_prev_year, false);
+    document.getElementById('next_year_btn').addEventListener('click', select_next_year, false);
+    document.getElementById('cur_year_btn').addEventListener('click', select_current_year, false);
+    document.getElementById('select_year_btn').addEventListener('click', change_year, false);
+
+    n_solutions_elem = document.getElementById('n_solutions');
+    selected_solution_idx_elem = document.getElementById('selected_solution_idx');
+    solution_tbl_btn_elem = document.getElementById('solution_tbl_btn');
+    solution_tbl_btn_elem.addEventListener('click', solution_tbl_click_hndlr, false);
+    solution_tbl_wrapper_elem = document.getElementById('solution_tbl_wrapper');
+    solution_tbl_elem = document.getElementById('solution_tbl');
+    solution_tbl_wait_elem = document.getElementById('solution_tbl_wait');
+
+    from_to = new FromTo();
+    var h = from_to.history;
+    h.add_year(2012).add_names(['Al', 'An', 'Pa', 'Pha', 'Su'])
+                    .block('Al','An').block('An','Al').block('Pa','Pha').block('Pha','Pa')
+                    .commit(7);
+    h.add_year(2013).commit(14);
+    h.add_year(2014).commit(5);
+    h.add_year(2015).commit(6);
+    h.add_year(2016).commit(3);
+    h.add_year(2017).commit(13);
+    h.add_year(2018).commit(10);
+    h.add_year(2019).add_names(['Pe']).block('Su','Pe').block('Pe','Su').commit();
+    h.add_year(2021).add_names(['Sy']).commit();
+    h.add_year(2022).remove_names(['Pe']).commit();
+    h.add_year(2112).commit();
+    if (debug)
+    {
+        console.log('solution counts=' + h[h.last_added_year].solution_counts);
+        var t_counts = h[h.last_added_year].transaction_scores.counts;
+        for (var t in t_counts)
+        {
+            console.log(t + ': ' + t_counts[t]);
+        }
+    }
+    select_current_year();
+    timer_tick();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<h1>Julegaveplan for <span id="year_output"></span></h1>
+
+<svg viewBox="-100 -100 200 200" width="0" height="0">
+    <defs>
+        <filter id="shadow">
+            <feFlood class="shadow_flood" />
+            <feComposite in2="SourceGraphic" operator="in" />
+            <feGaussianBlur stdDeviation="1.5" />
+            <feOffset dx="2" dy="2" result="offset" />
+            <feComposite in="SourceGraphic" in2="offset" operator="over" />
+        </filter>
+        <radialGradient id="gradient"
+            cx="25%"
+            cy="25%"
+            r="70%">
+            <stop offset="0%" class="gradient_stop0" />
+            <stop offset="50%" class="gradient_stop1" />
+            <stop offset="100%" class="gradient_stop2" />
+        </radialGradient>
+        <symbol id="psym" viewBox="-100 -100 200 200">
+            <circle
+                cx="0"
+                cy="0"
+                r="99"
+                fill="url(#gradient)"
+                stroke="none" />
+        </symbol>
+        <marker id="arrowhead"
+            markerWidth="10"
+            markerHeight="10"
+            refx="10"
+            refy="3"
+            orient="auto"
+            markerUnits="strokeWidth">
+            <path d="m 0,0 0,6 6,-3 z" />
+        </marker>
+    </defs>
+</svg>
+
+<div id="graphic_frame"><div id="graphic"></div></div>
+
+<br>
+
+<button id="prev_year_btn" type="button"><span class="leftptr"></span></button>
+<button id="cur_year_btn" type="button">I &aring;r</button>
+<button id="next_year_btn" type="button"><span class="rightptr"></span></button>
+
+<br>
+
+<input id="year_input" type="text" size=4 maxlength=4>
+<button id="select_year_btn" type="button">Vis</button>
+
+<hr>
+
+<h1><span id="n_solutions"></span> mulige l&oslash;sninger</h1>
+<button id="solution_tbl_btn">Vis</button>
+
+<div id='solution_tbl_wrapper' hidden>
+    <div class="selected_solution_info">L&oslash;sning <span id="selected_solution_idx"></span> valgt</div>
+    <div id="solution_tbl_wait">Vent...</div>
+    <div id='solution_tbl'></div>
+</div>
+
+</body>
+</html>

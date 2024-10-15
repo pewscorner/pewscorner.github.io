@@ -1,0 +1,565 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Multi-Cultural Number Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.linebreak > hr {
+    background-color: #66AA66;
+    border: none;
+    height: 3px;
+    margin: 1em 0em;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 0rem 0rem 0.5rem 0rem;
+}
+
+div.display_mode {
+    text-align: right;
+    margin-right: 1rem;
+    color: #608060;
+}
+
+div.instruction {
+    margin: 0.2rem 1rem; 
+    color: #608060;
+}
+
+div.text {
+    position: relative;
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+div.img_grp {
+    position: relative;
+    display: none;
+    width: 100%;
+    margin: 2px 1rem 0px 1rem;
+    padding: 0.2em 0.1em;
+    background-color: #FFFFFF;
+}
+
+div.thai_dig_img_clip {
+    float: left;
+    position: relative;
+    width: 18px;
+    height: 24px;
+    margin: 0px;
+    border: 0px;
+    padding: 0px;
+    overflow: hidden;
+}
+
+div.jap_dig_img_clip {
+    float: left;
+    position: relative;
+    width: 24px;
+    height: 26px;
+    margin: 0px;
+    border: 0px;
+    padding: 0px;
+    overflow: hidden;
+}
+
+div.devanagari_dig_img_clip {
+    float: left;
+    position: relative;
+    width: 16px;
+    height: 24px;
+    margin: 0px;
+    border: 0px;
+    padding: 0px;
+    overflow: hidden;
+}
+
+div.img_pan {
+    position: relative;
+    left: 0px;
+    top: 0px;
+}
+
+div.picker {
+    position: relative;
+    margin-left: 1rem;
+    margin-right: 1rem;
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 150%; 
+}
+
+input[type="text"]#romannum {
+    font-family: serif;
+}
+
+input[type="text"]#devanagarinum {
+    height: 2em; 
+}
+
+img {
+    max-width: none;
+}
+</style>
+<script type="text/javascript">
+var decTextBox;
+var romTextBox;
+var thaiTextBox, thaiImg, thaiModeBox, thaiPicker;
+var japTextBox, japImg, japModeBox, japPicker;
+var devanagariTextBox, devanagariImg, devanagariModeBox, devanagariPicker;
+
+var decDigToRom = new Array(
+  "","I","II","III","IV","V","VI","VII","VIII","IX",
+  "","X","XX","XXX","XL","L","LX","LXX","LXXX","XC",
+  "","C","CC","CCC","CD","D","DC","DCC","DCCC","CM",
+  "","M","MM","MMM","_I_V","_V","_V_I","_V_I_I","_V_I_I_I","_I_X",
+  "","_X","_X_X","_X_X_X","_X_L","_L","_L_X","_L_X_X","_L_X_X_X","_X_C",
+  "","_C","_C_C","_C_C_C","_C_D","_D","_D_C","_D_C_C","_D_C_C_C","_C_M",
+  "","_M","_M_M","_M_M_M"
+);
+var romDigs = "IVXLCDM";
+var romDigVals = new Array(1,5,10,50,100,500,1000,5000,10000,50000,100000,500000,1000000);
+
+var decDigToJap = new Array(
+  "","\u4E00","\u4E8C","\u4E09","\u56DB","\u4E94","\u516D","\u4E03","\u516B","\u4E5D"
+);
+var japDigs = decDigToJap.join("");
+var digPosToJap = new Array(
+  "","\u5341","\u767E","\u5343"
+);
+var japPositions = digPosToJap.join("");
+var digGrpToJap = new Array(
+  "","\u4E07","\u5104","\u5146","\u4EAC","\u5793"
+);
+var japGroups = digGrpToJap.join("");
+
+function dec2rom(x) {
+  var r, i, d, k;
+  r = "";
+  for (i = 0; i < x.length; i++) {
+    d = 1 * x.charAt(x.length - i - 1);
+    k = i * 10 + d;
+    if (k >= decDigToRom.length) {
+      r = "";
+      break;
+    }
+    r = decDigToRom[k].replace(/_/g, "/") + r;
+  }
+  romTextBox.value = r;
+}
+
+function dec2thai(x, updateTextBox) {
+  var r, i, d, imgHTML;
+  r = "";
+  imgHTML = "";
+  for (i = 0; i < x.length; i++) {
+    d = 1 * x.charAt(i);
+    r = r + String.fromCharCode(d + 0x0E50);
+    imgHTML += '<div class="thai_dig_img_clip"><div class="img_pan" style="left:' + (-18 * d) + 'px"><img src="thai_digits.gif" alt=""><\/div><\/div>';
+  }
+  if (updateTextBox) thaiTextBox.value = r;
+  thaiImg.innerHTML = imgHTML;
+}
+
+function makeThaiPicker() {
+  var i, imgHTML;
+  imgHTML = "";
+  for (i = 0; i < 10; i++) {
+    imgHTML += '<div class="thai_dig_img_clip" onClick="addThaiChar(' + (i + 0x0E50) + ')"><div class="img_pan" style="left:' + (-18 * i) + 'px"><img src="thai_digits.gif" alt=""><\/div><\/div>';
+  }
+  thaiPicker.innerHTML = imgHTML;
+}
+
+function addThaiChar(c) {
+  if (thaiTextBox.value.length < 20) {
+    thaiTextBox.value += String.fromCharCode(c);
+    update(3);
+  }
+}
+
+function dec2jap(x, updateTextBox) {
+  var r, i, d, k, g, gr, imgHTML, grHTML;
+  r = "";
+  gr = "";
+  imgHTML = "";
+  grHTML = "";
+  if (x == "0") {
+    r = "\u96F6";
+    imgHTML = '<div class="jap_dig_img_clip"><div class="img_pan" style="left:' + (-24 * 0) + 'px; top:0px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  } else {
+    for (i = x.length - 1; i >= 0; i--) {
+      k = i % 4;
+      g = Math.floor(i / 4);
+      d = 1 * x.charAt(x.length - i - 1);
+      if (d > 0) {
+        if (d > 1 || k == 0) {
+          gr += decDigToJap[d];
+          grHTML += '<div class="jap_dig_img_clip"><div class="img_pan" style="left:' + (-24 * d) + 'px; top:0px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+        }
+        gr += digPosToJap[k];
+        if (k > 0) grHTML += '<div class="jap_dig_img_clip"><div class="img_pan" style="left:' + (-24 * (k-1)) + 'px; top:-26px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+      }
+      if (k == 0) {
+        r += gr;
+        imgHTML += grHTML;
+        if (gr != "") {
+          if (g >= digGrpToJap.length) {
+            r = "";
+            imgHTML = "";
+            break;
+          }
+          r += digGrpToJap[g];
+          if (g > 0) imgHTML += '<div class="jap_dig_img_clip"><div class="img_pan" style="left:' + (-24 * (g-1)) + 'px; top:-52px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+        }
+        gr = "";
+        grHTML = "";
+      }
+    }
+  }
+  if (updateTextBox) japTextBox.value = r;
+  japImg.innerHTML = imgHTML;
+}
+
+function makeJapPicker() {
+  var i, c, imgHTML;
+  c = 0x96F6;
+  imgHTML = '<div class="jap_dig_img_clip" onClick="addJapChar(' + c + ')"><div class="img_pan" style="left:0px; top:0px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  for (i = 0; i < japDigs.length; i++) {
+    c = japDigs.charCodeAt(i);
+    imgHTML += '<div class="jap_dig_img_clip" onClick="addJapChar(' + c + ')"><div class="img_pan" style="left:' + (-24 * (i + 1)) + 'px; top:0px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  }
+  c = japPositions.charCodeAt(0);
+  imgHTML += '<br><div class="jap_dig_img_clip" style="clear:left" onClick="addJapChar(' + c + ')"><div class="img_pan" style="left:0px; top:-26px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  for (i = 1; i < japPositions.length; i++) {
+    c = japPositions.charCodeAt(i);
+    imgHTML += '<div class="jap_dig_img_clip" onClick="addJapChar(' + c + ')"><div class="img_pan" style="left:' + (-24 * i) + 'px; top:-26px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  }
+  for (i = 0; i < japGroups.length; i++) {
+    c = japGroups.charCodeAt(i);
+    imgHTML += '<div class="jap_dig_img_clip" onClick="addJapChar(' + c + ')"><div class="img_pan" style="left:' + (-24 * i) + 'px; top:-52px"><img src="jap_digits.gif" alt=""><\/div><\/div>';
+  }
+  japPicker.innerHTML = imgHTML;
+}
+
+function addJapChar(c) {
+  if (japTextBox.value.length < 41) {
+    japTextBox.value += String.fromCharCode(c);
+    update(4);
+  }
+}
+
+function dec2devanagari(x, updateTextBox) {
+  var r, i, d, imgHTML;
+  r = "";
+  imgHTML = "";
+  for (i = 0; i < x.length; i++) {
+    d = 1 * x.charAt(i);
+    r = r + String.fromCharCode(d + 0x0966);
+    imgHTML += '<div class="devanagari_dig_img_clip"><div class="img_pan" style="left:' + (-16 * d) + 'px"><img src="devanagari_digits.gif" alt=""><\/div><\/div>';
+  }
+  if (updateTextBox) devanagariTextBox.value = r;
+  devanagariImg.innerHTML = imgHTML;
+}
+
+function makeDevanagariPicker() {
+  var i, imgHTML;
+  imgHTML = "";
+  for (i = 0; i < 10; i++) {
+    imgHTML += '<div class="devanagari_dig_img_clip" onClick="addDevanagariChar(' + (i + 0x0966) + ')"><div class="img_pan" style="left:' + (-16 * i) + 'px"><img src="devanagari_digits.gif" alt=""><\/div><\/div>';
+  }
+  devanagariPicker.innerHTML = imgHTML;
+}
+
+function addDevanagariChar(c) {
+  if (devanagariTextBox.value.length < 20) {
+    devanagariTextBox.value += String.fromCharCode(c);
+    update(5);
+  }
+}
+
+function update(changedfield) {
+  var x, r, i, j, d, dOld, dInversion, c, g, k, gotDig;
+  switch (changedfield) {
+    case 1:
+      x = decTextBox.value.replace(/[^0-9]/g,"");
+      if (x != decTextBox.value) decTextBox.value = x;
+      x = x.replace(/^0*([0-9])/,"$1");
+      if (x == "") x = "0";
+      dec2rom(x);
+      dec2thai(x, true);
+      dec2jap(x, true);
+      dec2devanagari(x, true);
+      break;
+
+    case 2:
+      r = romTextBox.value.toUpperCase().replace(/[^/IVXLCDM]/g,"");
+      if (r != romTextBox.value) romTextBox.value = r;
+      x = "";
+      if (r.match(/^(\/?[IVXLCDM])*$/)) {
+        x = 0;
+        dOld = 99;
+        dInversion = false;
+        for (i = 0; i < r.length; i++) {
+          d = 0;
+          if (r.charAt(i) == "/") {
+            i++;
+            d = 6;
+          }
+          d += romDigs.indexOf(r.charAt(i));
+          if (d > dOld && dInversion) {
+            x = "";
+            break;
+          }
+          x += romDigVals[d];
+          dInversion = false;
+          if (d > dOld) {
+            x -= 2 * romDigVals[dOld];
+            dInversion = true;
+          }
+          dOld = d;
+        }
+        x = x.toString();
+      }
+      decTextBox.value = x;
+      dec2thai(x, true);
+      dec2jap(x, true);
+      dec2devanagari(x, true);
+      break;
+
+    case 3:
+      r = thaiTextBox.value.replace(/[^\u0E50-\u0E59]/g,"");
+      if (r != thaiTextBox.value) thaiTextBox.value = r;
+      r = r.replace(/^\u0E50*([\u0E50-\u0E59])/,"$1");
+      if (r == "") r = "\u0E50";
+      x = "";
+      for (i = 0; i < r.length; i++) {
+        d = r.charCodeAt(i) - 0x0E50;
+        x = x + d.toString();
+      }
+      decTextBox.value = x;
+      dec2rom(x);
+      dec2thai(x, false);
+      dec2jap(x, true);
+      dec2devanagari(x, true);
+      break;
+
+    case 4:
+      r = japTextBox.value.replace(/[^\u96F6\u4E00-\u7700]/g,"");
+      if (r != japTextBox.value) japTextBox.value = r;
+      if (r == "\u96F6") {
+        x = "0";
+      } else {
+        x = "";
+        g = 0;
+        k = 0;
+        gotDig = false;
+        for (i = 0; i < r.length; i++) {
+          c = r.charAt(r.length - i - 1);
+          if (!gotDig && (d = japDigs.indexOf(c) + 1) > 0) {
+            x = d.toString() + x;
+            gotDig = true;
+          } else if ((d = japPositions.indexOf(c) + 1) > 0 && d > k) {
+            if (!gotDig) {
+              if (k > 0)
+                x = "1" + x;
+              else
+                x = "0" + x;
+            }
+            for (j = 0; j < d - k - 1; j++) x = "0" + x;
+            k = d;
+            gotDig = false;
+          } else if ((d = japGroups.indexOf(c) + 1) > 0 && d > g) {
+            if (!gotDig) {
+              if (k > 0)
+                x = "1" + x;
+              else if (g == 0)
+                x = "0" + x;
+              else {
+                x = "";
+                gotDig = true;
+                break;
+              }
+            }
+            for (j = 0; j < 4 - k - 1; j++) x = "0" + x;
+            for (j = 0; j < d - g - 1; j++) x = "0000" + x;
+            g = d;
+            k = 0;
+            gotDig = false;
+          } else {
+            x = "";
+            gotDig = true;
+            break;
+          }
+        }
+        if (!gotDig) {
+          if (k > 0)
+            x = "1" + x;
+          else
+            x = "";
+        }
+      }
+      decTextBox.value = x;
+      dec2rom(x);
+      dec2thai(x, true);
+      dec2jap(x, false);
+      dec2devanagari(x, true);
+      break;
+    case 5:
+      r = devanagariTextBox.value.replace(/[^\u0966-\u096F]/g,"");
+      if (r != devanagariTextBox.value) devanagariTextBox.value = r;
+      r = r.replace(/^\u0966*([\u0966-\u096F])/,"$1");
+      if (r == "") r = "\u0966";
+      x = "";
+      for (i = 0; i < r.length; i++) {
+        d = r.charCodeAt(i) - 0x0966;
+        x = x + d.toString();
+      }
+      decTextBox.value = x;
+      dec2rom(x);
+      dec2thai(x, true);
+      dec2jap(x, true);
+      dec2devanagari(x, false);
+      break;
+    default:
+      break;
+  } // switch
+}
+
+function setThaiMode()
+{
+  if (thaiModeBox.checked) {
+    thaiImg.style.display = "none";
+    thaiTextBox.style.display = "inline";
+  } else {
+    thaiImg.style.display = "block";
+    thaiTextBox.style.display = "none";
+  }
+}
+
+function setJapMode()
+{
+  if (japModeBox.checked) {
+    japImg.style.display = "none";
+    japTextBox.style.display = "inline";
+  } else {
+    japImg.style.display = "block";
+    japTextBox.style.display = "none";
+  }
+}
+
+function setDevanagariMode()
+{
+  if (devanagariModeBox.checked) {
+    devanagariImg.style.display = "none";
+    devanagariTextBox.style.display = "inline";
+  } else {
+    devanagariImg.style.display = "block";
+    devanagariTextBox.style.display = "none";
+  }
+}
+
+function init()
+{
+  decTextBox = document.getElementById("decnum");
+  romTextBox = document.getElementById("romannum");
+  thaiTextBox = document.getElementById("thainum");
+  thaiImg = document.getElementById("thai_img");
+  thaiModeBox = document.getElementById("thai_mode");
+  thaiPicker = document.getElementById("thai_picker");
+  japTextBox = document.getElementById("japnum");
+  japImg = document.getElementById("jap_img");
+  japModeBox = document.getElementById("jap_mode");
+  japPicker = document.getElementById("jap_picker");
+  devanagariTextBox = document.getElementById("devanagarinum");
+  devanagariImg = document.getElementById("devanagari_img");
+  devanagariModeBox = document.getElementById("devanagari_mode");
+  devanagariPicker = document.getElementById("devanagari_picker");
+  var x = "2";
+  decTextBox.value = x;
+  dec2rom(x);
+  dec2thai(x, true);
+  dec2jap(x, true);
+  dec2devanagari(x, true);
+  makeThaiPicker();
+  makeJapPicker();
+  makeDevanagariPicker();
+}
+
+window.addEventListener('load', init, false);
+</script>
+
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Multi-Cultural Number Converter</h1>
+
+<div class="box hcontainer">
+
+<h2>Western (arabic) number</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="decnum" maxlength=20 onFocus="this.select()" onKeyUp="update(1)" onBlur="update(1)"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Roman number</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="romannum" maxlength=30 onFocus="this.select()" onKeyUp="update(2)" onBlur="update(2)"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Thai number</h2>
+<div class="display_mode"><input type="radio" id="thai_mode" name="thai_mode" checked onClick="setThaiMode()"><label for="thai_mode">text</label> <input type="radio" id="thai_mode_is_img" name="thai_mode" onClick="setThaiMode()"><label for="thai_mode_is_img">image</label></div>
+<div class="linebreak"></div>
+<div id="thai_img" class="img_grp"><div class="thai_dig_img_clip"><div class="img_pan" style="left:-18px"><img src="thai_digits.gif" alt=""></div></div></div>
+<div class="text"><input type="text" id="thainum" maxlength=20 onFocus="this.select()" onKeyUp="update(3)" onBlur="update(3)"></div>
+<div class="linebreak"></div>
+<div class="instruction">Click to add character:</div>
+<div class="linebreak"></div>
+<div id="thai_picker" class="picker" style="width:180px"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Japanese number</h2>
+<div class="display_mode"><input type="radio" id="jap_mode" name="jap_mode" checked onClick="setJapMode()"><label for="jap_mode">text</label> <input type="radio" id="jap_mode_is_img" name="jap_mode" onClick="setJapMode()"><label for="jap_mode_is_img">image</label></div>
+<div class="linebreak"></div>
+<div id="jap_img" class="img_grp"><div class="jap_dig_img_clip"><div class="img_pan" style="left:-24px; top:-26px"><img src="jap_digits.gif" alt=""></div></div></div>
+<div class="text"><input type="text" id="japnum" maxlength=41 onFocus="this.select()" onKeyUp="update(4)" onBlur="update(4)"></div>
+<div class="linebreak"></div>
+<div class="instruction">Click to add character:</div>
+<div class="linebreak"></div>
+<div id="jap_picker" class="picker" style="width:240px"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Indian (Devanagari) number</h2>
+<div class="display_mode"><input type="radio" id="devanagari_mode" name="devanagari_mode" checked onClick="setDevanagariMode()"><label for="devanagari_mode">text</label> <input type="radio" id="devanagari_mode_is_img" name="devanagari_mode" onClick="setDevanagariMode()"><label for="devanagari_mode_is_img">image</label></div>
+<div class="linebreak"></div>
+<div id="devanagari_img" class="img_grp"><div class="devanagari_dig_img_clip"><div class="img_pan" style="left:-18px"><img src="devanagari_digits.gif" alt=""></div></div></div>
+<div class="text"><input type="text" id="devanagarinum" maxlength=20 onFocus="this.select()" onKeyUp="update(5)" onBlur="update(5)"></div>
+<div class="linebreak"></div>
+<div class="instruction">Click to add character:</div>
+<div class="linebreak"></div>
+<div id="devanagari_picker" class="picker" style="width:160px"></div>
+
+</div>
+
+</div>
+
+</body>
+</html>

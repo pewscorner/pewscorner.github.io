@@ -1,0 +1,1124 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Platonic Solids</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.box#canvas {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+}
+
+div.box#description {
+    -webkit-flex: 1 1 50%;
+    flex: 1 1 50%;
+}
+
+table {
+    border-collapse: collapse;
+    margin-left: 1em;
+}
+
+table td, table th {
+    border: 1px solid #3366AA;
+    text-align: center;
+}
+
+table.lalign td, table.lalign th {
+    text-align: left;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var radians_per_degree = Math.PI/180;
+
+// Class Color
+
+function Color(r, g, b)
+{
+    this.r = r;
+    this.g = g;
+    this.b = b;
+}
+
+Color.prototype.toString = function()
+{
+    return "rgb(" + this.r + "," + this.g + "," + this.b + ")";
+}
+
+// Class RotationMatrix
+
+function RotationMatrix()
+{
+    this.elem = [new Array(3), new Array(3), new Array(3)];
+}
+
+RotationMatrix.prototype.set_from_quaternion = function(q)
+{
+    var aa = q.a * q.a;
+    var bb = q.b * q.b;
+    var cc = q.c * q.c;
+    var dd = q.d * q.d;
+    var ab2 = 2 * q.a * q.b;
+    var ac2 = 2 * q.a * q.c;
+    var ad2 = 2 * q.a * q.d;
+    var bc2 = 2 * q.b * q.c;
+    var bd2 = 2 * q.b * q.d;
+    var cd2 = 2 * q.c * q.d;
+
+    this.elem[0][0] = aa + bb - cc - dd;
+    this.elem[0][1] = bc2 - ad2;
+    this.elem[0][2] = bd2 + ac2;
+
+    this.elem[1][0] = bc2 + ad2;
+    this.elem[1][1] = aa - bb + cc - dd;
+    this.elem[1][2] = cd2 - ab2;
+
+    this.elem[2][0] = bd2 - ac2;
+    this.elem[2][1] = cd2 + ab2;
+    this.elem[2][2] = aa - bb - cc + dd;
+};
+
+// Class Quaternion
+
+function Quaternion(a, b, c, d)
+{
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
+}
+
+Quaternion.prototype.normalize = function()
+{
+    // this = this / ||this||
+    var norm = Math.sqrt(this.a * this.a + this.b * this.b + this.c * this.c + this.d * this.d);
+    this.a /= norm;
+    this.b /= norm;
+    this.c /= norm;
+    this.d /= norm;
+};
+
+Quaternion.prototype.reset = function()
+{
+    // this = (1,0,0,0), i.e. no rotation
+    this.a = 1;
+    this.b = 0;
+    this.c = 0;
+    this.d = 0;
+};
+
+Quaternion.prototype.set_from_quaternion = function(q)
+{
+    this.a = q.a;
+    this.b = q.b;
+    this.c = q.c;
+    this.d = q.d;
+};
+
+Quaternion.prototype.set_from_angles = function(rot_angles)
+{
+    // Angles applied in this order (roll is not used):
+    //var roll_half = rot_angles[0] * radians_per_degree / 2; // xy-angle (roll counterclockwise)
+    var pitch_half = rot_angles[1] * radians_per_degree / 2; // yz-angle (pitch visible side down)
+    var yaw_half = rot_angles[2] * radians_per_degree / 2; // zx-angle (yaw visible side right)
+
+    var cp = Math.cos(pitch_half);
+    var sp = Math.sin(pitch_half);
+    var cy = Math.cos(yaw_half);
+    var sy = Math.sin(yaw_half);
+    this.a = cy * cp;
+    this.b = cy * sp;
+    this.c = sy * cp;
+    this.d = -sy * sp;
+};
+
+Quaternion.prototype.set_from_rotation_target_vector = function(target_vector)
+{
+    // Calculates an unnormalized rotation quaternion that rotates the original vector
+    // (image plane normal) to the target vector. Since half of the rotation angle is needed for
+    // the quaternion, the half-angle vector is found by adding the original and target unit
+    // vectors. This vector is then divided by the original vector - both in quaternion form -
+    // to produce the desired rotation quaternion, i.e.:
+    //
+    //   rot_quat = (target_vec_q/||target_vec_q|| + original_vec_q) * original_vec_q^(-1)
+    //
+    // Note: The resulting rotation quaternion is unnormalized and must be normalized before
+    // being used to rotate object vertices.
+    // The target_vector argument does not need to be a unit vector, as it is normalized by this
+    // method.
+
+    var target_vector_norm = Math.sqrt(
+        target_vector[0] * target_vector[0] +
+        target_vector[1] * target_vector[1] +
+        target_vector[2] * target_vector[2]);
+    // Normalize target vector and add original vector (0,0,1)
+    var b = target_vector[0] / target_vector_norm + 0;
+    var c = target_vector[1] / target_vector_norm + 0;
+    var d = target_vector[2] / target_vector_norm + 1;
+    // Consider the above result a quaternion (0,b,c,d) and multiply it by the inverse
+    // original vector as a quaternion (i.e. (0,0,0,-1)). This multiplication just moves
+    // components around. Store the result in "this" quaternion.
+    this.a = d;
+    this.b = -c;
+    this.c = b;
+    this.d = 0;
+};
+
+Quaternion.prototype.left_multiply_and_normalize = function(q2)
+{
+    // this = q2 * this; this = this / ||this||
+    var a = q2.a * this.a - q2.b * this.b - q2.c * this.c - q2.d * this.d;
+    var b = q2.a * this.b + q2.b * this.a + q2.c * this.d - q2.d * this.c;
+    var c = q2.a * this.c - q2.b * this.d + q2.c * this.a + q2.d * this.b;
+    var d = q2.a * this.d + q2.b * this.c - q2.c * this.b + q2.d * this.a;
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
+    this.normalize();
+};
+
+Quaternion.prototype.left_divide_and_normalize = function(q2)
+{
+    // this = q2^(-1) * this; this = this / ||this||
+    // (Quaternion inversion is simply conjugation except for a scalar factor
+    // which is anyway overridden by the subsequent normalization).
+    var a = q2.a * this.a + q2.b * this.b + q2.c * this.c + q2.d * this.d;
+    var b = q2.a * this.b - q2.b * this.a - q2.c * this.d + q2.d * this.c;
+    var c = q2.a * this.c + q2.b * this.d - q2.c * this.a - q2.d * this.b;
+    var d = q2.a * this.d - q2.b * this.c + q2.c * this.b - q2.d * this.a;
+    this.a = a;
+    this.b = b;
+    this.c = c;
+    this.d = d;
+    this.normalize();
+};
+
+// Class Vertex
+
+function Vertex(x, y, z)
+{
+    this.xyz = [x, y, z];         // Intrinsic coordinates
+    this.xyz_plac = new Array(3); // Coordinates after rotation and placement in universe
+    this.xy_proj = new Array(2);  // Coordinates after projection onto image plane
+}
+
+Vertex.prototype.rotate_and_place = function(rot_matrix, position)
+{
+    this.xyz_plac[0] =
+        rot_matrix.elem[0][0] * this.xyz[0] +
+        rot_matrix.elem[0][1] * this.xyz[1] +
+        rot_matrix.elem[0][2] * this.xyz[2] +
+        position[0];
+    this.xyz_plac[1] =
+        rot_matrix.elem[1][0] * this.xyz[0] +
+        rot_matrix.elem[1][1] * this.xyz[1] +
+        rot_matrix.elem[1][2] * this.xyz[2] +
+        position[1];
+    this.xyz_plac[2] =
+        rot_matrix.elem[2][0] * this.xyz[0] +
+        rot_matrix.elem[2][1] * this.xyz[1] +
+        rot_matrix.elem[2][2] * this.xyz[2] +
+        position[2];
+};
+
+Vertex.prototype.project = function(image_z, image_ctr)
+{
+    this.xy_proj[0] =
+        image_z * this.xyz_plac[0] / this.xyz_plac[2] + image_ctr[0];
+    this.xy_proj[1] =
+        image_z * this.xyz_plac[1] / this.xyz_plac[2] + image_ctr[1];
+};
+
+// Class Face
+
+function Face(vertices, c)
+{
+    this.vertices = vertices;
+    this.color = c;
+    this.light_vector = new Array(3);
+    this.minimum_light_fraction;
+    this.set_light([0, 10, 10], 0.15);
+}
+
+// Some class variables for temporary use in methods (to avoid creating new objects all the time)
+Face.tmp_vec_a = new Array(3);
+Face.tmp_vec_b = new Array(3);
+Face.tmp_vec_c = new Array(3);
+Face.tmp_color = new Color();
+
+Face.prototype.visible = function()
+{
+    return (
+        (this.vertices[1].xy_proj[0] - this.vertices[0].xy_proj[0]) *
+        (this.vertices[2].xy_proj[1] - this.vertices[1].xy_proj[1]) -
+        (this.vertices[1].xy_proj[1] - this.vertices[0].xy_proj[1]) *
+        (this.vertices[2].xy_proj[0] - this.vertices[1].xy_proj[0])
+        > 0);
+};
+
+Face.prototype.nearer_than = function(face)
+{
+    return (this.vertices[1].xyz_plac[2] > face.vertices[1].xyz_plac[2]);
+};
+
+Face.prototype.set_light = function(vector, minimum_light_frac)
+{
+    var a = Face.tmp_vec_a;
+    var b = Face.tmp_vec_b;
+    var cross_prod = Face.tmp_vec_c;
+    var scaler;
+    var i;
+
+    this.minimum_light_fraction = minimum_light_frac;
+    for (i = 0; i < 3; i++)
+    {
+        a[i] = this.vertices[1].xyz[i] - this.vertices[0].xyz[i];
+        b[i] = this.vertices[2].xyz[i] - this.vertices[0].xyz[i];
+    }
+    cross_prod[0] = a[1] * b[2] - a[2] * b[1];
+    cross_prod[1] = a[2] * b[0] - a[0] * b[2];
+    cross_prod[2] = a[0] * b[1] - a[1] * b[0];
+    scaler = (1 - minimum_light_frac) / Math.sqrt(
+        (cross_prod[0] * cross_prod[0] +
+        cross_prod[1] * cross_prod[1] +
+        cross_prod[2] * cross_prod[2]) *
+        (vector[0] * vector[0] +
+        vector[1] * vector[1] +
+        vector[2] * vector[2]));
+    for (i = 0; i < 3; i++)
+    {
+        this.light_vector[i] = scaler * vector[i];
+    }
+};
+
+Face.prototype.seen_color_string = function()
+{
+    var a = Face.tmp_vec_a;
+    var b = Face.tmp_vec_b;
+    var factor;
+    var i;
+
+    for (i = 0; i < 3; i++)
+    {
+        a[i] = this.vertices[1].xyz_plac[i] - this.vertices[0].xyz_plac[i];
+        b[i] = this.vertices[2].xyz_plac[i] - this.vertices[0].xyz_plac[i];
+    }
+    factor = Math.max(0,
+        this.light_vector[0] * (a[1] * b[2] - a[2] * b[1]) +
+        this.light_vector[1] * (a[2] * b[0] - a[0] * b[2]) +
+        this.light_vector[2] * (a[0] * b[1] - a[1] * b[0])
+        ) + this.minimum_light_fraction;
+    Face.tmp_color.r = Math.round(this.color.r * factor);
+    Face.tmp_color.g = Math.round(this.color.g * factor);
+    Face.tmp_color.b = Math.round(this.color.b * factor);
+    return Face.tmp_color.toString();
+};
+
+// Face colors
+var colors =
+    [
+    new Color(250,200,200),
+    new Color(240,230,200),
+    new Color(200,250,200),
+    new Color(200,230,240),
+    new Color(200,200,250),
+    new Color(230,200,240),
+    ];
+
+// Class Obj
+
+function Obj(name, description, variable_defs, vertice_strings, face_strings, face_colors)
+{
+    this.name = name;
+    this.description = description;
+    this.variable_defs = variable_defs;
+
+    this.vertice_strings = vertice_strings;
+    vertice_strings = "[new Vertex(" + vertice_strings.join("), new Vertex(") + ")]";
+    this.vertices = eval("var " + variable_defs + ";" + vertice_strings);
+
+    this.face_strings = face_strings;
+    this.faces = [];
+    for (var face_idx = 0; face_idx < face_strings.length; face_idx++)
+    {
+        var vertex_indices = eval("[" + face_strings[face_idx] + "]");
+        var face_vertices = [];
+        for (var i = 0; i < vertex_indices.length; i++)
+        {
+            face_vertices.push(this.vertices[vertex_indices[i]]);
+        }
+        this.faces.push(new Face(
+            face_vertices, colors[face_colors ? face_colors[face_idx] : face_idx % colors.length]));
+    }
+
+    // Find distances from object center to vertex, edge midpoint, and face midpoint (by finding
+    // vector average of 1, 2, and all vertices of a single face, respectively)
+    var face0_vertices = this.faces[0].vertices;
+    var n_face0_vertices = face0_vertices.length;
+    var x = 0, y = 0, z = 0;
+    var edge_midpoint_times_2;
+    for (var i = 0; i < n_face0_vertices; i++)
+    {
+        var vertex_coords = face0_vertices[i].xyz;
+        x += vertex_coords[0];
+        y += vertex_coords[1];
+        z += vertex_coords[2];
+        if (i == 0)
+        {
+            // Use first vertex to find distance from object center to vertex
+            this.circumsphere_radius = Math.sqrt(x * x + y * y + z * z);
+        }
+        if (i == 1)
+        {
+            // Use average of first 2 vertices to find distance from object center to edge midpoint
+            this.midsphere_radius = Math.sqrt(x * x + y * y + z * z) / 2;
+            edge_midpoint_times_2 = [x, y, z];
+        }
+    }
+    // Use average of all vertices of face to find distance from object center to face midpoint
+    this.insphere_radius = Math.sqrt(x * x + y * y + z * z) / n_face0_vertices;
+    // Find distance from edge midpoint to face midpoint (multiplied by number of edges of face)
+    // in order to calculate face area
+    x -= edge_midpoint_times_2[0] * n_face0_vertices / 2;
+    y -= edge_midpoint_times_2[1] * n_face0_vertices / 2;
+    z -= edge_midpoint_times_2[2] * n_face0_vertices / 2;
+    var face_area = Math.sqrt(x * x + y * y + z * z) * L / 2;
+    // Find total surface area and volume
+    this.surface_area = face_area * this.faces.length;
+    this.volume = this.surface_area * this.insphere_radius / 3;
+}
+
+Obj.prototype.place_and_project = function(rot_matrix, obj_pos, image_z, image_ctr)
+{
+    for (var i = 0; i < this.vertices.length; i++)
+    {
+        this.vertices[i].rotate_and_place(rot_matrix, obj_pos);
+        this.vertices[i].project(image_z, image_ctr);
+    }
+};
+
+Obj.prototype.get_stats = function()
+{
+    var n_vertices = this.vertices.length;
+    var n_faces = this.faces.length;
+    var n_edges = 0;
+    var max_n_edges_per_face = 0;
+    var min_n_edges_per_face = Infinity;
+    for (var i = 0; i < n_faces; i++)
+    {
+        var n_edges_of_this_face = this.faces[i].vertices.length;
+        max_n_edges_per_face = Math.max(n_edges_of_this_face, max_n_edges_per_face);
+        min_n_edges_per_face = Math.min(n_edges_of_this_face, min_n_edges_per_face);
+        n_edges += n_edges_of_this_face;
+    }
+    n_edges /= 2;
+    var face_type = max_n_edges_per_face == min_n_edges_per_face
+        && [" (triangles)", " (squares)", " (pentagons)"][max_n_edges_per_face - 3]
+        || "";
+    var variable_defs = this.variable_defs + ", L = edge length";
+    if (variable_defs.indexOf("golden_ratio") >= 0)
+    {
+        variable_defs = (variable_defs + ", golden ratio golden_ratio = (1+Math.sqrt(5))/2")
+            .replace(/golden_ratio/g, "&phi;");
+    }
+    variable_defs = variable_defs.replace(/Math\.sqrt\((.*?)\)/g, "&radic;<span class='overline'>$1<\/span>");
+
+    var hs = "<h2>" + this.name + "<\/h2>";
+
+    hs += "<p>" + this.description;
+
+    hs += "<p>Counts: " + n_faces + " faces" + face_type + ", " + n_vertices + " vertices, " +
+        n_edges + " edges<br>";
+
+    hs += "<p>Vertex coordinates on sphere centered at (0,0,0) (where " + variable_defs + "):"
+        + "<table><tr><th>Vertex<th>Coordinates";
+    for (var i = 0; i < n_vertices; i++)
+    {
+        hs += "<tr><td>" + i + "<td>(" + this.vertice_strings[i] + ")";
+    } 
+    hs += "<\/table>";
+
+    hs += "<p>Face vertices (in counterclockwise order seen from outside):"
+        + "<table><tr><th>Face<th>Vertices";
+    for (var i = 0; i < n_faces; i++)
+    {
+        hs += "<tr><td>" + i + "<td>" + this.face_strings[i];
+    } 
+    hs += "<\/table>";
+
+    hs += "<p>Calculated quantities:"
+        + "<table class='lalign'>"
+        + "<tr><td>Insphere radius<br>(object center to face midpoint)<td>" + (this.insphere_radius / L).toFixed(8) + "&nbsp;L"
+        + "<tr><td>Midsphere radius<br>(object center to edge midpoint)<td>" + (this.midsphere_radius / L).toFixed(8) + "&nbsp;L"
+        + "<tr><td>Circumsphere radius<br>(object center to vertex)<td>" + (this.circumsphere_radius / L).toFixed(8) + "&nbsp;L"
+        + "<tr><td>Surface area<td>" + (this.surface_area / (L * L)).toFixed(8) + "&nbsp;L<sup>2<\/sup>"
+        + "<tr><td>Volume<td>" + (this.volume / (L * L * L)).toFixed(8) + "&nbsp;L<sup>3<\/sup>"
+        + "<\/table>";
+    return hs;
+};
+
+//-------------------------------------------------------------------------
+// Object data
+//
+// Conventions:
+// Observer is at (0,0,0) with x-axis pointing to the right, y-axis pointing
+// up, and z-axis pointing backwards. Image plane is at (0,0,image_z), where
+// image_z<0 (so plane is in front of observer). A face is only visible when its
+// normal is pointing towards observer, i.e. when observer sees its vertices
+// in counterclockwise order. So, face normals must point away from object
+// interior.
+//-------------------------------------------------------------------------
+
+var L = 1000;                               // Length of polyhedron edge
+var golden_ratio = (Math.sqrt(5) + 1) / 2;
+
+var tetrahedron = new Obj(
+    // name
+    "Tetrahedron",
+    // description
+    "The vertices of a regular tetrahedron are 4 vertices of a cube which do not share cube" +
+        " edges, and the tetrahedron's edges are diagonals of all the cube's faces." +
+        " The dual polyhedron (which replaces face centers with vertices or vertices with face centers)" +
+        " of a tetrahedron is another tetrahedron.",
+    // variable_defs
+    "a = L/(2*Math.sqrt(2))",
+    // vertices
+    [
+        "-a,-a,-a",
+        " a,-a, a",
+        "-a, a, a",
+        " a, a,-a",
+    ],
+    // faces
+    [
+        "0,1,2",
+        "0,2,3",
+        "0,3,1",
+        "1,3,2",
+    ],
+    // face colors
+    [3,0,2,4]
+);
+
+var hexahedron = new Obj(
+    // name
+    "Hexahedron",
+    // description
+    "A regular hexahedron is a cube." +
+        " The dual polyhedron (which replaces face centers with vertices or vertices with face centers)" +
+        " of a hexahedron is an octahedron.",
+    // variable_defs
+    "a = L/2",
+    // vertices
+    [
+        "-a,-a,-a",
+        " a,-a,-a",
+        "-a, a,-a",
+        " a, a,-a",
+        "-a,-a, a",
+        " a,-a, a",
+        "-a, a, a",
+        " a, a, a",
+    ],
+    // faces
+    [
+        "0,1,5,4",
+        "0,2,3,1",
+        "0,4,6,2",
+        "7,3,2,6",
+        "7,5,1,3",
+        "7,6,4,5",
+    ],
+    // face colors
+    [4,2,0,4,0,2]
+);
+
+var octahedron = new Obj(
+    // name
+    "Octahedron",
+    // description
+    "The vertices of a regular octahedron are the midpoints of the faces of a cube." +
+        " The dual polyhedron (which replaces face centers with vertices or vertices with face centers)" +
+        " of an octahedron is a hexahedron.",
+    // variable_defs
+    "a = L/Math.sqrt(2)",
+    // vertices
+    [
+        "-a, 0, 0",
+        " a, 0, 0",
+        " 0,-a, 0",
+        " 0, a, 0",
+        " 0, 0,-a",
+        " 0, 0, a",
+    ],
+    // faces
+    [
+        "0,2,5",
+        "0,4,2",
+        "0,3,4",
+        "0,5,3",
+        "1,2,4",
+        "1,5,2",
+        "1,3,5",
+        "1,4,3",
+    ],
+    // face colors
+    [0,2,0,2,0,2,0,2]
+);
+
+var dodecahedron = new Obj(
+    // name
+    "Dodecahedron",
+    // description
+    "The vertices of a regular dodecahedron are the vertices of a cube (whose edges are the" +
+        " golden ratio times the dodecahedron's edges and are diagonals of all the dodecahedron's" +
+        " faces) and 3 identical orthogonal concentric rectangles (whose short edges are edges of" +
+        " the dodecahedron, and whose long edges are 1 + the golden ratio times as long)." +
+        " Alternatively, all the vertices and face diagonals of the dodecahedron coincide with" +
+        " the vertices and edges of 5 suitably oriented cubes like the one described above." +
+        " The dual polyhedron (which replaces face centers with vertices or vertices with face centers)" +
+        " of a dodecahedron is an icosahedron.",
+    // variable_defs
+    "a = L/2, b = a*golden_ratio, c = a+b",
+    // vertices
+    [
+        "-b,-b,-b",
+        " b,-b,-b",
+        "-b, b,-b",
+        " b, b,-b",
+        "-b,-b, b",
+        " b,-b, b",
+        "-b, b, b",
+        " b, b, b",
+        " c,-a, 0",
+        " c, a, 0",
+        "-c,-a, 0",
+        "-c, a, 0",
+        " a, 0,-c",
+        "-a, 0,-c",
+        " a, 0, c",
+        "-a, 0, c",
+        " 0,-c,-a",
+        " 0,-c, a",
+        " 0, c,-a",
+        " 0, c, a",
+    ],
+    // faces
+    [
+        " 1,12, 3, 9, 8",
+        " 5, 8, 9, 7,14",
+        " 0,10,11, 2,13",
+        " 4,15, 6,11,10",
+        " 1,16, 0,13,12",
+        " 3,12,13, 2,18",
+        " 5,14,15, 4,17",
+        " 7,19, 6,15,14",
+        " 1, 8, 5,17,16",
+        " 0,16,17, 4,10",
+        " 3,18,19, 7, 9",
+        " 2,11, 6,19,18",
+    ],
+    // face colors
+    [0,2,2,0,1,3,3,1,4,5,5,4]
+);
+
+var icosahedron = new Obj(
+    // name
+    "Icosahedron",
+    // description
+    "The vertices of a regular icosahedron are the vertices of 3 identical orthogonal concentric" +
+        " golden rectangles." +
+        " The dual polyhedron (which replaces face centers with vertices or vertices with face centers)" +
+        " of an icosahedron is a dodecahedron.",
+    // variable_defs
+    "a = L/2, b = a*golden_ratio",
+    // vertices
+    [
+        "-a,-b, 0",
+        " a,-b, 0",
+        "-a, b, 0",
+        " a, b, 0",
+        " 0,-a,-b",
+        " 0, a,-b",
+        " 0,-a, b",
+        " 0, a, b",
+        "-b, 0,-a",
+        "-b, 0, a",
+        " b, 0,-a",
+        " b, 0, a",
+    ],
+    // faces
+    [
+        " 4, 5,10",
+        " 4, 8, 5",
+        " 7, 6,11",
+        " 7, 9, 6",
+        " 8, 9, 2",
+        " 8, 0, 9",
+        "11,10, 3",
+        "11, 1,10",
+        " 0, 1, 6",
+        " 0, 4, 1",
+        " 3, 2, 7",
+        " 3, 5, 2",
+        " 4,10, 1",
+        " 4, 0, 8",
+        " 5, 3,10",
+        " 5, 8, 2",
+        " 7,11, 3",
+        " 7, 2, 9",
+        " 6, 9, 0",
+        " 6, 1,11",
+    ],
+    // face colors
+    [0,2,2,0,0,2,2,0,0,2,2,0,4,4,4,4,4,4,4,4]
+);
+
+//-------------------------------------------------------------------------
+// End of object data
+//-------------------------------------------------------------------------
+
+var selectElem;
+var faceWireButtonElem;
+var runStopButtonElem;
+var resetButtonElem;
+var canvasElem;
+var descriptionElem;
+var obj;
+var g;
+var image_ctr;                  // Center of image window
+var image_z = -400;             // z-coord of image plane
+var obj_front_face_z = -3000;   // z-coord of forward facing face of object
+var obj_target_vector_z;        // z-coord of rotation target vector when dragging object
+var obj_pos = [0, 0, 0];        // Location of object in universe
+var rot_angles = [0, 0, 0];     // Object rotation angles in degrees:
+                                // (xy_angle (roll), yz_angle (pitch), zx_angle (yaw))
+var visible_drawlist = [];      // List of visible faces to be drawn
+var visible_drawlength;         // Number of faces in visible_drawlist
+var invisible_drawlist = [];    // List of invisible faces to be drawn in wire mode
+var invisible_drawlength;       // Number of faces in invisible_drawlist
+var base_rot_quaternion = new Quaternion(1, 0, 0, 0);   // Initially no rotation
+var extra_rot_quaternion = new Quaternion(1, 0, 0, 0);  // Initially no rotation
+var final_rot_quaternion = new Quaternion();
+var rot_matrix = new RotationMatrix();
+var face;
+var time;
+var t1 = 0;
+var target_delta_t = 17;
+var is_running = false;
+var is_wire_image = false;
+var timer_id;
+
+function update_display()
+{
+    // Clear canvas (make it transparent)
+    g.clearRect(0, 0, canvasElem.width, canvasElem.height);
+
+    // Calculate rotation matrix
+    final_rot_quaternion.set_from_quaternion(base_rot_quaternion);
+    final_rot_quaternion.left_multiply_and_normalize(extra_rot_quaternion);
+    rot_matrix.set_from_quaternion(final_rot_quaternion);
+
+    // Rotate and project all 3D vertices onto image plane
+    var faces = [];
+    obj.place_and_project(rot_matrix, obj_pos, image_z, image_ctr);
+    faces = faces.concat(obj.faces);
+
+    // Make ordered list of visible faces
+    visible_drawlength = 0;
+    invisible_drawlength = 0;
+    for (var i = 0; i < faces.length; i++)
+    {
+        face = faces[i];
+        if (face.visible())
+        {
+            for (j = visible_drawlength; j > 0; j--)
+            {
+                if (face.nearer_than(visible_drawlist[j-1]))
+                {
+                    break;
+                }
+                visible_drawlist[j] = visible_drawlist[j-1];
+            }
+            visible_drawlist[j] = face;
+            visible_drawlength++;
+        }
+        else if (is_wire_image)
+        {
+            invisible_drawlist[invisible_drawlength++] = face;
+        }
+    }
+
+    // Draw faces or edges
+    g.lineWidth = 1;
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    var drawlist;
+    var drawlength;
+    for (var is_visible = is_wire_image ? 0 : 1; is_visible < 2; is_visible++)
+    {
+        if (is_visible)
+        {
+            drawlist = visible_drawlist;
+            drawlength = visible_drawlength;
+            g.strokeStyle = "#000000";
+        }
+        else
+        {
+            drawlist = invisible_drawlist;
+            drawlength = invisible_drawlength;
+            g.strokeStyle = "#BBBBBB";
+        }
+        for (var i = 0; i < drawlength; i++)
+        {
+            face = drawlist[i];
+            g.fillStyle = face.seen_color_string();
+            g.beginPath();
+            g.moveTo(
+                face.vertices[0].xy_proj[0],
+                canvasElem.height - 1 - face.vertices[0].xy_proj[1]);
+            for (var j = 1; j < face.vertices.length; j++)
+            {
+                g.lineTo(
+                    face.vertices[j].xy_proj[0],
+                    canvasElem.height - 1 - face.vertices[j].xy_proj[1]);
+            }
+            g.closePath();
+            if (is_wire_image)
+            {
+                g.stroke();
+            }
+            else
+            {
+                g.fill();
+            }
+        }
+    }
+}
+
+function timer_event_handler()
+{
+    // Start new delay
+    timer_id = setTimeout(timer_event_handler, target_delta_t);
+
+    // Increase (and wrap) t1 parameter by an amount corresponding to the elapsed time since
+    // the last timer event
+    var new_time = (new Date()).valueOf();
+    var delta_t = Math.min(2 * target_delta_t, new_time - time);
+    time = new_time;
+    t1 = (t1 + delta_t/25) % 360;
+
+    // Calculate object rotation from t1 parameter
+    rot_angles[1] = 30 * Math.sin(2 * t1 * radians_per_degree);
+    rot_angles[2] = t1;
+    extra_rot_quaternion.set_from_angles(rot_angles);
+
+    update_display();
+}
+
+function select_obj()
+{
+    obj = selectElem[selectElem.selectedIndex].associated_obj;
+    descriptionElem.innerHTML = obj.get_stats();
+    // Position object so its nearest face is a fixed z-distance from observer
+    obj_pos[2] = obj_front_face_z - obj.insphere_radius;
+    // Calculate a suitable z-coordinate for the rotation target vector when dragging the
+    // object with the mouse: make the mouse plane appear to touch the nearest vertex of the
+    // object when that vertex is as close to the observer as possible
+    obj_target_vector_z = image_z * obj.circumsphere_radius / (obj_pos[2] + obj.circumsphere_radius);
+    update_display();
+}
+
+function show_faces()
+{
+    is_wire_image = false;
+    faceWireButtonElem.innerHTML = "Edges";
+    update_display();
+}
+
+function show_wires()
+{
+    is_wire_image = true;
+    faceWireButtonElem.innerHTML = "Faces";
+    update_display();
+}
+
+function toggle_faces_wires()
+{
+    if (is_wire_image)
+    {
+        show_faces();
+    }
+    else
+    {
+        show_wires();
+    }
+}
+
+function run()
+{
+    is_running = true;
+    runStopButtonElem.innerHTML = "Manual rotation";
+    time = (new Date()).valueOf();
+    t1 = 0;
+    timer_event_handler();
+}
+
+function stop()
+{
+    is_running = false;
+    runStopButtonElem.innerHTML = "Auto rotation";
+    if (timer_id)
+    {
+        clearTimeout(timer_id);
+        timer_id = 0;
+    }
+    base_rot_quaternion.left_multiply_and_normalize(extra_rot_quaternion);
+    extra_rot_quaternion.reset();
+}
+
+function toggle_run_stop()
+{
+    if (is_running)
+    {
+        stop();
+    }
+    else
+    {
+        run();
+    }
+}
+
+function reset_rotation()
+{
+    base_rot_quaternion.reset();
+    extra_rot_quaternion.reset();
+    time = (new Date()).valueOf();
+    t1 = 0;
+    update_display();
+}
+
+// Class Pointer
+
+function Pointer()
+{
+    this.identifier = null;
+}
+
+Pointer.prototype.is_active = function()
+{
+    return this.identifier !== null;
+};
+
+Pointer.prototype.calculate_rotation = function(x, y)
+{
+    var rect = canvasElem.getBoundingClientRect();
+    // Change pointer coords to be zero at center of canvas, and >0 to the right and up
+    x -= (rect.left + rect.right) / 2;
+    y = (rect.top + rect.bottom) / 2 - y;
+    // Scale down obj_target_vector_z if canvas element has been scaled down (due to small window)
+    var scale = (rect.right - rect.left) / canvasElem.width;
+    // Calculate rotation quaternion from pointer coordinates
+    extra_rot_quaternion.set_from_rotation_target_vector([x, y, obj_target_vector_z * scale]);
+};
+
+Pointer.prototype.down = function(x, y, target, pointer_id)
+{
+    this.identifier = pointer_id;
+    this.calculate_rotation(x, y);
+    base_rot_quaternion.left_divide_and_normalize(extra_rot_quaternion);
+    update_display();
+};
+
+Pointer.prototype.move = function(x, y)
+{
+    this.calculate_rotation(x, y);
+    update_display();
+};
+
+Pointer.prototype.up = function(x, y)
+{
+    this.identifier = null;
+    this.calculate_rotation(x, y);
+    base_rot_quaternion.left_multiply_and_normalize(extra_rot_quaternion);
+    extra_rot_quaternion.reset();
+    update_display();
+};
+
+var pointer = new Pointer();
+
+function pointer_event_handler(ev)
+{
+    var event_handled = false;
+    var touchobj;
+    switch (ev.type)
+    {
+        case "mousedown":
+            if (!is_running && !pointer.is_active())
+            {
+                pointer.down(ev.clientX, ev.clientY, ev.target, 0);
+                event_handled = true;
+            }
+            break;
+        
+        case "mousemove":
+            if (pointer.is_active())
+            {
+                pointer.move(ev.clientX, ev.clientY);
+                event_handled = true;
+            } 
+            break;
+
+        case "mouseup":
+            if (pointer.is_active())
+            {
+                pointer.up(ev.clientX, ev.clientY);
+                event_handled = true;
+            }
+            break;
+
+        case "touchstart":
+            if (!is_running && !pointer.is_active())
+            {
+                touchobj = ev.changedTouches[0];
+                pointer.down(touchobj.clientX, touchobj.clientY, touchobj.target, touchobj.identifier);
+                //event_handled = true; // see comment below
+            }
+            event_handled = true; // This should be done inside the 'if' above, but for some reason
+                                  // mobile Chrome and Opera don't handle this well (auto rotation
+                                  // slows to a crawl when swiping up or down - maybe due to some
+                                  // interaction with the page header animation).
+            break;
+
+        case "touchmove":
+            if (pointer.is_active())
+            {
+                for(var i = 0; i < ev.changedTouches.length; i++)
+                {
+                    touchobj = ev.changedTouches[i];
+                    if (touchobj.identifier == pointer.identifier)
+                    {
+                        pointer.move(touchobj.clientX, touchobj.clientY);
+                        event_handled = true;
+                        break;
+                    }
+                } 
+            } 
+            break;
+
+        case "touchcancel":
+        case "touchend":
+            if (pointer.is_active())
+            {
+                for(var i = 0; i < ev.changedTouches.length; i++)
+                {
+                    touchobj = ev.changedTouches[i];
+                    if (touchobj.identifier == pointer.identifier)
+                    {
+                        pointer.up(touchobj.clientX, touchobj.clientY);
+                        event_handled = true;
+                        break;
+                    }
+                }
+            }
+            break;
+    }
+    if (event_handled)
+    {
+        ev.preventDefault();
+        ev.stopPropagation();
+    }
+    return !event_handled;
+}
+
+function default_event_handler(ev)
+{
+    ev.preventDefault();
+    ev.stopPropagation();
+    return false;
+}
+
+function init()
+{
+    canvasElem = document.getElementById("canvas");
+    descriptionElem = document.getElementById("description");
+    selectElem = document.getElementById("select");
+    faceWireButtonElem = document.getElementById("face_wire_button");
+    runStopButtonElem = document.getElementById("run_stop_button");
+    resetButtonElem = document.getElementById("reset_button");
+
+    g = canvasElem.getContext("2d");
+    image_ctr = [canvasElem.width/2, canvasElem.height/2];
+
+    var objects = [tetrahedron, hexahedron, octahedron, dodecahedron, icosahedron];
+    for (var i = 0; i < objects.length; i++)
+    {
+        var option = document.createElement("option");
+        option.text = objects[i].name;
+        option.associated_obj = objects[i];
+        selectElem.add(option);
+    }
+    selectElem.selectedIndex = objects.length - 1;
+    // Complete the object selection and display the object
+    select_obj();
+    selectElem.addEventListener("change", select_obj, false);
+
+    canvasElem.addEventListener("mousedown", pointer_event_handler, false);
+    canvasElem.addEventListener("mousemove", pointer_event_handler, false);
+    canvasElem.addEventListener("mouseup", pointer_event_handler, false);
+    canvasElem.addEventListener("touchstart", pointer_event_handler, false);
+    canvasElem.addEventListener("touchmove", pointer_event_handler, false);
+    canvasElem.addEventListener("touchend", pointer_event_handler, false);
+    canvasElem.addEventListener("touchcancel", pointer_event_handler, false);
+    canvasElem.addEventListener("selectstart", default_event_handler, false); // disable text selection in MSIE
+    canvasElem.addEventListener("click", default_event_handler, false);
+    canvasElem.addEventListener("scroll", default_event_handler, false);
+    window.addEventListener("mousemove", pointer_event_handler, false);
+    window.addEventListener("mouseup", pointer_event_handler, false);
+
+    show_faces();
+    run();
+    faceWireButtonElem.addEventListener("click", toggle_faces_wires, false);
+    runStopButtonElem.addEventListener("click", toggle_run_stop, false);
+    resetButtonElem.addEventListener("click", reset_rotation, false);
+}
+
+window.addEventListener("load", init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Platonic Solids</h1>
+<p class="page_subtitle">(Regular convex polyhedra)</p>
+
+<select id="select"></select>
+<div class="linebreak"></div>
+<button id="face_wire_button" type="button"></button>
+<button id="run_stop_button" type="button"></button>
+<button id="reset_button" type="button">Reset</button>
+
+<div class="box imgbox" id="canvas_box">
+<canvas id="canvas" width=350 height=350><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+</div>
+
+<div class="box" id="description">
+</div>
+
+</div>
+
+</body>
+</html>

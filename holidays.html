@@ -1,0 +1,328 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Danske Helligdage</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.box#control {
+    text-align: center;
+    width: 100%;
+}
+
+input {
+    margin: 2px 0px 2px 0px;
+    text-align: center;
+    vertical-align: middle;
+}
+
+h2 {
+    text-align: center;
+}
+
+table.plain {
+    margin: auto;
+    border-collapse: separate;
+    border-spacing: 0em 0.2em;
+}
+
+table.plain td {
+    text-align: left;
+    background-color: #DDF8FF;
+    padding: 0em 0.2em;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+genericPageSetup.extra_menu_buttons = [
+    ['lang_button', 'English', 'change_language()'],
+];
+
+// Hack to get around javascript's weird % behavior (x%y takes the sign of x rather than y)
+function mod(x, y)
+{
+    return (x % y + y) % y;
+}
+
+// Hack to get around javascript's weird handling of year < 100 (99 means 1999) and month (0 means january)
+function make_date(year, month, day_of_month)
+{
+    var d = new Date(year, month - 1, day_of_month, 12);
+    d.setFullYear(year);
+    return d;
+}
+
+const msperday = Number(make_date(2000,1,2)) - Number(make_date(2000,1,1));
+var year = -1;
+
+class SpecialDay
+{
+    name;
+    date;
+
+    constructor(name, date)
+    {
+        this.name = name;
+        this.date = date;
+    }
+}
+
+class Language
+{
+    constructor(lang_id)
+    {
+        const idx = lang_id == 'da' ? 0 : 1;
+        this.lang_id = ['da','en'][idx];
+        this.title = ['Danske Helligdage &Aring;r ', 'Danish Holidays Year '][idx];
+        this.year_input_label = ['V&aelig;lg nyt &aring;rstal:', 'Select new year:'][idx];
+        this.months = [["jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec"], ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]][idx];
+        this.weekdays = [["s&oslash;ndag","mandag","tirsdag","onsdag","torsdag","fredag","l&oslash;rdag"], ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]][idx];
+
+        this.floating_holiday_title = ['Flydende helligdage', 'Floating holidays'][idx];
+        this.quinquagesima_sunday_txt = ['Fastelavn', 'Quinquagesima Sunday'][idx];
+        this.palm_sunday = ['Palmes&oslash;ndag', 'Palm Sunday'][idx];
+        this.maundy_thursday = ['Sk&aelig;rtorsdag', 'Maundy Thursday'][idx];
+        this.good_friday = ['Langfredag', 'Good Friday'][idx];
+        this.easter_day = ['P&aring;skedag', 'Easter Day'][idx];
+        this.easter_monday = ['2. p&aring;skedag', 'Easter Monday'][idx];
+        this.prayer_day = ['Store bededag', 'Prayer Day'][idx];
+        this.ascension_day = ['Kristi himmelfartsdag', 'Ascension Day'][idx];
+        this.whitsunday = ['Pinsedag', 'Whitsunday'][idx];
+        this.whitmonday = ['2. pinsedag', 'Whitmonday'][idx];
+
+        this.other_special_day_title = ['Andre m&aelig;rkedage', 'Other special days'][idx];
+        this.new_years_day = ['Nyt&aring;rsdag', 'New Year\'s Day'][idx];
+        this.valentines_day = ['Valentinsdag', 'Valentine\'s Day'][idx];
+        this.daylight_saving_begins = ['Sommertid begynder', 'Daylight Saving begins'][idx];
+        this.mothers_day = ['Mors dag', 'Mother\'s Day'][idx];
+        this.constitution_day = ['Grundlovsdag', 'Constitution Day'][idx];
+        this.fathers_day = ['Fars dag', 'Father\'s Day'][idx];
+        this.autumn_holiday_week_begins = ['Efter&aring;rsferien begynder', 'Autumn holiday week begins'][idx];
+        this.daylight_saving_ends = ['Sommertid ender', 'Daylight Saving ends'][idx];
+        this.halloween = ['Halloween', 'Halloween'][idx];
+        this.all_saints_sunday = ['Allehelgenss&oslash;ndag', 'All Saints\' Sunday'][idx];
+        this.first_sunday_in_advent = ['1. s&oslash;ndag i advent', '1st Sunday in Advent'][idx];
+        this.christmas_day = ['Juledag', 'Christmas Day'][idx];
+        this.boxing_day = ['2. juledag', 'Boxing Day'][idx];
+        this.new_years_eve = ['Nyt&aring;rsaften', 'New Year\'s Eve'][idx];
+    }
+}
+
+var lang = new Language('da');
+
+function date2str(d)
+{
+    return lang.weekdays[d.getDay()] + ', ' +
+        (lang.lang_id == 'da' ?
+            d.getDate() + '. ' + lang.months[d.getMonth()] :
+            lang.months[d.getMonth()] + ' ' + d.getDate());
+}
+
+function show()
+{
+    var hs;
+
+    if (isNaN(year) || year<0) year = (new Date()).getFullYear();
+
+    document.getElementById('title').innerHTML = lang.title + year;
+    document.getElementById('year_input_label').innerHTML = lang.year_input_label;
+    document.getElementById('year_input').value = year;
+    document.getElementById('lang_button').innerHTML = lang.lang_id == 'da' ? 'English' : 'Dansk';
+
+    const a = mod(year, 19);
+    const b = Math.floor(year / 100);
+    const c = Math.floor(b / 4);
+    var i = mod(b - c - Math.floor((b - Math.floor((b - 17) / 25)) / 3) + 19 * a + 15, 30);
+    const e = Math.floor(i / 28);
+    i = i - e * (1 - e * Math.floor(29 / (i + 1)) * Math.floor((21 - a) / 11));
+    i = i - mod(year + Math.floor(year / 4) + i + 2 - b + c, 7);
+    const m = 3 + Math.floor((i + 40) / 44);
+    const date_easter = make_date(year, m, i + 28 - 31 * Math.floor(m / 4));
+
+    var date1 = make_date(year,1,1);
+    const weekday = mod(date1.getDay() - 1, 7); // Make 0..6 mean Monday..Sunday instead of Sunday..Saturday
+    const week1date = new Date(Number(date1) + (7 * (weekday >= 4) - weekday) * msperday);
+
+    // Floating holidays
+
+    let special_days = [];
+
+    date1 = new Date(Number(date_easter) - 49 * msperday);
+    special_days.push(new SpecialDay(lang.quinquagesima_sunday_txt, date1));
+
+    date1 = new Date(Number(date_easter) - 7 * msperday);
+    special_days.push(new SpecialDay(lang.palm_sunday, date1));
+
+    date1 = new Date(Number(date_easter) - 3 * msperday);
+    special_days.push(new SpecialDay(lang.maundy_thursday, date1));
+
+    date1 = new Date(Number(date_easter) - 2 * msperday);
+    special_days.push(new SpecialDay(lang.good_friday, date1));
+
+    special_days.push(new SpecialDay(lang.easter_day, date_easter));
+
+    date1 = new Date(Number(date_easter) + 1 * msperday);
+    special_days.push(new SpecialDay(lang.easter_monday, date1));
+
+    if (year < 2024) {
+        date1 = new Date(Number(date_easter) + 26 * msperday);
+        special_days.push(new SpecialDay(lang.prayer_day, date1));
+    }
+
+    date1 = new Date(Number(date_easter) + 39 * msperday);
+    special_days.push(new SpecialDay(lang.ascension_day, date1));
+
+    date1 = new Date(Number(date_easter) + 49 * msperday);
+    special_days.push(new SpecialDay(lang.whitsunday, date1));
+
+    date1 = new Date(Number(date_easter) + 50 * msperday);
+    special_days.push(new SpecialDay(lang.whitmonday, date1));
+
+    special_days.sort((d1, d2) => d1.date - d2.date);
+
+    hs = "<h2>" + lang.floating_holiday_title + "<\/h2>"
+        + "<table class='plain'>"
+        + special_days.map(d => "<tr><td>" + d.name + ":<td>"+date2str(d.date)).join('')
+        + "<\/table>";
+    document.getElementById('floating_days').innerHTML = hs;
+
+    // Other special days
+
+    special_days = [];
+
+    date1 = make_date(year,1,1);
+    special_days.push(new SpecialDay(lang.new_years_day, date1));
+
+    date1 = make_date(year,2,14);
+    special_days.push(new SpecialDay(lang.valentines_day, date1));
+
+    date1 = make_date(year,3,31);
+    date1 = new Date(Number(date1) - date1.getDay() * msperday);
+    special_days.push(new SpecialDay(lang.daylight_saving_begins, date1));
+
+    date1 = make_date(year,5,14);
+    date1 = new Date(Number(date1) - date1.getDay() * msperday);
+    special_days.push(new SpecialDay(lang.mothers_day, date1));
+
+    date1 = make_date(year,6,5);
+    special_days.push(new SpecialDay(lang.constitution_day, date1));
+    special_days.push(new SpecialDay(lang.fathers_day, date1));
+
+    date1 = new Date(Number(week1date) + 41 * 7 * msperday);
+    special_days.push(new SpecialDay(lang.autumn_holiday_week_begins, date1));
+
+    date1 = make_date(year,10,31);
+    date1 = new Date(Number(date1) - date1.getDay() * msperday);
+    special_days.push(new SpecialDay(lang.daylight_saving_ends, date1));
+
+    date1 = make_date(year,10,31);
+    special_days.push(new SpecialDay(lang.halloween, date1));
+
+    date1 = make_date(year,11,7);
+    date1 = new Date(Number(date1) - date1.getDay() * msperday);
+    special_days.push(new SpecialDay(lang.all_saints_sunday, date1));
+
+    date1 = make_date(year,12,24);
+    date1 = new Date(Number(date1) - (21 + date1.getDay()) * msperday);
+    special_days.push(new SpecialDay(lang.first_sunday_in_advent, date1));
+
+    date1 = make_date(year,12,25);
+    special_days.push(new SpecialDay(lang.christmas_day, date1));
+
+    date1 = make_date(year,12,26);
+    special_days.push(new SpecialDay(lang.boxing_day, date1));
+
+    date1 = make_date(year,12,31);
+    special_days.push(new SpecialDay(lang.new_years_eve, date1));
+
+    if (year >= 2024) {
+        date1 = new Date(Number(date_easter) + 26 * msperday);
+        special_days.push(new SpecialDay(lang.prayer_day, date1));
+    }
+
+    special_days.sort((d1, d2) => d1.date - d2.date);
+
+    hs = "<h2>" + lang.other_special_day_title + "<\/h2>"
+        + "<table class='plain'>"
+        + special_days.map(d => "<tr><td>" + d.name + ":<td>"+date2str(d.date)).join('')
+        + "<\/table>";
+    document.getElementById('other_days').innerHTML = hs;
+}
+
+function change_year()
+{
+    year = 1 * document.getElementById('year_input').value;
+    show();
+}
+
+function change_year_if_enter(e)
+ {
+    if (window.event)
+        e = window.event;
+    if (e.key == 'Enter')
+    {
+        change_year();
+        return false;
+    }
+    else
+    {
+        return true;
+    }
+}
+
+function change_language()
+{
+    lang = new Language(lang.lang_id == 'da' ? 'en' : 'da');
+    show();
+}
+
+function init()
+{
+    // Handle URL arguments
+    const page_settings_spec = {
+        year: {obj: window, attr: 'year'},
+        lang: {
+            get: function() {return lang.lang_id},
+            set: function(v) {lang = new Language(v)}
+        },
+    };
+    genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+    show();
+
+    document.getElementById('year_input').onkeydown = change_year_if_enter;
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1 id="title"></h1>
+
+<div class="box" id="control">
+<label id="year_input_label" for="year_input"></label>
+<input id="year_input" type="text" size="4" maxlength="4" onchange="change_year();">
+</div>
+
+<div class="box" id="floating_days">
+</div>
+
+<div class="box" id="other_days">
+</div>
+
+</div>
+
+</body>
+</html>

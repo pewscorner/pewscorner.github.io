@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Key/Mouse/Touch Event Logger</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 5em;
+    padding: 0.2em;
+}
+textarea#output {
+    box-sizing: border-box;
+    width: 100%;
+    height: 20em;
+    padding: 0.2em;
+}
+div.popup_container {
+    position: relative;
+    width: 0px;
+    height: 0px;
+    border: 0px solid #000000;
+}
+div.popup {
+    position: absolute;
+    left: 0.5em;
+    top: 0.5em;
+    display: none;
+    border: 1px solid #000000;
+    color: #FFFFFF;
+    background-color: #666666;
+    padding: 0.5em;
+}
+textarea#event_list_input {
+    width: 15em;
+    height: 10em;
+    border: 0px solid #FFFFFF;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+var inputElem;
+var outputElem;
+var modifyPopupElem;
+var eventListInputElem;
+var preventDefaultElem;
+var preventDefault = false;
+
+var new_output = "";
+
+var events_to_catch =
+    [
+    'keydown',
+    'keypress',
+    'keyup',
+    'beforeinput',
+    'input',
+    'textInput',
+    'pointerdown',
+    'pointerup',
+    'pointerover',
+    'pointerout',
+    'pointerenter',
+    'pointerleave',
+    'pointercancel',
+    'mousedown',
+    'mouseup',
+    'mouseover',
+    'mouseout',
+    'mouseenter',
+    'mouseleave',
+    'click',
+    'dblclick',
+    'select',
+    'touchstart',
+    'touchmove',
+    'touchend',
+    'touchcancel',
+    'contextmenu',
+    ];
+
+function timertick()
+    {
+    outputElem.value += new_output;
+    new_output = "";
+    }
+
+function compare_key_val_pairs(x, y)
+    {
+    return x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0;
+    }
+
+function dump_event_props(e)
+    {
+    new_output += "Event " + e.type + ":\n    ";
+    var key_val_pairs = [];
+    var e_proto = Object.getPrototypeOf(e);
+    for (var key in e)
+        {
+        if ((e.hasOwnProperty(key) || e_proto.hasOwnProperty(key)) && typeof e[key] !== "function")
+            {
+            key_val_pairs.push([key, e[key]]);
+            }
+        }
+    key_val_pairs.sort(compare_key_val_pairs);
+    new_output += key_val_pairs.join("\n    ") + "\n\n";
+    if (preventDefault)
+        {
+        e.preventDefault();
+        return false;
+        }
+    }
+
+function clear_input()
+    {
+    inputElem.value = "";
+    inputElem.focus();
+    }
+
+function clear_output()
+    {
+    outputElem.value = "";
+    new_output = "";
+    inputElem.focus();
+    }
+
+function change_prevent_default_state()
+    {
+        preventDefault = preventDefaultElem.checked;
+        inputElem.focus();
+    }
+
+function remove_event_listeners()
+    {
+    for (var i = 0; i < events_to_catch.length; i++)
+        {
+        inputElem.removeEventListener(events_to_catch[i], dump_event_props, false);
+        }
+    }
+
+function add_event_listeners()
+    {
+    for (var i = 0; i < events_to_catch.length; i++)
+        {
+        inputElem.addEventListener(events_to_catch[i], dump_event_props, false);
+        }
+    document.getElementById('events_to_log').innerHTML = events_to_catch.join(', ') + ".";
+    }
+
+function modify_events_popup()
+    {
+    remove_event_listeners();
+    eventListInputElem.value = events_to_catch.join('\n');
+    modifyPopupElem.style.display = 'block';
+    eventListInputElem.focus();
+    }
+
+function apply_new_events()
+    {
+    modifyPopupElem.style.display = 'none';
+    events_to_catch = eventListInputElem.value.split(/\s/);
+    add_event_listeners();
+    inputElem.focus();
+    }
+
+function cancel_new_events()
+    {
+    modifyPopupElem.style.display = 'none';
+    add_event_listeners();
+    inputElem.focus();
+    }
+
+function init()
+    {
+    inputElem = document.getElementById('input');
+    outputElem = document.getElementById('output');
+    modifyPopupElem = document.getElementById('modify_popup');
+    eventListInputElem = document.getElementById('event_list_input');
+    preventDefaultElem = document.getElementById('prevent_default');
+
+    change_prevent_default_state();
+    preventDefaultElem.addEventListener('click', change_prevent_default_state, false);
+
+    document.getElementById('clear_input_button').addEventListener('click', clear_input, false);
+    document.getElementById('clear_output_button').addEventListener('click', clear_output, false);
+    document.getElementById('modify_button').addEventListener('click', modify_events_popup, false);
+
+    document.getElementById('apply_new_events_button').addEventListener('click', apply_new_events, false);
+    document.getElementById('cancel_new_events_button').addEventListener('click', cancel_new_events, false);
+
+    add_event_listeners();
+
+    inputElem.focus();
+    
+    setInterval(timertick, 1000);
+    }
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1><span class="words">Key/</span><span class="words">Mouse/</span>Touch Event Logger</h1>
+
+<div class="box">
+<div class='popup_container'>
+    <div id='modify_popup' class='popup'>
+        Add or delete/rename events to capture:
+        <textarea id='event_list_input'></textarea><br>
+        <button id='apply_new_events_button' type='button'>Apply</button>
+        <button id='cancel_new_events_button' type='button'>Cancel</button>
+    </div>
+</div>
+
+<button id='clear_input_button' type='button'>Clear</button> Input:<br>
+<textarea id='input' name='input'></textarea><br>
+
+<p><button id='modify_button' type='button'>Modify</button> Events logged: <span id='events_to_log'></span></p>
+
+<p><input id='prevent_default' type='checkbox' checked><label for="prevent_default">Prevent default behavior (new keys might not show up in input field).</label></p>
+
+<button id='clear_output_button' type='button'>Clear</button> Results:<br>
+<textarea id='output' name='output' rows="10"></textarea>
+</div>
+
+</div>
+
+</body>
+</html>
+

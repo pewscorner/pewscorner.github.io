@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Translation Practice: Numbers</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var words = [
+    ["","ichi","ni","san","yon","go","roku","nana","hachi","kyuu"],
+    ["","juu","nijuu","sanjuu","yonjuu","gojuu","rokujuu","nanajuu","hachijuu","kyuujuu"],
+    ["","hyaku","nihyaku","sambyaku","yonhyaku","gohyaku","roppyaku","nanahyaku","happyaku","kyuuhyaku"],
+    ["","sen","nisen","sanzen","yonsen","gosen","rokusen","nanasen","hassen","kyuusen"],
+    ["","ichiman","niman","samman","yomman","goman","rokuman","nanaman","hachiman","kyuuman"],
+    ["","juuman","nijuuman","sanjuuman","yonjuuman","gojuuman","rokujuuman","nanajuuman","hachijuuman","kyuujuuman"],
+    ["","hyakuman","nihyakuman","sambyakuman","yonhyakuman","gohyakuman","roppyakuman","nanahyakuman","happyakuman","kyuuhyakuman"],
+    ["","senman","nisenman","sanzenman","yonsenman","gosenman","rokusenman","nanasenman","hassenman","kyuusenman"],
+    ["","ichioku","nioku","samoku","yomoku","gooku","rokuoku","nanaoku","hachioku","kyuuoku"],
+    ["","juuoku","nijuuoku","sanjuuoku","yonjuuoku","gojuuoku","rokujuuoku","nanajuuoku","hachijuuoku","kyuujuuoku"],
+    ["","hyakuoku","nihyakuoku","sambyakuoku","yonhyakuoku","gohyakuoku","roppyakuoku","nanahyakuoku","happyakuoku","kyuuhyakuoku"],
+    ["","senoku","nisenoku","sanzenoku","yonsenoku","gosenoku","rokusenoku","nanasenoku","hassenoku","kyuusenoku"]
+];
+
+var output = "";
+var result = "";
+var oldns = "";
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+    var ndigits = document.getElementById('ndigits').selectedIndex + 1;
+    var ns = "";
+    result = "";
+    for (var i = ndigits; i > 0; i--) {
+        var d = 8 - Math.floor(Math.random() * (8 + (i < ndigits || ndigits == 1)));
+        if (ndigits == oldns.length && d >= oldns.charAt(ndigits - i)) d += 1;
+        if (i < ndigits && i % 3 == 0) ns += ",";
+        ns += d.toString();
+        if (d != 0 && result != "") result += "-";
+        result += words[i - 1][d];
+    }
+    if (ns == "0") {
+        result = "rei";
+    }
+    oldns = ns.replace(/,/g,"");
+    output = "Translate the following number into Japanese:<br>" + ns;
+    document.getElementById('output').innerHTML = output;
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Translation Practice:<br>Numbers</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button><br>
+
+Set number of digits:&nbsp;<select id="ndigits" onChange="create_new()">
+<option>1
+<option>2
+<option>3
+<option>4
+<option selected>5
+<option>6
+<option>7
+<option>8
+<option>9
+<option>10
+<option>11
+<option>12
+</select>
+
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,250 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Eyes</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+div.box {
+    overflow: hidden;
+}
+
+div.frame {
+    position: relative;
+    box-sizing: content-box;
+    width: 100%;
+    padding: 50% 0px 0px 0px; /* padding-top is relative to parent width, so this assures fixed width/height ratio */
+    height: 0px;
+}
+
+svg {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    background-color: #E0C0A0;
+}
+
+.eyeborder {
+    fill: none;
+    stroke: #000000;
+    stroke-width: 4px;
+    stroke-linejoin: round;
+}
+
+.eyebg {
+    fill: #DDDDDD;
+    stroke: none;
+}
+
+.eyesparkle {
+    fill: url(#sparkleGradient);
+    stroke: none;
+}
+
+.iris {
+    fill: #3D1812;
+    stroke: none;
+}
+
+.pupil {
+    /*fill: url(#sparkleGradient);*/
+    fill: #000000;
+    stroke: none;
+}
+
+.sparkleGradient_stop0 {
+    stop-color: rgba(255,255,255,0.5);
+}
+
+.sparkleGradient_stop1 {
+    stop-color: rgba(255,255,255,0);
+}
+
+</style>
+<script type="text/javascript">
+var ms_per_tick = 30;
+var max_pupil_move_per_tick = 4;
+var max_pupil_x = 20;
+var max_pupil_y = 10;
+var max_pupil_pause_ticks = Math.round(2000 / ms_per_tick);
+var min_pupil_pause_ticks = Math.round(200 / ms_per_tick);
+
+var max_lid_open_ticks = Math.round(5000 / ms_per_tick);
+var min_lid_open_ticks = Math.round(2000 / ms_per_tick);
+var lid_closed_ticks = Math.round(100 / ms_per_tick);
+
+var target_pupil_x = 0;
+var target_pupil_y = 0;
+var current_pupil_x = 0;
+var current_pupil_y = 0;
+var pupil_pause_ticks = 0;
+
+var lid_open_ys = [-60,30];
+var lid_closed_ys = [10,10];
+var lid_is_open = true;
+var lid_pause_ticks = 0;
+
+var lefteyeball_elem;
+var righteyeball_elem;
+var lefteyeborder_elem;
+var righteyeborder_elem;
+
+function tick_handler()
+{
+    setTimeout(tick_handler, ms_per_tick);
+
+    if (pupil_pause_ticks <= 0)
+    {
+        pupil_pause_ticks = Math.floor(Math.random() * (max_pupil_pause_ticks - min_pupil_pause_ticks) + min_pupil_pause_ticks);
+        if (target_pupil_x != 0 || target_pupil_y != 0)
+        {
+            target_pupil_x = target_pupil_y = 0;
+        }
+        else
+        {
+            target_pupil_x = Math.round((Math.random() * 2 - 1) * max_pupil_x);
+            target_pupil_y = Math.round((Math.random() * 2 - 1) * max_pupil_y);
+        }
+    }
+    pupil_pause_ticks--;
+
+    let pupil_must_move = (current_pupil_x != target_pupil_x || current_pupil_y != target_pupil_y);
+    if (pupil_must_move)
+    {
+        let dist_x = target_pupil_x - current_pupil_x;
+        let dist_y = target_pupil_y - current_pupil_y;
+        let dist = Math.sqrt(dist_x * dist_x + dist_y * dist_y);
+        if (dist <= max_pupil_move_per_tick)
+        {
+            current_pupil_x = target_pupil_x;
+            current_pupil_y = target_pupil_y;
+        }
+        else
+        {
+            let limit_fraction = max_pupil_move_per_tick / dist;
+            current_pupil_x += dist_x * limit_fraction;
+            current_pupil_y += dist_y * limit_fraction;
+        }
+
+        let x = current_pupil_x - 30;
+        let y = -current_pupil_y - 37;
+        lefteyeball_elem.setAttribute('x', x - 70);
+        lefteyeball_elem.setAttribute('y', y);
+        righteyeball_elem.setAttribute('x', x + 70);
+        righteyeball_elem.setAttribute('y', y);
+    }
+
+    let lid_must_open_close = (lid_pause_ticks <= 0);
+    if (lid_must_open_close)
+    {
+        lid_is_open = !lid_is_open;
+        if (lid_is_open)
+        {
+            lid_pause_ticks = Math.floor(Math.random() * (max_lid_open_ticks - min_lid_open_ticks) + min_lid_open_ticks);
+        }
+        else
+        {
+            lid_pause_ticks = lid_closed_ticks;
+        }
+    }
+    lid_pause_ticks--;
+
+    if (lid_must_open_close || lid_is_open && pupil_must_move)
+    {
+        let top_dx, top_dy, bottom_dx, bottom_dy;
+        if (lid_is_open)
+        {
+            top_dx = 50 + Math.floor(current_pupil_x / 2);
+            top_dy = lid_open_ys[0] - Math.floor(current_pupil_y / 2);
+            bottom_dx = top_dx - 100;
+            bottom_dy = lid_open_ys[1] - Math.floor(current_pupil_y / 2);
+        }
+        else
+        {
+            top_dx = 50;
+            top_dy = 10;
+            bottom_dx = top_dx - 100;
+            bottom_dy = 10;
+        }
+        let lid_path = 'q ' + top_dx + ',' + top_dy + ' 100,0 ' + bottom_dx + ',' + bottom_dy + ' -100,0 z';
+        lefteyeborder_elem.setAttribute('d', 'M -120,0 ' + lid_path);
+        righteyeborder_elem.setAttribute('d', 'M 20,0 ' + lid_path);
+    }
+}
+
+function init()
+{
+    lefteyeball_elem = document.getElementById('lefteyeball');
+    righteyeball_elem = document.getElementById('righteyeball');
+    lefteyeborder_elem = document.getElementById('lefteyeborder');
+    righteyeborder_elem = document.getElementById('righteyeborder');
+    tick_handler();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Eyes</h1>
+
+<div class="box">
+<div class="frame">
+<svg viewBox="-140 -90 280 140">
+    <defs>
+        <radialGradient
+            id="sparkleGradient"
+            cx="40%"
+            cy="30%"
+            r="10%">
+            <stop offset="0" class="sparkleGradient_stop0" />
+            <stop offset="1" class="sparkleGradient_stop1" />
+        </radialGradient>
+        <symbol id="eyeball" viewBox="-100 -100 200 200">
+            <circle class="iris" cx="0" cy="0" r="98" />
+            <circle class="pupil" cx="0" cy="0" r="75" />
+        </symbol>
+        <rect id="lefteyearea" x="-120" y="-50" width="100" height="100" />
+        <rect id="righteyearea" x="20" y="-50" width="100" height="100" />
+        <path id="lefteyeborder" d="M -120,0 q 50,-60 100,0 -50,30 -100,0 z" />
+        <path id="righteyeborder" d="M 20,0 q 50,-60 100,0 -50,30 -100,0 z" />
+    </defs>
+    <g id="lefteye">
+        <clipPath id="lefteyeclip">
+            <use xlink:href="#lefteyeborder" class="eyeborder" />
+        </clippath>
+        <g clip-path="url(#lefteyeclip)">
+            <use xlink:href="#lefteyearea" class="eyebg" />
+            <use id="lefteyeball" xlink:href="#eyeball" x="-100" y="-35" width="60" height="60" />
+            <use xlink:href="#lefteyearea" class="eyesparkle" />
+        </g>
+        <use xlink:href="#lefteyeborder" class="eyeborder" />
+    </g>
+    <g id="righteye">
+        <clipPath id="righteyeclip">
+            <use xlink:href="#righteyeborder" class="eyeborder" />
+        </clippath>
+        <g clip-path="url(#righteyeclip)">
+            <use xlink:href="#righteyearea" class="eyebg" />
+            <use id="righteyeball" xlink:href="#eyeball" x="40" y="-35" width="60" height="60" />
+            <use xlink:href="#righteyearea" class="eyesparkle" />
+        </g>
+        <use xlink:href="#righteyeborder" class="eyeborder" />
+    </g>
+</svg>
+</div>
+</div>
+
+</div>
+
+</body>
+</html>

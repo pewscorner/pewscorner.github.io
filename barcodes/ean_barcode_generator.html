@@ -1,0 +1,343 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>EAN Barcode Generator</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+#input {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+#output {
+    text-align: center;
+}
+
+a[href].downloadbut {
+    display: inline-block;
+    width: auto;
+}
+
+#error_msg {
+    display: none;
+    color: red;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+class Ean13Barcode
+{
+    // Widths (in "modules") of bars and spaces for sets A, B, and C for each digit
+    // (sets A and B are used in left half of barcode, i.e. for 2nd-7th digit,
+    // set C is used in right half, i.e. for 8th-13th digit,
+    // 13th digit is check digit)
+    static DIGIT_ENCODING = [
+        //   S B S B       S B S B       B S B S    (B = bar, S = space)
+        {a: [3,2,1,1], b: [1,1,2,3], c: [3,2,1,1]},
+        {a: [2,2,2,1], b: [1,2,2,2], c: [2,2,2,1]},
+        {a: [2,1,2,2], b: [2,2,1,2], c: [2,1,2,2]},
+        {a: [1,4,1,1], b: [1,1,4,1], c: [1,4,1,1]},
+        {a: [1,1,3,2], b: [2,3,1,1], c: [1,1,3,2]},
+        {a: [1,2,3,1], b: [1,3,2,1], c: [1,2,3,1]},
+        {a: [1,1,1,4], b: [4,1,1,1], c: [1,1,1,4]},
+        {a: [1,3,1,2], b: [2,1,3,1], c: [1,3,1,2]},
+        {a: [1,2,1,3], b: [3,1,2,1], c: [1,2,1,3]},
+        {a: [3,1,1,2], b: [2,1,1,3], c: [3,1,1,2]},
+    ];
+
+    // Implicit encoding of first digit as combination of sets A and B for digits in left half of barcode
+    static FIRST_DIGIT_ENCODING = [
+        ['a', 'a', 'a', 'a', 'a', 'a'],
+        ['a', 'a', 'b', 'a', 'b', 'b'],
+        ['a', 'a', 'b', 'b', 'a', 'b'],
+        ['a', 'a', 'b', 'b', 'b', 'a'],
+        ['a', 'b', 'a', 'a', 'b', 'b'],
+        ['a', 'b', 'b', 'a', 'a', 'b'],
+        ['a', 'b', 'b', 'b', 'a', 'a'],
+        ['a', 'b', 'a', 'b', 'a', 'b'],
+        ['a', 'b', 'a', 'b', 'b', 'a'],
+        ['a', 'b', 'b', 'a', 'b', 'a'],
+    ];
+
+    // Left/right end pattern: bar, space, bar
+    static NORMAL_GUARD_PATTERN = [1,1,1]; // unit: modules
+
+    // Center pattern: space, bar, space, bar, space
+    static CENTER_GUARD_PATTERN = [1,1,1,1,1]; // unit: modules
+
+    static LEFT_QUIET_ZONE_WIDTH = 11; // unit: modules
+
+    static RIGHT_QUIET_ZONE_WIDTH = 7; // unit: modules
+
+    static DIGIT_PATTERN_WIDTH = 7; // unit: modules
+
+    static GUARD_PATTERN_EXTRA_HEIGHT = 5; // unit: modules
+
+    static DIGIT_HEIGHT = 10; // unit: modules
+
+    // Total number of bars and spaces (dark and light bars)
+    static N_ALL_BARS =
+        this.NORMAL_GUARD_PATTERN.length +
+        6 * this.DIGIT_ENCODING[0].a.length +
+        this.CENTER_GUARD_PATTERN.length +
+        6 * this.DIGIT_ENCODING[0].c.length +
+        this.NORMAL_GUARD_PATTERN.length;
+
+    static TOTAL_WIDTH =
+        this.LEFT_QUIET_ZONE_WIDTH +
+        this.NORMAL_GUARD_PATTERN.length +
+        6 * this.DIGIT_PATTERN_WIDTH +
+        this.CENTER_GUARD_PATTERN.length +
+        6 * this.DIGIT_PATTERN_WIDTH +
+        this.NORMAL_GUARD_PATTERN.length +
+        this.RIGHT_QUIET_ZONE_WIDTH;
+
+    numeric_code = null;
+    error = null;
+    bar_dims = [];
+
+    constructor()
+    {
+        for (var i = 0; i < Ean13Barcode.N_ALL_BARS; i++)
+        {
+            this.bar_dims[i] = [0, 0];
+        }
+    }
+
+    check_and_add_check_digit()
+    {
+        if (!/^\d{12}$/.test(this.numeric_code))
+        {
+            this.error = this.numeric_code + ' is not 12 digits!';
+            return;
+        }
+        var sum0 = 0;
+        var sum1 = 0;
+        for (var i = 0; i < 12; i += 2)
+        {
+            sum0 += +this.numeric_code.charAt(i);
+            sum1 += +this.numeric_code.charAt(i + 1);
+        }
+        var checkdigit = (10 - (sum0 + 3 * sum1) % 10) % 10;
+        this.numeric_code += checkdigit.toString();
+    }
+
+    append_bar_dims(bar_idx, bar_widths, bar_extra_height)
+    {
+        for (var i = 0; i < bar_widths.length; i++, bar_idx++)
+        {
+            this.bar_dims[bar_idx][0] = bar_widths[i];
+            this.bar_dims[bar_idx][1] = bar_extra_height;
+        }
+        return bar_idx;
+    }
+
+    calc_bar_dims()
+    {
+        var first_digit = +this.numeric_code.charAt(0);
+        var bar_idx = 0;
+        bar_idx = this.append_bar_dims(bar_idx, Ean13Barcode.NORMAL_GUARD_PATTERN,
+            Ean13Barcode.GUARD_PATTERN_EXTRA_HEIGHT);
+        for (var i = 1; i < 7; i++)
+        {
+            var digit = +this.numeric_code.charAt(i);
+            // Determine which set (A or B) to use for this digit
+            var set_id = Ean13Barcode.FIRST_DIGIT_ENCODING[first_digit][i - 1];
+            // Append all bars for this digit (using set A or B) to bar_dims
+            bar_idx = this.append_bar_dims(bar_idx, Ean13Barcode.DIGIT_ENCODING[digit][set_id], 0);
+        }
+        bar_idx = this.append_bar_dims(bar_idx, Ean13Barcode.CENTER_GUARD_PATTERN,
+            Ean13Barcode.GUARD_PATTERN_EXTRA_HEIGHT);
+        for (var i = 7; i < 13; i++)
+        {
+            var digit = +this.numeric_code.charAt(i);
+            // Append all bars for this digit (using set C) to bar_dims
+            bar_idx = this.append_bar_dims(bar_idx, Ean13Barcode.DIGIT_ENCODING[digit].c, 0);
+        }
+        bar_idx = this.append_bar_dims(bar_idx, Ean13Barcode.NORMAL_GUARD_PATTERN,
+            Ean13Barcode.GUARD_PATTERN_EXTRA_HEIGHT);
+    }
+
+    create(numeric_code)
+    {
+        this.numeric_code = numeric_code;
+        this.error = null;
+        this.check_and_add_check_digit();
+        if (this.error) return;
+        this.calc_bar_dims();
+    }
+
+    draw_on_canvas(canvas_context)
+    {
+        var module_width = Math.floor(canvas_context.canvas.width / Ean13Barcode.TOTAL_WIDTH);
+        var bar_top = 2 * module_width;
+        var bar_height = canvas_context.canvas.height - 14 * module_width;
+        var x = Math.floor((canvas_context.canvas.width - Ean13Barcode.TOTAL_WIDTH * module_width) / 2);
+        x += Ean13Barcode.LEFT_QUIET_ZONE_WIDTH * module_width;
+        var digit_width = Ean13Barcode.DIGIT_PATTERN_WIDTH * module_width;
+        var digit_height = Ean13Barcode.DIGIT_HEIGHT * module_width;
+        var first_digit_x = x - digit_width;
+        var digit_x = x + (Ean13Barcode.NORMAL_GUARD_PATTERN.length + 1) * module_width;
+        var digit_y = bar_top + bar_height + digit_height;
+        var is_bar = true;
+        for (var i = 0; i < this.bar_dims.length; i++)
+        {
+            var bar_width = this.bar_dims[i][0] * module_width;
+            var bar_extra_height = this.bar_dims[i][1] * module_width;
+            if (is_bar)
+            {
+                canvas_context.fillRect(x, bar_top, bar_width, bar_height + bar_extra_height);
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        canvas_context.font = digit_height + 'px monospace';
+        canvas_context.fillText(this.numeric_code.charAt(0), first_digit_x, digit_y);
+        for (var i = 1; i < this.numeric_code.length; i++)
+        {
+            canvas_context.fillText(this.numeric_code.charAt(i), digit_x, digit_y);
+            digit_x += digit_width + (i == 6 && Ean13Barcode.CENTER_GUARD_PATTERN.length * module_width);
+        }
+        digit_x += Ean13Barcode.NORMAL_GUARD_PATTERN.length * module_width;
+        canvas_context.fillText('>', digit_x, digit_y);
+    }
+
+    to_svg()
+    {
+        var total_height = Math.floor(Ean13Barcode.TOTAL_WIDTH * 0.6);
+        var bar_top = 2;
+        var bar_height = total_height - 14;
+        var x = Ean13Barcode.LEFT_QUIET_ZONE_WIDTH;
+        var first_digit_x = x - Ean13Barcode.DIGIT_PATTERN_WIDTH;
+        var digit_x = x + (Ean13Barcode.NORMAL_GUARD_PATTERN.length + 1);
+        var digit_y = bar_top + bar_height + Ean13Barcode.DIGIT_HEIGHT;
+        var is_bar = true;
+        var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg width="10cm" height="6cm" viewBox="0 0 ' +
+            Ean13Barcode.TOTAL_WIDTH + ' ' + total_height +'" version="1.1" xmlns="http://www.w3.org/2000/svg">\n' +
+            '<style>text {font-size:' + Ean13Barcode.DIGIT_HEIGHT + 'px;font-family:monospace}</style>\n' +
+            '<rect style="fill:white" x="0" y="0" width="100%" height="100%"/>\n';
+        for (var i = 0; i < this.bar_dims.length; i++)
+        {
+            var bar_width = this.bar_dims[i][0];
+            var bar_extra_height = this.bar_dims[i][1];
+            if (is_bar)
+            {
+                svg += '<rect x="' + x + '" y="' + bar_top +
+                    '" width="' + bar_width + '" height="' + (bar_height + bar_extra_height) + '"/>\n';
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        svg += '<text x="' + first_digit_x + '" y="' + digit_y + '">' + this.numeric_code.charAt(0) + '</text>\n';
+        for (var i = 1; i < this.numeric_code.length; i++)
+        {
+            svg += '<text x="' + digit_x + '" y="' + digit_y + '">' + this.numeric_code.charAt(i) + '</text>\n';
+            digit_x += Ean13Barcode.DIGIT_PATTERN_WIDTH + (i == 6 && Ean13Barcode.CENTER_GUARD_PATTERN.length);
+        }
+        digit_x += Ean13Barcode.NORMAL_GUARD_PATTERN.length;
+        svg += '<text x="' + digit_x + '" y="' + digit_y + '">&gt;</text>\n';
+        svg += '</svg>';
+        return svg;
+    }
+}
+
+function input_focus_handler()
+{
+    input_elem.select();
+}
+
+function png_download_link_click_handler(ev)
+{
+    png_download_link_elem.href = barcode_canvas_elem.toDataURL();
+    png_download_link_elem.download = 'eancode.png';
+}
+
+function svg_download_link_click_handler(ev)
+{
+    svg_download_link_elem.href = 'data:image/svg+xml,' + encodeURIComponent(code.to_svg());
+    svg_download_link_elem.download = 'eancode.svg';
+}
+
+function show_code()
+{
+    input_elem.focus();
+    code.create(input_elem.value);
+    if (code.error)
+    {
+        barcode_output_elem.style.display = 'none';
+        error_msg_elem.innerHTML = 'ERROR: ' + code.error;
+        error_msg_elem.style.display = 'block';
+        return;
+    }
+    error_msg_elem.style.display = 'none';
+    barcode_output_elem.style.display = 'block';
+    var canvas_width = Ean13Barcode.TOTAL_WIDTH * 3;
+    barcode_canvas_elem.width = canvas_width;
+    canvas_context.fillStyle = '#FFFFFF';
+    canvas_context.fillRect(0, 0, barcode_canvas_elem.width, barcode_canvas_elem.height);
+    canvas_context.fillStyle = '#000000';
+    code.draw_on_canvas(canvas_context);
+}
+
+var input_elem;
+var generate_button_elem;
+var barcode_output_elem;
+var barcode_canvas_elem;
+var png_download_link_elem;
+var svg_download_link_elem;
+var error_msg_elem;
+var canvas_context;
+// Instantiate Ean13Barcode (and reuse this instance for all codes)
+var code = new Ean13Barcode();
+
+function init()
+{
+    input_elem = document.getElementById('input');
+    input_elem.addEventListener('keyup', show_code, false);
+    input_elem.addEventListener('focus', input_focus_handler, false);
+    generate_button_elem = document.getElementById('generate_button');
+    generate_button_elem.addEventListener('click', show_code, false);
+    barcode_output_elem = document.getElementById('output');
+    barcode_canvas_elem = document.getElementById('canvas');
+    png_download_link_elem = document.getElementById('png_download_link');
+    svg_download_link_elem = document.getElementById('svg_download_link');
+    error_msg_elem = document.getElementById('error_msg');
+    canvas_context = barcode_canvas_elem.getContext("2d");
+    show_code();
+    png_download_link_elem.addEventListener('click', png_download_link_click_handler, false);
+    svg_download_link_elem.addEventListener('click', svg_download_link_click_handler, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+<body>
+
+<div class="hcontainer">
+
+<h1>EAN-13 Barcode Generator</h1>
+
+<div id="main" class="box">
+Input 12-digit number (excl. final check digit):
+<input type="text" id="input" value="871256624613" maxlength=12>
+<button id="generate_button" type="button">Generate</button>
+</div>
+
+<div class="box imgbox">
+<div id="output">
+<canvas id="canvas" width=339 height=200><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+<a id="png_download_link" class="navbut downloadbut" href="">Download PNG</a>
+<a id="svg_download_link" class="navbut downloadbut" href="">Download SVG</a>
+</div>
+<div id="error_msg"></div>
+</div>
+
+</div>
+
+</body>
+</html>

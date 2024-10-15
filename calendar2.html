@@ -1,0 +1,743 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Kalender</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.year {
+    box-sizing: border-box;
+    width: 100%;
+    text-align: center;
+    font-size: 200%;
+    font-weight: bold;
+    border: 1px solid;
+    border-radius: 1em;
+    padding: 0em;
+    margin: 0.2em;
+}
+
+div.hcontainer > div.month {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    padding: 0.2em;
+}
+
+table.month {
+    border-collapse: collapse;
+}
+
+table.month td {
+    padding: 0.2em;
+    border: none;
+}
+
+table.month tr:first-child td {
+    border-top-left-radius: 1em;
+    border-top-right-radius: 1em;
+    padding-top: 0.4em;
+    font-weight: bold;
+}
+
+tr {
+    text-align: center; vertical-align: top;
+}
+
+td[onclick] {
+    cursor: pointer;
+}
+
+div.info {
+    text-align: left; padding: 2px; position:relative;
+}
+
+.frame {
+    background-color: #BBDDFF;
+}
+
+@keyframes blink {
+    0% { opacity: 0; }
+    33% { opacity: 1; }
+    67% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+@-webkit-keyframes blink {
+    0% { opacity: 0; }
+    33% { opacity: 1; }
+    67% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.today {
+    background-color: #EEEE00;
+    border-radius: 0.5em;
+    -webkit-animation: blink 1s infinite;
+    animation: blink 1s infinite;
+}
+
+.day_style0 {
+    color: #000000;
+    text-shadow: 0px 0px 0.2em #00FF00;
+}
+
+.day_style1 {
+    color: #000000;
+    text-shadow: 0px 0px 0.2em #FF0000;
+}
+
+.day_style2 {
+    color: #000000;
+    font-weight: bold;
+}
+
+input {
+  margin: 2px 0px 2px 0px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+button span.upptr {
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0px;
+    border-top: 0px;
+    border-right: 5px solid transparent;
+    border-bottom: 10px solid #553300;
+    border-left: 5px solid transparent;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+button span.downptr {
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 0px;
+    border-top: 10px solid #553300;
+    border-right: 5px solid transparent;
+    border-bottom: 0px;
+    border-left: 5px solid transparent;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+button span.leftptr {
+    float: left;
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 3px 0px;
+    border-top: 5px solid transparent;
+    border-right: 10px solid #553300;
+    border-bottom: 5px solid transparent;
+    border-left: 0px;
+    font-size: 0px;
+    line-height: 0px;
+}
+
+button span.rightptr {
+    float: left;
+    display: block;
+    position: relative;
+    width: 0px; height: 0px;
+    margin: 3px;
+    border-top: 5px solid transparent;
+    border-right: 0px;
+    border-bottom: 5px solid transparent;
+    border-left: 10px solid #553300;
+    font-size: 0px;
+    line-height: 0px;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var start_year;
+var quarter;
+var special_dates;
+
+var this_year;
+var this_month; // 0-based month
+var this_day;
+
+var range_from_date = undefined;
+var range_to_date;
+var range_day_count;
+var from_year;
+var to_year;
+
+var showingall = false;
+var showing_exceptions = {};
+
+var weekstr = "Uge";
+var weekdays = new Array("M","T","O","T","F","L","S");
+var months = new Array("jan","feb","mar","apr","maj","jun","jul","aug","sep","okt","nov","dec");
+var todaystr = "i dag";
+var showallstr = "Vis<br>s&aelig;rlige<br>dage";
+var hideallstr = "Skjul<br>s&aelig;rlige<br>dage";
+var goherestr = "<span class='leftptr'><\/span>";
+var gocurryearstr = "<span class='rightptr'><\/span>i &aring;r";
+var gotodaystr = "<span class='rightptr'><\/span>i dag";
+
+// Hack to get around javascript's weird % behavior (x%y takes the sign of x rather than y)
+function mod(x, y)
+{
+    return (x % y + y) % y;
+}
+
+function to_date_str(y, m, d, with_hyphen)
+{
+    var ystr = (10000 + y).toString().substring(1);
+    var mstr = (100 + m).toString().substring(1);
+    var dstr = (100 + d).toString().substring(1);
+    if (with_hyphen) {
+        return ystr + "-" + mstr + "-" + dstr;
+    } else {
+        return ystr + mstr + dstr;
+    }
+}
+
+function show_day_content(action)
+{
+    var x,n,date_str,showit;
+    switch (action) {
+        case 0: // Show specified days
+            date_str = arguments[1];
+            x = document.getElementById("info" + date_str);
+            if (x) {
+                x = x.style;
+                showit = showingall;
+                if (showing_exceptions[date_str])
+                    delete showing_exceptions[date_str];
+                else {
+                    showing_exceptions[date_str] = 1;
+                    showit = !showit;
+                }
+                if (showit) {
+                    x.display = "block";
+                } else {
+                    x.display = "none";
+                }
+            }
+            document.getElementById("range_from").value = document.getElementById("range_to").value;
+            document.getElementById("range_to").value =
+                date_str.slice(0, 4) + '-' + date_str.slice(4, 6) + '-' + date_str.slice(6);
+            calc_range();
+            break;
+
+        case 1: // Show all days
+            for (n = 0; n < special_dates.length; n++) {
+                document.getElementById("info" + special_dates[n]).style.display = "block";
+            }
+            showingall = true;
+            showing_exceptions = {};
+            break;
+
+        case 2: // Hide all days
+            for (n = 0; n < special_dates.length; n++) {
+                document.getElementById("info" + special_dates[n]).style.display = "none";
+            }
+            showingall = false;
+            showing_exceptions = {};
+            break;
+    }
+}
+
+function change_year()
+{
+    var inputyear = document.getElementById("yr").value;
+    if (inputyear != start_year || quarter != 0)
+        make_cal(inputyear, 0);
+    document.getElementById("yr").select();
+}
+
+function goto_from_year()
+{
+    if (from_year != undefined)
+        make_cal(from_year.year, 0);
+    document.getElementById("range_from").select();
+}
+
+function goto_to_year()
+{
+    if (to_year != undefined)
+        make_cal(to_year.year, 0);
+    document.getElementById("range_to").select();
+}
+
+function change_year_if_enter(e) {
+    if (window.event)
+        e = window.event;
+    if (e.key == 'Enter') {
+        change_year();
+        return false;
+    } else {
+        return true;
+    }
+}
+
+function update_quarter(delta_q)
+{
+    make_cal(start_year, quarter + delta_q);
+}
+
+function calc_range()
+{
+    var error = false;
+    var from_y, from_m, from_d, to_y, to_m, to_d, ar;
+    var n_days = 0;
+    range_from_date = document.getElementById("range_from").value;
+    range_to_date = document.getElementById("range_to").value;
+
+    error = error || !(ar = range_from_date.match(/^(\d\d\d\d)-(\d\d)-(\d\d)$/)) || ar.length != 4 ||
+        isNaN(from_y = 1*ar[1]) || isNaN(from_m = 1*ar[2]) || isNaN(from_d = 1*ar[3]) ||
+        from_y > 9999 || from_m < 1 || from_m > 12 || from_d < 1 ||
+        (from_year = new Year(from_y), from_d > from_year.daysinmonth[from_m-1]);
+
+    error = error || !(ar = range_to_date.match(/^(\d\d\d\d)-(\d\d)-(\d\d)$/)) || ar.length != 4 ||
+        isNaN(to_y = 1*ar[1]) || isNaN(to_m = 1*ar[2]) || isNaN(to_d = 1*ar[3]) ||
+        to_y > 9999 || to_m < 1 || to_m > 12 || to_d < 1 ||
+        (to_year = new Year(to_y), to_d > to_year.daysinmonth[to_m-1]);
+
+    if (error) {
+        range_day_count = "Fejl i dato";
+        from_year = undefined;
+        to_year = undefined;
+    } else {
+        n_days = to_d + to_year.daysum[to_m-1] + to_year.startsum - (from_d + from_year.daysum[from_m-1] + from_year.startsum);
+        range_day_count = n_days + " dag" + (Math.abs(n_days) == 1 ? "" : "e");
+    }
+    document.getElementById("range_days").innerHTML = range_day_count;
+}
+
+function calc_range_from_if_enter(e)
+{
+    if (window.event)
+        e = window.event;
+    if (e.key == 'Enter') {
+        calc_range();
+        document.getElementById("range_from").select();
+        return false;
+    } else {
+        return true;
+    }
+}
+
+function calc_range_to_if_enter(e)
+{
+    if (window.event)
+        e = window.event;
+    if (e.key == 'Enter') {
+        calc_range();
+        document.getElementById("range_to").select();
+        return false;
+    } else {
+        return true;
+    }
+}
+
+const SpecialDay = function(name, type, day)
+{
+    this.name = name;
+    this.type = type;
+    this.day = day;
+    this.next_day = undefined;
+    this.prev_day = undefined;
+};
+
+const SpecialDays = function()
+{
+    this.first_day = undefined;
+    this.last_day = undefined;
+};
+
+SpecialDays.prototype.add = function(special_day)
+{
+    var d = this.first_day;
+    while (d && d.day <= special_day.day) d = d.next_day;
+    special_day.next_day = d;
+    if (d) {
+        special_day.prev_day = d.prev_day;
+        d.prev_day = special_day;
+    } else {
+        special_day.prev_day = this.last_day;
+        this.last_day = special_day;
+    }
+    if (special_day.prev_day) {
+        special_day.prev_day.next_day = special_day;
+    } else {
+        this.first_day = special_day;
+    }
+};
+
+SpecialDays.prototype.find_first = function(day)
+{
+    var d = this.first_day;
+    while (d && d.day < day) d = d.next_day;
+    return d;
+};
+
+const Year = function(year)
+{
+    var d;
+
+    // Save year, and number of days in each month (indexed by month-1)
+    this.year = year;
+    this.daysinmonth = [31,28 + this.is_leapyear(),31,30,31,30,31,31,30,31,30,31];
+    // Find sum of all days in previous months for each month (indexed by month-1)
+    this.daysum = new Array(13);
+    this.daysum[0] = 0;
+    for (var i = 1; i < 13; i++) {
+        this.daysum[i] = this.daysum[i-1] + this.daysinmonth[i-1];
+    }
+    // Find sum of all days in all previous years
+    const prev_year = year - 1;
+    this.startsum = 365 * prev_year + Math.floor(prev_year / 4) - Math.floor(prev_year / 100) + Math.floor(prev_year / 400);
+    // Find weekday of first day of this year
+    this.weekday = mod(this.startsum, 7); // 0: Monday
+    // Find day-of-year number of first day of week 1 (first day-of-year number is 1)
+    const week1_day = 1 - this.weekday + 7 * (this.weekday >= 4);
+    // Find week number for first day of this year
+    this.week = 1;
+    if (this.weekday >= 4) {
+        const prev_year_weekday = this.weekday - 1 - this.is_leapyear(prev_year);
+        this.week = 52 + (prev_year_weekday < 4);
+    }
+
+    // Find day-of-year number of Easter Sunday (first day-of-year number is 1)
+    const a = mod(year, 19);
+    const b = Math.floor(year / 100);
+    const c = Math.floor(b / 4);
+    var i = mod(b - c - Math.floor((b - Math.floor((b - 17) / 25)) / 3) + 19 * a + 15, 30);
+    const e = Math.floor(i / 28);
+    i = i - e * (1 - e * Math.floor(29 / (i + 1)) * Math.floor((21 - a) / 11));
+    i = i - mod(year + Math.floor(year / 4) + i + 2 - b + c, 7);
+    const m = 3 + Math.floor((i + 40) / 44);
+    d = i + 28 - 31 * Math.floor(m / 4);
+    const easter_day = d + this.daysum[m-1];
+
+    // Find day-of-year number of each special day (first day-of-year number is 1)
+    this.special_days = new SpecialDays();
+    this.special_days.add(new SpecialDay("Fastelavn",                 0, easter_day - 49));
+    this.special_days.add(new SpecialDay("Palmes&oslash;ndag",        1, easter_day - 7));
+    this.special_days.add(new SpecialDay("Sk&aelig;rtorsdag",         1, easter_day - 3));
+    this.special_days.add(new SpecialDay("Langfredag",                1, easter_day - 2));
+    this.special_days.add(new SpecialDay("P&aring;skedag",            1, easter_day));
+    this.special_days.add(new SpecialDay("2. p&aring;skedag",         1, easter_day + 1));
+    this.special_days.add(new SpecialDay("Store bededag",             year < 2024 ? 1 : 0, easter_day + 26));
+    this.special_days.add(new SpecialDay("Kristi himmelfartsdag",     1, easter_day + 39));
+    this.special_days.add(new SpecialDay("Bankferiedag",              1, easter_day + 40));
+    this.special_days.add(new SpecialDay("Pinsedag",                  1, easter_day + 49));
+    this.special_days.add(new SpecialDay("2. pinsedag",               1, easter_day + 50));
+  
+    this.special_days.add(new SpecialDay("Nyt&aring;rsdag",           1, 1));
+    this.special_days.add(new SpecialDay("Valentinsdag",              0, 14 + this.daysum[2-1]));
+    this.special_days.add(new SpecialDay("Sommertid begynder",        0, (d = 31 + this.daysum[3-1], d - mod(d - week1_day + 1, 7))));
+    this.special_days.add(new SpecialDay("Mors dag",                  0, (d = 14 + this.daysum[5-1], d - mod(d - week1_day + 1, 7))));
+    this.special_days.add(new SpecialDay("Arbejdernes kampdag",       0, 1 + this.daysum[5-1]));
+    this.special_days.add(new SpecialDay("Grundlovsdag",              1, (d = 5 + this.daysum[6-1])));
+    this.special_days.add(new SpecialDay("Fars dag",                  0, d));
+    this.special_days.add(new SpecialDay("Skt. Hans aften",           0, 23 + this.daysum[6-1]));
+    this.special_days.add(new SpecialDay("Efter&aring;rsferie",       0, (d = week1_day + 41 * 7)));
+    this.special_days.add(new SpecialDay("Efter&aring;rsferie",       0, d + 1));
+    this.special_days.add(new SpecialDay("Efter&aring;rsferie",       0, d + 2));
+    this.special_days.add(new SpecialDay("Efter&aring;rsferie",       0, d + 3));
+    this.special_days.add(new SpecialDay("Efter&aring;rsferie",       0, d + 4));
+    this.special_days.add(new SpecialDay("Halloween",                 0, (d = 31 + this.daysum[10-1])));
+    this.special_days.add(new SpecialDay("Sommertid ender",           0, d - mod(d - week1_day + 1, 7)));
+    this.special_days.add(new SpecialDay("Allehelgenss&oslash;ndag",  0, (d = 7 + this.daysum[11-1], d - mod(d - week1_day + 1, 7))));
+    this.special_days.add(new SpecialDay("1. s&oslash;ndag i advent", 0, (d = 3 + this.daysum[12-1], d = d - mod(d - week1_day + 1, 7))));
+    this.special_days.add(new SpecialDay("2. s&oslash;ndag i advent", 0, d + 7));
+    this.special_days.add(new SpecialDay("3. s&oslash;ndag i advent", 0, d + 14));
+    this.special_days.add(new SpecialDay("4. s&oslash;ndag i advent", 0, d + 21));
+    this.special_days.add(new SpecialDay("Mortensaften",              0, 10 + this.daysum[11-1]));
+    this.special_days.add(new SpecialDay("Luciadag",                  0, 13 + this.daysum[12-1]));
+    this.special_days.add(new SpecialDay("Juleaften",                 1, 24 + this.daysum[12-1]));
+    this.special_days.add(new SpecialDay("Juledag",                   1, 25 + this.daysum[12-1]));
+    this.special_days.add(new SpecialDay("2. juledag",                1, 26 + this.daysum[12-1]));
+    this.special_days.add(new SpecialDay("Nyt&aring;rsaften",         1, 31 + this.daysum[12-1]));
+
+    for (let m = 1; m <= 12; m++) {
+        let d = this.first_coming_bankday(8 + this.daysum[m-1]);
+        this.special_days.add(new SpecialDay("Dag A",                 2, d));
+        d = this.first_coming_bankday(d + 1);
+        d = this.first_coming_bankday(d + 1);
+        this.special_days.add(new SpecialDay("Dag B",                 2, d));
+    }
+
+    // Find day-of-year number of today if year is current year, else set day-of-year number out of range (zero)
+    this.today = (year == this_year) && this_day + this.daysum[this_month];
+};
+
+Year.prototype.is_leapyear = function(year)
+{
+    if (year === undefined) year = this.year;
+    return mod(year, 4) == 0 && (mod(year, 100) != 0 || mod(year, 400) == 0);
+};
+
+// Return first bank day on or after given day of year, or first day beyond end of year if no more bank days in year
+Year.prototype.first_coming_bankday = function(day)
+{
+    let first_day_beyond_end_of_year = 32 + this.daysum[12-1];
+    while (day < first_day_beyond_end_of_year) {
+        let wday = mod(this.weekday + day - 1, 7);
+        if (wday > 4) day += 7 - wday;
+        let next_special_day = this.special_days.find_first(day);
+        let is_bankday = true;
+        while (next_special_day && next_special_day.day == day) {
+            if (next_special_day.type == 1) is_bankday = false;
+            next_special_day = next_special_day.next_day;
+        }
+        if (is_bankday) return day;
+        day++;
+    }
+    return first_day_beyond_end_of_year;
+}
+
+function make_cal(y, q)
+{
+    var m,d,k,w,n,i,j,s,htmlstr;
+    var lastdate,next_special_day;
+    var date_str,day_name_str,style_str;
+    var week;
+    var weekday;
+    var inputyear;
+    var curr_year;
+    var scroll_to_current_month = (y == undefined);
+
+    var now = new Date();
+    this_year = now.getFullYear();
+    this_month = now.getMonth();
+    this_day = now.getDate();
+
+    if (range_from_date == undefined) {
+        range_from_date = to_date_str(this_year, this_month+1, this_day, 1);
+        range_to_date = to_date_str(this_year, this_month+1, this_day, 1);
+    }
+
+    if (document.getElementById("yr"))
+        inputyear = Math.round(1*document.getElementById("yr").value);
+    if (isNaN(inputyear) || inputyear < 0 || inputyear > 9999)
+        inputyear = this_year;
+    y = Math.round(1*y);
+    if (isNaN(y) || y < 0 || y > 9999) y = this_year;
+    q = Math.round(1*q);
+    if (isNaN(q)) q = this_month/3;
+    quarter = q & 3;
+    y = mod(y + Math.floor(q/4), 10000);
+    start_year = y;
+    curr_year = new Year(y);
+
+    m = quarter * 3;
+    d = curr_year.daysum[m];
+    k = 1 + d;
+    weekday = mod(curr_year.weekday + d, 7);
+    w = Math.floor((weekday + d)/7);
+    week = curr_year.week;
+    if (week > 50 && w > 0) week = 0;
+    week += w;
+
+    next_special_day = curr_year.special_days.find_first(k);
+
+    htmlstr = "";
+    htmlstr += "<button type='button' name='upup1' onclick='update_quarter(-4);'><span style='top:9px;' class='upptr'><\/span><span style='top:-9px;' class='upptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='up1' onclick='update_quarter(-1);'><span class='upptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='down1' onclick='update_quarter(1);'><span class='downptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='dndn1' onclick='update_quarter(4);'><span style='top:1px;' class='downptr'><\/span><span style='top:0px;' class='downptr'><\/span><\/button>\n";
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    special_dates = [];
+    for (q = 0; q < 4; q++) {
+        if (m == 12) {
+            m = 0;
+            k = 1;
+            y = mod(y + 1, 10000);
+            curr_year = new Year(y);
+            weekday = curr_year.weekday;
+            week = curr_year.week;
+            next_special_day = curr_year.special_days.find_first(k);
+        }
+        if (m == 0) {
+            htmlstr += "<div class='year'>" + y + "<\/div>\n";
+        }
+        for (i = 0; i < 3; i++) {
+            d = 1;
+            lastdate = curr_year.daysinmonth[m];
+            var day_htmlstr = "";
+            htmlstr += "<div class='month' id='m" + y + "_" + m + "'><table class='month'>\n";
+            htmlstr += "<tr><td class='frame' colspan='8'>"
+                + months[m].charAt(0).toUpperCase() + months[m].substring(1)
+                + " " + y;
+            htmlstr += "<tr><td class='frame'>" + weekstr;
+            for (n = 0; n < 7; n++) {
+                htmlstr += "<td class='frame'>" + weekdays[n];
+            }
+            for (j = 0; j < 6; j++) {
+                htmlstr += "<tr><td class='frame'>";
+                if (d <= lastdate) {
+                    htmlstr += (week++);
+                    if (((m == 0) && (week > 50)) || ((m == 11) && (d > 21))) week = 1;
+                } else {
+                    htmlstr += "&nbsp;";
+                }
+                for (n = 0; n < 7; n++) {
+                    if (((j > 0) || (n >= weekday)) && (d <= lastdate)) {
+                        /* Here: y = year, m = month-1, d = day, n = weekday */
+                        /* This is k'th day of year */
+                        var day_names = [];
+                        var styles = [];
+                        date_str = to_date_str(y, m+1, d, 0);
+                        var action = " onclick='show_day_content(0,\"" + date_str + "\");'";
+                        if (k == curr_year.today) {
+                            day_names.push(todaystr);
+                            styles.push('today');
+                        }
+                        if (k == next_special_day.day) {
+                            special_dates.push(date_str);
+                            day_htmlstr += "<div class='info' id='info" + date_str + "' style='display:";
+                            if (showingall == !showing_exceptions[date_str])
+                                day_htmlstr += "block";
+                            else
+                                day_htmlstr += "none";
+                            day_htmlstr += "'>";
+                            var types = 0x0;
+                            do {
+                                s = next_special_day.name;
+                                types |= 1 << next_special_day.type;
+                                day_names.push(s);
+                                day_htmlstr += "<span class='day_style" + next_special_day.type + "'>" + d + ": " + s + "<\/span><br>\n";
+                                next_special_day = next_special_day.next_day;
+                            } while (next_special_day && k == next_special_day.day);
+                            day_htmlstr += "<\/div>\n";
+                            if (types & 0x4) styles.push("day_style2");
+                            if (types & 0x2) styles.push("day_style1");
+                            else if (types & 0x1) styles.push("day_style0");
+                        }
+                        style_str = (styles.length > 0) ? " class='" + styles.join(" ") + "'" : "";
+                        day_name_str = (day_names.length > 0) ?
+                            " title='" + d + ". " + months[m] + ": " + day_names.join(" + ") + "'" :
+                            "";
+                        htmlstr += "<td " + style_str + day_name_str + action + ">" + d;
+                        k++; d++;
+                    } else {
+                        htmlstr += "<td>";
+                        if (d == lastdate + 1) {
+                            weekday = n;
+                            if (n > 0) week--;
+                            d++;
+                        }
+                    }
+                } // n
+            } // j
+            htmlstr += "<\/table>\n";
+            htmlstr += day_htmlstr + "<\/div>\n";
+            m++;
+        } // i
+        htmlstr += "\n";
+    } // q
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "<button type='button' name='upup1' onclick='update_quarter(-4);'><span style='top:9px;' class='upptr'><\/span><span style='top:-9px;' class='upptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='up1' onclick='update_quarter(-1);'><span class='upptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='down1' onclick='update_quarter(1);'><span class='downptr'><\/span><\/button>\n";
+    htmlstr += "<button type='button' name='dndn1' onclick='update_quarter(4);'><span style='top:1px;' class='downptr'><\/span><span style='top:0px;' class='downptr'><\/span><\/button>\n";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "<div class='hcontainer vcenter'>";
+
+    htmlstr += "<input type='text' id='yr' name='year' size=4 maxlength=4 onfocus='this.select();' onchange='change_year();'>";
+    htmlstr += "<button type='button' name='goto' onclick='change_year();'>" + goherestr + "<\/button>\n";
+    htmlstr += "<button type='button' name='go_this_year' onclick='make_cal(undefined, 0);'>" + gocurryearstr + "<\/button>\n";
+    htmlstr += "<button type='button' name='go_today' onclick='make_cal();'>" + gotodaystr + "<\/button>\n";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "<button type='button' name='show_all' onclick='show_day_content(1);'>" + showallstr + "<\/button>\n";
+    htmlstr += "<button type='button' name='hide_all' onclick='show_day_content(2);'>" + hideallstr + "<\/button>\n";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "Fra&nbsp;(inkl.):<input type='text' id='range_from' name='range_from' value='" + range_from_date + "' size=10 maxlength=10 onfocus='this.select();' onchange='calc_range();'>";
+    htmlstr += "<button type='button' name='goto_from' onclick='goto_from_year();'>" + goherestr + "<\/button>\n";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "Til&nbsp;(ekskl.):<input type='text' id='range_to' name='range_to' value='" + range_to_date + "' size=10 maxlength=10 onfocus='this.select();' onchange='calc_range();'>";
+    htmlstr += "<button type='button' name='goto_to' onclick='goto_to_year();'>" + goherestr + "<\/button>\n";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "=&nbsp;<span id='range_days'>" + range_day_count + "<\/span>";
+
+    htmlstr += "<div class='linebreak'><\/div>";
+
+    htmlstr += "(S&aelig;t fra/til-datoer ved at klikke p&aring; kalenderen)";
+
+    htmlstr += "<\/div>";
+
+    document.getElementById("canvas").innerHTML = htmlstr;
+    document.getElementById("yr").value = inputyear;
+    document.getElementById("yr").onkeydown = change_year_if_enter;
+    document.getElementById("range_from").onkeydown = calc_range_from_if_enter;
+    document.getElementById("range_to").onkeydown = calc_range_to_if_enter;
+
+    if (scroll_to_current_month) {
+        var m_elem = document.getElementById("m" + this_year + "_" + this_month);
+        if (m_elem) {
+            var bbox = m_elem.getBoundingClientRect();
+            if (bbox.top < 0 || bbox.bottom > window.innerHeight) {
+                var new_pos = window.pageYOffset + bbox.top;
+                setTimeout(function(){genericPageSetup.scroll_and_hide_header(new_pos);}, 1);
+            }
+        }
+    }
+}
+
+function init()
+{
+    // Handle URL arguments
+    const page_settings_spec = {
+        year: {obj: window, attr: 'start_year'},
+        quarter: {obj: window, attr: 'quarter'},
+        range_from: {obj: window, attr: 'range_from_date'},
+        range_to: {obj: window, attr: 'range_to_date'},
+        showall: {obj: window, attr: 'showingall'},
+        showexceptions: {
+            get: function() {return Object.keys(showing_exceptions).join(',')},
+            set: function(v) {v.split(',').forEach(function(date_str) {showing_exceptions[date_str] = 1})}
+        },
+    };
+    genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+    make_cal(start_year, quarter || 0);
+    calc_range();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Kalender</h1>
+
+<div id="canvas" class="box hcontainer">
+</div>
+
+</div>
+
+</body>
+</html>

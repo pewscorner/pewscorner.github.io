@@ -1,0 +1,535 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Doppler Shift Calculator</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.box#form_container {
+    -webkit-flex: 100 1 20rem;
+    flex: 100 1 20rem;
+}
+
+div.box#figure_container {
+    -webkit-flex: 1 1 150px;
+    flex: 1 1 150px;
+    -webkit-align-content: flex-start;
+    align-content: flex-start;
+}
+
+div.box.imgbox {
+    padding: 0px;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 1rem 0rem 0.5rem 0rem;
+    width: 100%;
+}
+
+div.hcontainer {
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+}
+
+div.text, div.comment {
+    width: 100%;
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+div.output {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid;
+    font-weight: bold;
+    color: #000000;
+    padding: 0.1em 0em;
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 100%; 
+}
+
+div.comment {
+    font-size: 80%; 
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['theory_button', 'Theory', 'window.open("doppler_theory/doc.html", "_blank")']];
+
+var canvas_elem;
+var g;
+var image_ctr;                  // Center of image window
+var bg_color = "#000000";       // Background color
+var wave_color = "#F0F0A0";     // Wave color
+var tx_color = "#A05050";       // Transmitter color
+var tx_flash_color = "#FFE0E0"; // Transmitter color
+var rx_color = "#408040";       // Receiver color
+var rx_flash_color = "#E0FFE0"; // Receiver hit color
+var rxtx_txt_color = "#FFFFFF"; // Receiver/transmitter text color
+var grph_bg_color = "#404040";  // Graph background color
+var grph_line_color = "#C0C0C0";// Graph line and text color
+var rxtx_font = "10px Arial, sans-serif";
+var axis_font = "12px Arial, sans-serif";
+var tx;
+var rx;
+var wave_period = 16;
+var wave_speed = 1;
+var wvs;
+var grph;
+
+var events = 0;
+var target_delta_t = 25;
+
+
+// class Timecount
+
+function Timecount() {
+    this.count = Timecount.global_count;
+}
+
+Timecount.global_count = 0;
+Timecount.wrap_count = 0x10000;
+
+Timecount.advance_global_count = function() {
+    Timecount.global_count = (Timecount.global_count + 1) % Timecount.wrap_count;
+}
+
+Timecount.prototype.get_age = function() {
+    var a = Timecount.global_count - this.count;
+    if (a < 0) a += Timecount.wrap_count;
+    return a;
+}
+
+Timecount.prototype.reset = function() {
+    this.count = Timecount.global_count;
+}
+
+
+// class Point
+
+function Point(x, y) {
+    this.x = x;
+    this.y = y;
+}
+
+Point.prototype.clone = function() {
+    var p = new Point(this.x, this.y);
+    return p;
+}
+
+Point.prototype.copyFrom = function(source_point) {
+    this.x = source_point.x;
+    this.y = source_point.y;
+}
+
+
+// class Program_line
+
+function Program_line(duration, tx_v, rx_v) {
+    this.duration = duration;
+    this.tx_v = tx_v;
+    this.rx_v = rx_v;
+}
+
+var program = [
+    new Program_line( 140, 0, 0),
+    new Program_line( 140, -0.5, 0),
+    new Program_line( 140, 0.5, 0),
+    new Program_line( 140, 0, 0),
+    new Program_line( 140, 0, 0.5),
+    new Program_line( 140, 0, -0.5),
+];
+
+var prog_linenr;
+var prog_count;
+
+
+// class Wave
+
+function Wave(prev_wave, next_wave, initial_radius, speed) {
+    this.prev_wave = prev_wave;
+    this.next_wave = next_wave;
+    this.initial_radius = initial_radius;
+    this.speed = speed;
+    this.alive = false;
+    this.origin = new Point(0, 0);
+    this.birth_time = new Timecount();
+}
+
+Wave.prototype.start = function(origin, pwr, tx_v) {
+    this.origin.copyFrom(origin);
+    this.initial_pwr = pwr;
+    this.initial_tx_speed = tx_v;
+    this.birth_time.reset();
+    this.alive = true;
+    this.hit = false;
+}
+Wave.prototype.stop = function() {
+    this.alive = false;
+}
+Wave.prototype.draw = function() {
+    var r = this.initial_radius + this.speed * this.birth_time.get_age();
+    g.beginPath();
+    g.arc(this.origin.x, this.origin.y, r, 0, 2 * Math.PI);
+    g.closePath();
+    g.stroke();
+    return r;
+}
+
+
+// class Waves
+
+function Waves(initial_radius, max_radius, color) {
+    this.speed = wave_speed;
+    this.initial_radius = initial_radius;
+    this.max_radius = max_radius;
+    this.color = color;
+    this.hit_pwr = undefined;
+    this.hit_initial_tx_speed = undefined;
+    // Put two dead waves into list of waves
+    var w = new Wave(null, null, this.initial_radius, this.speed);
+    this.last_wave = new Wave(w, w, this.initial_radius, this.speed);
+    w.prev_wave = this.last_wave;
+    w.next_wave = this.last_wave;
+}
+
+Waves.prototype.add_wave = function(origin, pwr, tx_v) {
+    var nextw = this.last_wave.next_wave;
+    if (nextw.alive) {
+        this.last_wave = new Wave(this.last_wave, nextw, this.initial_radius, this.speed);
+        nextw.prev_wave = this.last_wave;
+        this.last_wave.prev_wave.next_wave = this.last_wave;
+    } else
+        this.last_wave = nextw;
+    this.last_wave.start(origin, pwr, tx_v);
+}
+
+Waves.prototype.draw = function(obstacle_y) {
+    g.strokeStyle = this.color;
+    g.lineWidth = 1;
+    var w = this.last_wave;
+    var hit = false;
+    while (w.alive) {
+        var r = w.draw();
+        if (!w.hit) {
+            var dist = w.origin.y + r - obstacle_y;
+            if (dist >= 0) {
+                hit = w.hit = true;
+                this.hit_pwr = w.initial_pwr
+                        - 10 * Math.log(r/this.initial_radius)/Math.LN10;
+                this.hit_initial_tx_speed = w.initial_tx_speed;
+            }
+        }
+        if (r > this.max_radius) w.stop();
+        w = w.prev_wave;
+        if (w == this.last_wave) break;
+    }
+    return hit;
+}
+
+
+// class Transceiver
+
+function Transceiver(txt, norm_color, flash_color, txt_color) {
+    this.txt = txt;
+    this.color = this.norm_color = norm_color;
+    this.flash_color = flash_color;
+    this.txt_color = txt_color;
+    this.ctr = image_ctr.clone();
+    this.radius = 6;
+    this.speed = undefined;
+    this.flash = false;
+    this.flash_period = Number.POSITIVE_INFINITY;
+    this.flash_pwr = Number.NEGATIVE_INFINITY;
+}
+
+Transceiver.prototype.set_flash = function(flash, flash_pwr, flash_period) {
+    this.flash = flash;
+    if (flash) {
+        this.color = this.flash_color;
+        this.flash_pwr = flash_pwr;
+        this.flash_period = flash_period;
+    } else
+        this.color = this.norm_color;
+}
+
+Transceiver.prototype.draw = function() {
+    g.fillStyle = this.color;
+    g.beginPath();
+    g.arc(this.ctr.x, this.ctr.y, this.radius, 0, 2 * Math.PI);
+    g.closePath();
+    g.fill();
+    g.fillStyle = this.txt_color;
+    g.font = rxtx_font;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillText(this.txt, this.ctr.x, this.ctr.y);
+}
+
+
+// class Graph
+
+function Graph() {
+    this.width = 80;
+    this.height = 60;
+    this.xaxis_ofs = this.height - 15.5;
+    this.yaxis_ofs = 15.5;
+    this.x = (canvas_elem.width - this.width)/2;
+    this.y = canvas_elem.height - this.height - this.x;
+    this.buffer = document.createElement("canvas");
+    this.buffer.width = this.width;
+    this.buffer.height = this.height;
+    this.g2 = this.buffer.getContext("2d");
+
+    // Draw and fill graph frame
+    this.g2.fillStyle = grph_bg_color;
+    this.g2.fillRect(0, 0, this.width, this.height);
+    this.g2.lineWidth = 1;
+    this.g2.strokeStyle = this.g2.fillStyle = grph_line_color;
+    this.g2.strokeRect(0, 0, this.width, this.height);
+    // Draw x-axis
+    this.g2.font = axis_font;
+    this.g2.beginPath();
+    this.g2.moveTo(0, this.xaxis_ofs);
+    this.g2.lineTo(this.width - 1, this.xaxis_ofs);
+    this.g2.lineTo(this.width - 5, this.xaxis_ofs - 3);
+    this.g2.moveTo(this.width - 1, this.xaxis_ofs);
+    this.g2.lineTo(this.width - 5, this.xaxis_ofs + 3);
+    this.g2.stroke();
+    this.g2.fillText("freq", this.width - 23, this.xaxis_ofs + 11);
+    // Draw y-axis
+    this.g2.beginPath();
+    this.g2.moveTo(this.yaxis_ofs, 0);
+    this.g2.lineTo(this.yaxis_ofs, this.height - 1);
+    this.g2.moveTo(this.yaxis_ofs, 0);
+    this.g2.lineTo(this.yaxis_ofs - 3, 4);
+    this.g2.moveTo(this.yaxis_ofs, 0);
+    this.g2.lineTo(this.yaxis_ofs + 3, 4);
+    this.g2.stroke();
+    this.g2.rotate(-Math.PI/2);
+    this.g2.fillText("pwr", -22, this.yaxis_ofs - 6);
+}
+
+Graph.prototype.draw = function() {
+    g.drawImage(this.buffer, this.x, this.y);
+    var ref = wave_period * (this.width - this.yaxis_ofs)/3.0;
+    var line_x = this.x + this.yaxis_ofs + Math.round(ref / tx.flash_period);
+    var line_y = this.y + 10 - 2 * Math.round(tx.flash_pwr);
+    g.fillStyle = tx.color;
+    g.fillRect(line_x, line_y, 2, this.y + this.xaxis_ofs - line_y);
+    line_x = this.x + this.yaxis_ofs + Math.round(ref / rx.flash_period);
+    line_y = this.y + 10 - 2 * Math.round(rx.flash_pwr);
+    g.fillStyle = rx.color;
+    g.fillRect(line_x, line_y, 2, this.y + this.xaxis_ofs - line_y);
+}
+
+
+function updateAnim() {
+    events++;
+    if (events > 1) return;
+
+    // Start new delay
+
+    setTimeout(updateAnim, target_delta_t);
+
+    // Set background color
+
+    g.fillStyle = bg_color;
+    g.fillRect(0, 0, canvas_elem.width, canvas_elem.height);
+
+    // Move objects
+
+    Timecount.advance_global_count();
+    if (prog_count.get_age() == program[prog_linenr].duration) {
+        prog_linenr++;
+        if (prog_linenr >= program.length)
+            prog_linenr = 0;
+        tx.speed = program[prog_linenr].tx_v;
+        rx.speed = program[prog_linenr].rx_v;
+        prog_count.reset();
+    }
+    var flash = (!wvs.last_wave.alive || wvs.last_wave.birth_time.get_age() >= wave_period);
+    tx.set_flash(flash, 0, wave_period);
+    if (flash)
+        wvs.add_wave(tx.ctr, tx.flash_pwr, tx.speed);
+
+    tx.ctr.y += tx.speed;
+    rx.ctr.y += rx.speed;
+
+    // Draw waves and detect collision with receiver
+
+    flash = wvs.draw(rx.ctr.y - rx.radius);
+    var flash_period = 0;
+    if (flash) {
+        flash_period = wave_period *
+                (wvs.speed - wvs.hit_initial_tx_speed)/
+                (wvs.speed - rx.speed);
+    }
+    rx.set_flash(flash, wvs.hit_pwr, flash_period);
+
+    // Draw transmitter and receiver
+
+    tx.draw();
+    rx.draw();
+
+    // Draw graph
+
+    grph.draw();
+
+
+    events--;
+    if (events > 0) {
+        events = 0;
+        setTimeout(updateAnim, 1);
+    }
+}
+
+var scenario_elem;
+var em_hidden_elems;
+var vt_elem;
+var vr_elem;
+var vw_elem;
+var result_elem;
+
+var scenario = null;
+
+function update() {
+    var is_em_case = (scenario_elem.value == 'electromag');
+    if (scenario_elem.value != scenario)
+    {
+        for (var i = 0; i < em_hidden_elems.length; i++)
+        {
+            em_hidden_elems[i].hidden = is_em_case;
+        }
+        scenario = scenario_elem.value;
+    }
+    var vt = +vt_elem.value;
+    if (isNaN(vt)) {
+        result_elem.innerHTML = "Illegal transmitter velocity!";
+        return true;
+    }
+    var vr = +vr_elem.value;
+    if (!is_em_case && isNaN(vr)) {
+        result_elem.innerHTML = "Illegal receiver velocity!";
+        return true;
+    }
+    var vw = +vw_elem.value;
+    if (isNaN(vw) || (vw <= 0)) {
+        result_elem.innerHTML = "Illegal wave velocity!";
+        return true;
+    }
+    var r;
+    if (is_em_case)
+    {
+        vt = vt / vw;
+        r = Math.sqrt((1 + vt) / (1 - vt)) - 1;
+    }
+    else
+    {
+        r = (vr + vt) / (vw - vt);
+    }
+    if (Math.abs(r) > 0.001) {
+        result_elem.innerHTML = (r * 100) + "%";
+    } else {
+        result_elem.innerHTML = (r * 1e6) + " ppm";
+    }
+    return true;
+}
+
+function set_speed(v)
+{
+    vw_elem.value = v;
+    update();
+}
+
+function init() {
+    scenario_elem = document.getElementById('scenario');
+    em_hidden_elems = document.querySelectorAll('[data-em-hide]');
+    vt_elem = document.getElementById('vt');
+    vr_elem = document.getElementById('vr');
+    vw_elem = document.getElementById('vw');
+    result_elem = document.getElementById('result');
+    canvas_elem = document.getElementById('canvas');
+    g = canvas_elem.getContext('2d');
+
+    grph = new Graph();
+    image_ctr = new Point(canvas_elem.width/2, grph.y/2);
+
+    tx = new Transceiver("T", tx_color, tx_flash_color, rxtx_txt_color);
+    tx.ctr.y = image_ctr.y - 3 * tx.radius;
+
+    rx = new Transceiver("R", rx_color, rx_flash_color, rxtx_txt_color);
+    rx.ctr.y = image_ctr.y + 3 * rx.radius;
+
+    wvs = new Waves(tx.radius, canvas_elem.height, wave_color);
+
+    prog_count = new Timecount();
+    prog_linenr = 0;
+    tx.speed = program[prog_linenr].tx_v;
+    rx.speed = program[prog_linenr].rx_v;
+
+    update();
+    updateAnim();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Doppler Shift Calculator</h1>
+
+<div id="form_container" class="box hcontainer">
+
+<select id="scenario" onChange="update()">
+    <option value="medium">Waves in a medium
+    <option value="electromag">Electromagnetic waves (with relativistic effects)
+</select>
+
+<h2>Transmitter velocity</h2>
+<div class="text"><input id="vt" type="text" value=0 maxlength=30 onKeyUp="update()" onBlur="update()"></div>
+<div class="comment">Note: This velocity is relative to <span data-em-hide>the medium </span>and towards the receiver.</div>
+
+<h2 data-em-hide>Receiver velocity</h2>
+<div data-em-hide class="text"><input id="vr" type="text" value=0 maxlength=30 onKeyUp="update()" onBlur="update()"></div>
+<div data-em-hide class="comment">Note: This velocity is relative to the medium and towards the transmitter.</div>
+
+<h2>Wave velocity</h2>
+<div class="text"><input id="vw" type="text" value=340 maxlength=30 onKeyUp="update()" onBlur="update()">
+Use velocity of
+<button type="button" onClick="set_speed(299792458)">light in vacuum</button
+><button type="button" onClick="set_speed(340)">sound in air</button> (m/s).
+</div>
+<div data-em-hide class="comment">Note: This velocity is relative to the medium.</div>
+<div class="comment">Note: Use the same units for all velocities.</div>
+
+<h2>Resulting Doppler shift</h2>
+<div class="text"><div id="result" class="output"></div></div>
+<div class="comment">Note: This is the ratio of the observed frequency shift to the original frequency.</div>
+
+</div>
+
+<div id="figure_container" class="box hcontainer">
+
+<h2>Example cases</h2>
+<div class="box imgbox">
+<canvas id="canvas" width=100 height=300><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

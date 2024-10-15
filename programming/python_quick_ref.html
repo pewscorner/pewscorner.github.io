@@ -1,0 +1,3105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Python 2 Quick Reference</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+div#frame {
+    position: relative;
+    box-sizing: content-box;
+    width: 100%;
+    padding: 74% 0px 0px 0px; /* padding-top is relative to parent width, so this assures fixed width/height ratio */
+    height: 0px;
+}
+
+svg {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+}
+
+text {
+    font-weight: normal;
+    font-size: 15px;
+    font-family: sans-serif;
+    text-align: center;
+    text-anchor: middle;
+    fill: #000000;
+    stroke: none;
+}
+
+path.arrow {
+    fill: none;
+    stroke: #000000;
+    stroke-width: 1.5px;
+    stroke-linecap: butt;
+    stroke-linejoin: round;
+    stroke-miterlimit: 4;
+    marker-end: url(#marker9726);
+}
+
+pre.code {
+    color: black;
+    background-color: #FFFFFF;
+    overflow: auto;
+}
+
+.code_comment {
+    color: #009900;
+}
+
+/* <u> tag is used for highlighting */
+u {
+    color: #FF00FF;
+    text-decoration: none;
+}
+
+/* <s> tag is used for lowlighting illegal/obsolete stuff */
+s {
+    opacity: 0.5;
+    text-decoration: none;
+}
+</style>
+<script type="text/javascript">
+function apply_filter(filter_id)
+{
+    var filter = document.getElementById('applies_to_' + filter_id).value;
+    var elems = document.querySelectorAll('[data-filter-id=' + filter_id + '][data-applies-to]');
+    for (var i = 0; i < elems.length; i++)
+    {
+        var elem = elems[i];
+        elem.style.display =
+            (filter == 'all' || elem.dataset.appliesTo.split(',').indexOf(filter) >= 0) ?
+            'block' :
+            'none';
+    }
+}
+
+var filter_id;
+
+function mk_replacement_for_filtering(match, p1, p2, p3)
+{
+    return '<div data-filter-id="' + filter_id +
+        '" data-applies-to="' + p1 + (p2 ? ',' + p2 + (p3 ? ',' + p3 : '') : '') + '">' +
+        match + '</div>';
+}
+
+function init()
+{
+    var code_elems = document.getElementsByClassName('code');
+    for (var ci = 0; ci < code_elems.length; ci++)
+    {
+        var code_elem = code_elems[ci];
+        var html = code_elem.innerHTML;
+        if (code_elem.dataset.filterId)
+        {
+            filter_id = code_elem.dataset.filterId;
+            html = html.replace(
+                /^\S(?:.|\r|\n)*?# applies to\s+(.*?)(?:,\s*(?:\r\n|\n|\r).*?#\s+(.*?)(?:,\s*(?:\r\n|\n|\r).*?#\s+(.*?))?)?\s*(?:\r\n|\n|\r)/mg,
+                mk_replacement_for_filtering);
+        }
+        html = html.replace(/^\s*#.*|#\s.*/mg, '<span class="code_comment">$&<\/span>');
+        code_elem.innerHTML = html;
+    }
+    genericPageSetup.make_table_of_contents();
+    apply_filter('containers');
+    apply_filter('basic_objs');
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Python 2<br>Quick Reference</h1>
+
+<div class="box imgbox">
+
+This is a one-(long-)page overview of the <a href="https://docs.python.org/2/">Python 2</a> (2.7.18) programming
+language in the form of commented lines of code. This was a work in progress until the official death of Python 2 in
+2020.
+
+<p>See also the <b><a href="python3_quick_ref.html">Python 3 quick reference</a></b>.</p>
+
+<h2 class="toc">Contents</h2>
+
+<h2>Python Script Execution</h2>
+
+<h3>Shebang</h3>
+
+<pre class="code">
+#!/usr/bin/env python2
+</pre>
+
+<pre class="code">
+#!/usr/bin/env python2.7
+</pre>
+
+<pre class="code">
+#!/usr/bin/env python2.7.18
+</pre>
+
+With one of the above shebangs as the first line of the script, most Unix/Linux systems will
+automatically pass the script to the latest installed version 2.x.x, 2.7.x, or 2.7.18 Python
+interpreter when the script is run as a command. This also works on Windows if the script is passed
+to (or the typical script extension .py is associated with) the Python launcher py.exe.
+
+<h2>Syntax</h2>
+
+<h3>Statement Boundaries</h3>
+
+<pre class="code">
+a = 3                   # Statements are usually separated by newlines
+print a                 # ...
+b = 'hi'; print b       # (Non-compound) statements may be separated by semicolon
+c = 4;                  # and optionally terminated by semicolon
+                        # but using semicolons is discouraged (PEP 8)
+d = 2 * a + \
+    c                   # Any statement can be split across multiple lines
+                        # using backslash + newline (nothing allowed between the two)
+print 'hel\
+  lo'                   # Prints 'hel  lo' (any indention is included in string)
+print 'hel' \
+    'lo'                # Prints 'hello' (adjacent string literals are concatenated)
+d = 2 * (a +            # No backslash needed inside parentheses/brackets/...
+    c)
+print ('hel'            # Prints 'hello' (adjacent string literals are concatenated;
+    'lo')               # no backslash needed inside parentheses)
+</pre>
+
+<h3>Comments and Docstrings</h3>
+
+<pre class="code">
+# Comments start with the '#' and end at the end of the same line,
+# so a comment spanning multiple lines must have '#' at the start
+# of each line.
+a = 3                   # Here's a comment following some code
+b = a + \               <s># ILLEGAL comment after backslash
+</s>    2 +                 # and backslash WON'T WORK after comment either -&gt; \
+    3                   # Comment must be on last line when using backslashes
+
+"""Another way to make a multiline comment
+is to put it inside a multiline string which
+is not assigned to anything."""
+
+def f():
+    # Here's a <b>docstring</b> for this function (similar for <a class="toc_ref" href="#Classes">classes</a>, <a class="toc_ref" href="#Modules">modules</a>):
+    """When a string is the first statement of a function (or class
+    or module), it becomes that object's docstring, accessible via
+    the __doc__ attribute. All lines traditionally have the same
+    indentation, and those spaces become part of the string.
+    """
+    return 3.14
+
+print f.__doc__         # Prints f's docstring (or None if none): 'When a string ...'
+help(f)                 # Prints information about f - including f's docstring
+</pre>
+
+<h3>Compound Statement Format</h3>
+
+<pre class="code">
+if len(mylist) > 0:     # A compound statement contains a header
+    sum = 0             # and a suite of statements with same indentation
+    for x in mylist:    # and possibly nested compound statements
+        print x
+        sum += x
+    print sum
+else:                   # and possibly another header
+    print 'Empty list'  # and its associated suite
+
+def func(x):            # A compound statement cannot have an empty suite
+    pass                # but 'pass' can be used to do nothing
+
+if x &lt; y: x = y; y = 0  # Single-line compound statement (discouraged)
+                        # (cannot contain nested compound statements)
+</pre>
+
+<h3>Expression Lists</h3>
+
+<pre class="code">
+# Expression list
+t = 4, a + 1, 'hi'      # Right-hand side expression list becomes <a class="toc_ref" href="#Sequence_Types">tuple</a> (4, 2, 'hi')
+                        # (assuming a = 1)
+a, (b, c) = 3, (4, 5)   # Multiple assignments a=3, b=4, c=5 using expression lists
+                        # (all right-hand expressions are evaluated before any assignments)
+a, (b, c) = [3, (4, 5)] # Some alternatives equivalent to above; [] could also be ()
+[a, (b, c)] = 3, (4, 5) # ...
+10,                     # Trailing comma is illegal/mandatory/optional if 0/1/more items
+[4, a + 1, 'hi']        # <a class="toc_ref" href="#Sequence_Types">List</a> created from expression list
+{4, a + 1, 'hi'}        # <a class="toc_ref" href="#Sequence_Types">Set</a> created from expression list
+f(4, a + 1, 'hi')       # <a class="toc_ref" href="#Functions">Function</a> call using expression list as argument list
+f(*range(2), **{'a':5}) # Iterable unpacking; same as f(0, 1, a=5)
+</pre>
+
+<h2>Types</h2>
+
+<h3>Basic Types (Immutable)</h3>
+
+<pre class="code">
+# Int
+i = -2                  # Assigns an int (range from -sys.maxint-1 thru sys.maxint)
+type(i)                 # Returns type <i>int</i>
+isinstance(i, int)      # Returns True
+int('20')               # Returns 20 (an int)
+int('20', 16)           # Returns 32 (second arg is base, 16 means hex)
+i += 0xA + 0o12 + 0b10  # i is now 20 (-2 + 10 + 10 + 2); this is hex + octal + binary
+<s>012</s>                     # Returns 10; this octal format is discouraged, use 0o12
+i.bit_length()          # Returns 5 (minimum number of bits needed to represent 20)
+(5).bit_length()        # Returns 3 (5.bit_length() would fail because 5. means 5.0)
+
+# Long
+j = -5L                 # Assigns a long (infinite range and precision)
+type(j)                 # Returns type <i>long</i>
+isinstance(j, long)     # Returns True
+long(2)                 # Returns 2L
+long('20', 16)          # Returns 32L
+
+# Float
+x = -3.4                # Assigns a float (range: sys.float_info.min to sys.float_info.max)
+type(x)                 # Returns type <i>float</i>
+isinstance(x, float)    # Returns True
+float(3)                # Returns 3.0
+float('2.5e6')          # Returns 2500000.0
+float('inf')            # Returns positive infinity (greater than sys.float_info.max)
+float('-inf')           # Returns negative infinity (less than sys.float_info.min)
+float('nan')            # Returns the "not a number" (NaN) error value
+0 * float('inf')        # Returns float('nan')
+import math                 # Imports math module
+math.isinf(float('-inf'))   # Returns True
+math.isnan(float('nan'))    # Returns True
+float('nan') == float('nan')# Returns False; NaN is unequal to everything, incl. itself
+1. + .2 + 3.4e-2        # Returns 1.234 (1. means 1.0, .2 means 0.2)
+
+# Complex
+c = 1+2j                # Assigns a complex (pair of floats)
+type(c)                 # Returns type <i>complex</i>
+isinstance(c, complex)  # Returns True
+c.real                  # 1.0
+c.imag                  # 2.0
+<s>c.real = 3</s>              # ILLEGAL! Raises TypeError exception (complex is immutable)
+c.conjugate()           # Returns (1-2j)
+complex(1, 2)           # Returns (1+2j)
+complex('1+2j')         # Returns (1+2j)
+complex(1+2j, 10j)      # Returns (-9+2j)
+
+# Bool
+b = True                # Assigns a bool (True or False)
+type(b)                 # Returns type <i>bool</i>
+isinstance(b, bool)     # Returns True
+bool(0)                 # Returns False for 0 (else True)
+bool('')                # Returns False for empty sequence type (else True)
+bool(None)              # Returns False
+int(True)               # Returns 1
+int(False)              # Returns 0
+3 + True                # Returns 4
+False * 5               # Returns 0
+
+# None
+x = None                # Assigns null object (nothing, unassigned argument/return value)
+type(x)                 # Returns type with name 'NoneType'; <i>None</i> is the only instance of
+                        # this type
+isinstance(x, type(None)) # Returns True
+bool(x)                 # Returns False
+
+# Slice
+sl = slice(3)           # Assigns a slice object equivalent to the :3 in a[:3] (supports
+                        # same parameters as xrange(), except negative start/stop values
+                        # are counted from end); more under <a class="toc_ref" href="#Classes">classes</a>
+type(sl)                # Returns type <i>slice</i>
+isinstance(sl, slice)   # Returns True
+print sl                # Prints 'slice(None, 3, None)'
+'hello'[sl]             # Returns 'hel' (same as 'hello'[:3])
+sl.start, sl.stop, sl.step  # Returns (None, 3, None)
+sl.indices(len('hello'))    # Returns (0, 3, 1) (xrange()-style (start, stop, step) args)
+sl.indices(len('hi'))       # Returns (0, 2, 1) (range is reduced to fit given length)
+sl = slice(-2, None, -1)# Assigns a slice object equivalent to the -2::-1 in a[-2::-1]
+'hello'[sl]             # Returns 'lleh' (same as 'hello'[-2::-1])
+sl.indices(len('hello'))# Returns (3, -1, -1) (here, stop == None for slice() maps to
+                        # stop == -1 for xrange())
+
+# Ellipsis
+e = Ellipsis            # Assigns Ellipsis object (intended for extended slice syntax)
+type(e)                 # Returns type with name 'ellipsis'; <i>Ellipsis</i> is the only instance
+                        # of this type
+isinstance(e, type(Ellipsis)) # Returns True
+bool(e)                 # Returns True
+
+# NotImplemented
+n = NotImplemented      # Assigns NotImplemented object (returned by methods such as
+                        # __add__ when they can't handle the provided argument type; the
+                        # interpreter will then try something else such as calling __radd__
+                        # on the other operand)
+type(n)                 # Returns type with name 'NotImplementedType'; <i>NotImplemented</i> is
+                        # the only instance of this class
+isinstance(n, type(NotImplemented)) # Returns True
+bool(n)                 # Returns True
+
+# Object
+o = object()            # Assigns a featureless object; object is the base of all new-style
+                        # classes and built-in types (<a class="toc_ref" href="#About_Classes_Types_and_Objects">about classes/types and objects</a>)
+type(o)                 # Returns type <i>object</i>
+isinstance(o, object)   # Returns True
+isinstance(10, object)  # Returns True (int is a subclass of object)
+
+# Type
+T = type('MyT', (), {}) # Assigns a type object; all new-style classes and built-in types
+                        # are instances of <i>type</i> (<a class="toc_ref" href="#About_Classes_Types_and_Objects">about classes/types and objects</a>)
+type(T)                 # Returns type <i>type</i>
+isinstance(T, type)     # Returns True
+class T2(object): pass  # Assigns a type object using a class statement (normal approach)
+type(T2)                # Returns type <i>type</i>
+</pre>
+
+Notes:
+<ul>
+<li>Although Python 2 (not 3) has two integer types, an int and a long,
+an int is automatically converted to a long when it exceeds its
+range, so the programmer usually doesn't need to worry about which one to use.
+</ul>
+
+<h4>Basic Object Attributes</h4>
+
+The following is a list of attributes (properties and methods) provided by instances of the
+basic types
+int, long, float, complex, bool, slice.
+(Some general object attributes and low-level attributes are omitted from this list).
+<p>
+
+Show <select id="applies_to_basic_objs" onchange="apply_filter('basic_objs');">
+    <option>all
+    <option>int
+    <option>long
+    <option>float
+    <option>complex
+    <option>bool
+    <option>slice
+</select> attributes below:
+
+<pre class="code" data-filter-id="basic_objs">
+o.__abs__()             # <a class="toc_ref" href="#Special_Methods">Special method</a> implementing abs(o);
+                        # applies to int,long,float,complex,bool
+o.__add__(o2)           # <a class="toc_ref" href="#Special_Methods">Special method</a> implementing o + o2;
+                        # applies to int,long,float,complex,bool
+o.__and__(o2)           # <a class="toc_ref" href="#Special_Methods">Special method</a> implementing o &amp; o2;
+                        # applies to int,long,bool
+o.__cmp__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool,slice
+o.__coerce__()          # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__div__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__divmod__()          # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__eq__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__float__()           # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__floordiv__()        # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__ge__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__getformat__()       # TBD
+                        # applies to float
+o.__getnewargs__()      # TBD (pickle protocol)
+                        # applies to int,long,float,complex,bool
+o.__gt__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__hex__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__index__()           # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__int__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__invert__()          # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__le__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__long__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__lshift__()          # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__lt__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__mod__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__mul__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__ne__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to float,complex
+o.__neg__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__nonzero__()         # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__oct__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__or__()              # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__pos__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__pow__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__radd__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rand__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__rdiv__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rdivmod__()         # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rfloordiv__()       # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rlshift__()         # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__rmod__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rmul__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__ror__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__rpow__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rrshift__()         # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__rshift__()          # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__rsub__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rtruediv__()        # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__rxor__()            # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+o.__setformat__()       # TBD
+                        # applies to float
+o.__sub__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__truediv__()         # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,complex,bool
+o.__trunc__()           # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,float,bool
+o.__xor__()             # <a class="toc_ref" href="#Special_Methods">Special method</a>
+                        # applies to int,long,bool
+</pre>
+
+<pre class="code" data-filter-id="basic_objs">
+o.as_integer_ratio()    # Returns 2-tuple of integers whose ratio is equal to o;
+                        # (-1.5).as_integer_ratio() returns (-3,2); 0.1.as_integer_ratio()
+                        # returns (3602879701896397L, 36028797018963968L);
+                        # applies to float
+o.bit_length()          # Returns minimum number of bits (disregarding sign) needed to
+                        # represent o; (10).bit_length() returns 4;
+                        # applies to int,long,bool
+o.conjugate()           # Returns complex conjugate of o; (1+2j).conjugate() returns (1-2j);
+                        # applies to int,long,float,complex,bool
+o.denominator           # Returns 1 (unless o is a fractions.Fraction);
+                        # applies to int,long,bool
+o.fromhex(s)            # Class method; returns float value converted from hex number in
+                        # string s; float.fromhex(' ff.8 ') returns 255.5;
+                        # float.fromhex('0x1p10') returns 1024.0;
+                        # applies to float
+o.hex()                 # Returns hex string representing float o (in '0x#p#' format);
+                        # 255.0.hex() returns '0x1.fe00000000000p+7';
+                        # applies to float
+o.imag                  # Returns imaginary part of o (which is 0 if o is not complex);
+                        # applies to int,long,float,complex,bool
+o.indices(n)            # Returns tuple of integers (start, stop, step) which can be passed
+                        # to range() to get a sequence of indices corresponding to applying
+                        # slice o to a sequence of length n;
+                        # ii = slice(None,None,-1).indices(5) makes ii (4,-1,-1), and
+                        # range(*ii) returns [4,3,2,1,0];
+                        # applies to slice
+o.is_integer()          # Returns True if o is integral; 3.0.is_integer() returns True;
+                        # applies to float
+o.numerator             # Returns int(o) (unless o is a fractions.Fraction);
+                        # applies to int,long,bool
+o.real                  # Returns real part of o (which is o or int(o) if o is not complex);
+                        # applies to int,long,float,complex,bool
+o.start                 # Read-only start value of slice o; slice(2,5).start returns 2;
+                        # applies to slice
+o.step                  # Read-only step value of slice o; slice(5,2,-1).step returns -1;
+                        # applies to slice
+o.stop                  # Read-only stop value of slice o; slice(5).stop returns 5;
+                        # applies to slice
+</pre>
+
+<h3>Container Types</h3>
+
+<pre class="code">
+# Container type detection
+import collections
+isinstance(o, collections.Container)  # Returns True if o is a container object (e.g. 'hi')
+                                      # (except for memoryview)
+</pre>
+
+<h4>Sequence Types</h4>
+
+<pre class="code">
+# Sequence type detection
+import collections
+isinstance(o, collections.Sequence)  # Returns True if o is a sequence object (e.g. 'hi')
+                                     # (except for memoryview)
+
+# String
+s1 = 'Say "hi"\n\'ho\'' # Assigns a string (immutable): Say "hi"(newline)'ho'
+s2 = "Say 'hi'\n\"ho\"" # Same as above, but with swapped single- and double-quotes
+                        # (Single-quotes allow embedded unescaped double-quotes, and vice
+                        # versa, otherwise no difference in behavior)
+s3 = """Say "hi"
+'ho'"""                 # Same as s1 above; triple-quotes allow embedded unescaped newlines
+                        # (usually used for <a class="toc_ref" href="#Comments_and_Docstrings">docstrings</a>)
+s4 = '''Say 'hi'
+"ho"'''                 # Same as s2 above (but triple single-quotes are not often used)
+s5 = r'\n\''            # Raw string of length 4; backslashes are taken literally, but
+                        # still escape quotes; often used for regular expressions
+s6 = r"""\\
+"""                     # Raw triple-quoted string of length 3: 2 backslashes and a newline
+                        # (see s3 and s5 above)
+b'hi', br'ho'           # Same as 'hi', r'ho'; Python 2 ignores the b prefix
+s = ('hel'              # Adjacent string literals are concatenated (s = 'hello');
+    "lo")               # useful for splitting string literals and commenting each part
+                        # (see <a class="toc_ref" href="#Statement_Boundaries">statement boundaries</a> for other ways of breaking strings)
+type(s)                 # Returns type <i>str</i>
+isinstance(s, str)      # Returns True
+len(s)                  # Returns 5
+'e' in s                # Returns True
+s[0]                    # Returns 'h'
+<s>s[0] = 'a'</s>              # ILLEGAL! Raises TypeError exception because string is immutable
+s[-1]                   # Returns 'o'
+s[1:3]                  # Returns 'el' (general slice syntax is [start:stop:step] with
+                        # default values (if omitted) start=0, stop=end, step=1)
+s[-2:]                  # Returns 'lo'
+s[:-1]                  # Returns 'hell'
+s[::-1]                 # Returns 'olleh'
+s + ' there'            # Returns 'hello there'
+s * 2                   # Returns 'hellohello'
+str(4.1)                # Returns '4.1'
+
+# Unicode
+s1 = u'\xC6\u0E01\U0001F60E'   # Assigns a 4-character unicode (UTF-16) string (immutable);
+                        # '\U0001F60E' is stored as the surrogate pair '\uD83D\uDE0E'
+s2 = u"\u0E01"          # Same quote variants as for non-unicode strings (see above)...
+s3 = u"""\u0E01
+\u0E2E"""
+s4 = ur'\u0E01\n'       # (Note: \u escapes are interpreted even in raw string, so s4 has
+                        # 3 chararacters)
+type(s1)                # Returns type <i>unicode</i>
+isinstance(s1, unicode) # Returns True
+len(s1)                 # Returns 4
+len(s3)                 # Returns 3
+len(s4)                 # Returns 3
+s1[-1]                  # Returns u'\ude0e'
+unicode(4.1)            # Returns u'4.1'
+
+# Basestring (abstract superclass for string and unicode types)
+isinstance('hi', basestring)    # Returns True (same as isinstance('hi', (str, unicode)))
+isinstance(u'hi', basestring)   # Returns True
+
+# List
+a1 = [3, 'hello']       # Assigns a list (mutable)
+type(a1)                # Returns type <i>list</i>
+isinstance(a1, list)    # Returns True
+len(a1)                 # Returns 2
+'hello' in a1           # Returns True
+a1[-1]                  # Returns 'hello'
+a1[0] = 4               # Assigns 4 to first item
+a1.append('bye')        # a1 is now [4, 'hello', 'bye']
+a1.extend([10, 11])     # a1 is now [4, 'hello', 'bye', 10, 11]
+a1[-2:] = [9]           # a1 is now [4, 'hello', 'bye', 9]
+del a1[-2:]             # a1 is now [4, 'hello']
+a2 = a1                 # a2 now points to same list as a1
+                        # (changes to a1 items affect a2 items)
+a2 = a1[:]              # a2 is now a shallow copy of a1
+                        # (changes to 1st level of a1 don't affect a2)
+                        # (use a2 = copy.deepcopy(a1) to make a complete copy)
+list('hello')           # Returns ['h', 'e', 'l', 'l', 'o']
+
+# Tuple
+t = (3, 'hello')        # Assigns a tuple (immutable)
+t = 3, 'hello'          # Same as above but using unenclosed <a class="toc_ref" href="#Expression_Lists">expression list</a>
+type(t)                 # Returns type <i>tuple</i>
+()                      # Returns () (empty tuple)
+(4,)                    # Returns (4,) (single-item tuple)
+(4)                     # Returns 4 (int, not tuple)
+isinstance(t, tuple)    # Returns True
+len(t)                  # Returns 2
+'hello' in t            # Returns True
+t[-1]                   # Returns 'hello'
+<s>t[-1] = 'a'</s>             # ILLEGAL! Raises TypeError exception because tuple is immutable
+tuple('hello')          # Returns ('h', 'e', 'l', 'l', 'o')
+t2 = (4, [])            # Although tuples are immutable, they may contain mutable items
+t2[-1].append(5)        # t2 is now (4, [5])
+
+# Namedtuple types
+import collections
+NT = collections.namedtuple('Mynamedtuple', 'x,y,z')    # Assigns a new named tuple type;
+                        # namedtuple itself is not a type but a function that makes a type
+type(NT)                # Returns type <i>type</i>
+nt = NT(4, 5, z=6)      # Assigns a named tuple of type NT (immutable; like tuple, but
+                        # allows items to be accessed by name)
+type(nt)                # Returns class with name 'Mynamedtuple'
+isinstance(nt, NT)      # Returns True
+nt.x                    # Returns 4 (unlike tuple)
+nt[-1]                  # Returns 6 (like tuple)
+5 in nt                 # Returns True (like tuple)
+NT._make([6,7,8])       # Same as NT(6, 7, 8) or NT(*[6, 7, 8])
+
+# Bytearray
+b1 = bytearray(2)               # Assigns a bytearray (mutable) containing 2 null bytes
+b2 = bytearray([65, 66, 67])    # Assigns a bytearray from a list
+                                # (each value must be in the range 0-255)
+b3 = bytearray(u'\u0E01\u0E2E', 'utf_8')  # Assigns a bytearray from a string using the
+                                          # specified encoding
+list(b1)                        # Returns [0, 0]
+list(b2)                        # Returns [65, 66, 67]
+list(b3)                        # Returns [224, 184, 129, 224, 184, 174]
+print b2                        # Prints 'ABC'; bytearray converted to string
+print b2[0]                     # Prints '65'; no conversion of single byte
+type(b1)                        # Returns type <i>bytearray</i>
+isinstance(b1, bytearray)       # Returns True
+len(b1)                         # Returns 2
+b1[0] = 72                      # b1 now contains 72, 0
+b1[1:] = 'ey'                   # b1 now contains 72, 101, 121
+b1 += b2                        # b1 now contains 72, 101, 121, 65, 66, 67
+print b1                        # Prints 'HeyABC'
+
+# Memoryview
+s = 'hello'
+m = memoryview(s)       # Assigns a memoryview referencing object s
+type(m)                 # Returns type <i>memoryview</i>
+isinstance(m, memoryview)   # Returns True
+m.readonly              # Returns True (because the referenced object s is immutable)
+m[-1]                   # Returns 'o'
+m[1:4]                  # Returns a new memoryview referencing s[1:4]
+ba = bytearray('hello') # Assigns a bytearray containing 'hello'
+m2 = memoryview(ba)     # Assigns a memoryview referencing object ba
+m2.readonly             # Returns False (because the referenced object ba is mutable)
+m2[1] = 'u'             # ba is now bytearray('hullo')
+
+# Xrange
+xr = xrange(4)          # Assigns an xrange object (immutable) representing 0, 1, 2, 3
+                        # without actually storing this sequence like range() would
+r = range(4)            # Assigns list [0, 1, 2, 3] returned from standard function
+type(xr)                # Returns type <i>xrange</i>
+type(r)                 # Returns type <i>list</i>
+print xr                # Prints 'xrange(4)'; xr is an unexpanded xrange object
+print r                 # Prints '[0, 1, 2, 3]'; r is an actual list
+print list(xr)          # Prints '[0, 1, 2, 3]'; list(xr) expands xr to a list
+print tuple(xr)         # Prints '(0, 1, 2, 3)'; tuple(xr) expands xr to a tuple
+print tuple(r)          # Prints '(0, 1, 2, 3)'; an actual list can also become a tuple
+isinstance(xr, xrange)  # Returns True
+len(xr)                 # Returns 4
+xr[-1]                  # Returns 3
+xrange(2, 5)            # Returns xrange object representing sequence 2, 3, 4
+xrange(1, -2, -1)       # Returns xrange object representing sequence 1, 0, -1 (from 1 to
+                        # -2 (-2 excluded) with step -1)
+
+# Buffer (no longer recommended; use memoryview instead)
+s = 'hello'
+b = buffer(s)           # Assigns a buffer which is a readonly reference to object s
+type(b)                 # Returns type <i>buffer</i>
+b[-1]                   # Returns 'o'
+ba = bytearray(s)       # Assigns a bytearray containing 'hello'
+b2 = buffer(ba, 1, 3)   # Assigns a buffer referencing ba[1:4], i.e. the 'ell' part of ba
+ba[3] = 'i'             # ba is now bytearray('helio'), and b2 is buffer('eli')
+str(b2)                 # Returns 'eli'
+</pre>
+
+<h4>Other Container Types</h4>
+
+<pre class="code">
+# Set
+u = {3, 'hello'}        # Assigns a set (mutable; unordered unique items)
+type(u)                 # Returns type <i>set</i>
+set()                   # Returns empty set
+{}                      # Returns empty dict, not set!
+isinstance(u, set)      # Returns True
+len(u)                  # Returns 2
+'hello' in u            # Returns True
+u.add(10)               # u is now {10, 3, 'hello'} (undefined order)
+u.remove(10)            # u is now {3, 'hello'}
+u.remove(10)            # Raises KeyError exception (no such item)
+u.discard(3)            # u is now {'hello'}
+u.discard(3)            # u is unchanged (did not contain 3)
+set('hello')            # Returns {'h', 'e', 'l', 'o'} (only one 'l')
+
+# Frozenset
+w = frozenset((3, 'hi'))    # Assigns a frozenset (like a set, but immutable, so can be
+                            # used as a dictionary key or element of a set)
+type(w)                     # Returns type <i>frozenset</i>
+isinstance(w, frozenset)    # Returns True
+
+# Dict
+d = {'a':10, 'b':5}     # Assigns a dictionary (mutable unordered mapping; unique keys)
+type(d)                 # Returns type <i>dict</i>
+{}                      # Returns {} (empty dict, not set)
+isinstance(d, dict)     # Returns True
+len(d)                  # Returns 2
+'a' in d                # Returns True
+d['a'] = 11             # d is now {'a': 11, 'b': 5}
+d.keys()                # Returns ['a', 'b'] (list)
+d.values()              # Returns [11, 5]
+d.items()               # Returns [('a', 11), ('b', 5)] (list of tuples)
+del d['a']              # d is now {'b': 5}
+dict((('a',10),('b',5))) # Returns {'a': 10, 'b': 5}
+dict(a=10, b=5)         # Returns {'a': 10, 'b': 5}
+
+# Defaultdict
+import collections
+dd = collections.defaultdict(int, {'a': 3}) # Assigns a defaultdict (same as dict, but the
+                        # first arg is called with no args to provide the default value for
+                        # nonexistent keys; here, int() returns the default value 0)
+type(dd)                # Returns type <i>collections.defaultdict</i>
+isinstance(dd, collections.defaultdict) # Returns True
+dd['a']                 # Returns 3
+dd['b']                 # Returns 0 (because that's what int() returns);
+                        # dd is now defaultdict(int, {'a': 3, 'b': 0})
+dd['c'] += 1            # dd is now defaultdict(int, {'a': 3, 'b': 0, 'c': 1})
+
+# OrderedDict
+import collections
+od = collections.OrderedDict([('a',10), ('b',11), ('c',12)]) # Assigns an OrderedDict (like
+                            # dict but ordered, e.g. od.keys() lists keys in the order they
+                            # were added)
+type(od)                    # Returns class <i>collections.OrderedDict</i>
+isinstance(od, collections.OrderedDict) # Returns True
+od.popitem()                # Returns ('c',12); od is now OrderedDict([('a',10), ('b',11)])
+od.popitem(last=False)      # Returns ('a',10); od is now OrderedDict([('b',11)])
+
+# Counter
+import collections
+c = collections.Counter('abaab')    # Assigns a Counter (like a dict, but the values are
+                        # counts for the keys, i.e. {'a': 3, 'b': 2})
+type(c)                 # Returns class <i>collections.Counter</i>
+isinstance(c, collections.Counter)  # Returns True
+c['a']                  # Returns 3
+c['x']                  # Returns 0
+c['c'] += 2             # c is now Counter({'a': 3, 'b': 2, 'c': 2})
+c.update(['a', 'c'])    # c is now Counter({'a': 4, 'b': 2, 'c': 3})
+c.update({'a': 5})      # c is now Counter({'a': 9, 'b': 2, 'c': 3})
+c.most_common(2)        # Returns [('a', 9), ('c', 3)] (ordered with most common first);
+                        # if no arg, all items are returned
+
+# Deque (double-ended queue)
+import collections
+q = collections.deque((3, 'hi'))    # Assigns a deque (a bit like list but with faster
+                        # adding/removing of items at both ends and slower indexing in the
+                        # middle)
+type(q)                 # Returns type <i>collections.deque</i>
+isinstance(q, collections.deque)    # Returns True
+q.append('right')       # q is now deque([3, 'hi', 'right'])
+q.appendleft('left')    # q is now deque(['left', 3, 'hi', 'right'])
+if q:                   # If q is not empty...
+    q.pop()             # Returns 'right'; q is now deque(['left', 3, 'hi'])
+q.popleft()             # Returns 'left'; q is now deque([3, 'hi'])
+q.extend([4,5])         # q is now deque([3, 'hi', 4, 5])
+q.extendleft([2,1])     # q is now deque([1, 2, 3, 'hi', 4, 5])
+</pre>
+
+<h4>Container Object Attributes</h4>
+
+The following is a list of attributes (properties and methods) provided by instances of the
+container types
+str, unicode, list, tuple, (types produced by) collections.namedtuple, bytearray, memoryview,
+xrange, set, frozenset, dict, collections.defaultdict, collections.OrderedDict, collections.Counter,
+collections.deque.
+(Some general object attributes and low-level attributes are omitted from this list).
+<p>
+
+Show <select id="applies_to_containers" onchange="apply_filter('containers');">
+    <option>all
+    <option>str
+    <option>unicode
+    <option>list
+    <option>tuple
+    <option>namedtuple
+    <option>bytearray
+    <option>memoryview
+    <option>xrange
+    <option>set
+    <option>frozenset
+    <option>dict
+    <option>defaultdict
+    <option>OrderedDict
+    <option>Counter
+    <option>deque
+</select> attributes below:
+
+<pre class="code" data-filter-id="containers">
+o.__add__(o2)           # <a class="toc_ref" href="#Special_Methods">Special method</a> implementing o + o2 (concatenation); 'hi' + 'ho'
+                        # returns 'hiho'; for Counter the counts of equal keys are added;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,Counter
+o.__alloc__()           # Returns number of bytes allocated to o;
+                        # bytearray('hi').__alloc__() returns 3;
+                        # applies to bytearray
+o.__and__(o2)           # Implements o &amp; o2 (intersection); {1,'a',3} &amp; {'a',3,4} returns
+                        # {'a',3}; for Counter the intersection applies to the keys and the
+                        # smallest count is chosen for equal keys;
+                        # applies to set,frozenset,Counter
+o.__cmp__(o2)           # Implements cmp(o, o2) (3-way comparison);
+                        # cmp({1:4},{2:4}) returns -1;
+                        # applies to set,frozenset,dict,defaultdict,OrderedDict,Counter
+o.__contains__(x)       # Implements x in o (membership test); 'b' in 'abc' returns True;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,set,
+                        # frozenset,dict,defaultdict,OrderedDict,Counter
+o.__copy__()            # Implements copy.copy(o) (shallow copy);
+                        # applies to defaultdict,deque
+o.__delitem__(x)        # Implements del o[x] (item deletion); if o = [4,5] then del o[0]
+                        # makes o [5]; o.__delitem__(slice(x,y,z)) implements del o[x:y:z];
+                        # applies to list,bytearray,memoryview,dict,defaultdict,
+                        # OrderedDict,Counter,deque
+<s>o.__delslice__(x,y)</s>     # Implements del o[x:y] (obsolete, use __delitem__);
+                        # applies to list
+o.__eq__(o2)            # Implements o == o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__ge__(o2)            # Implements o &gt;= o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__getitem__(x)        # Implements o[x];
+                        # o.__getitem__(slice(x,y,z)) implements o[x:y:z];
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,xrange,dict,defaultdict,OrderedDict,Counter,deque
+o.__getnewargs__()      # TBD (pickle protocol)
+                        # applies to str,unicode,tuple,namedtuple
+<s>o.__getslice__(x,y)</s>     # Implements o[x:y] (obsolete, use __getitem__);
+                        # applies to str,unicode,list,tuple,namedtuple
+o.__getstate__()        # TBD (pickle protocol)
+                        # applies to namedtuple
+o.__gt__(o2)            # Implements o &gt; o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__iadd__(o2)          # Implements o += o2 (in-place concatenation); if o = [1,2] then
+                        # o += [3,4] makes o [1,2,3,4];
+                        # applies to list,bytearray,deque
+o.__iand__(o2)          # Implements o &amp;= o2 (in-place intersection);
+                        # applies to set
+o.__imul__(x)           # Implements o *= x (in-place repetition); if o = [1,2] then o *= 3
+                        # makes o [1,2,1,2,1,2];
+                        # applies to list,bytearray
+o.__ior__(o2)           # Implements o |= o2 (in-place union);
+                        # applies to set
+o.__isub__(o2)          # Implements o -= o2 (in-place difference);
+                        # applies to set
+o.__iter__()            # Returns an <a class="toc_ref" href="#Iterator_Types">iterator</a> for iterable o;
+                        # applies to list,tuple,namedtuple,bytearray,xrange,set,frozenset,
+                        # dict,defaultdict,OrderedDict,Counter,deque
+o.__ixor__(o2)          # Implements o ^= o2 (in-place symmetric difference);
+                        # applies to set
+o.__le__(o2)            # Implements o &lt;= o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__len__()             # Implements len(o) (item count); len([5,6]) returns 2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,xrange,set,frozenset,dict,defaultdict,OrderedDict,
+                        # Counter,deque
+o.__lt__(o2)            # Implements o &lt; o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__missing__(x)        # Implements o[x] if x is not one of o's keys; returns the default
+                        # value for a missing key;
+                        # applies to defaultdict,Counter
+o.__mod__(x)            # Implements o % x (formatting); '%-3s%03u' % ('hi', 9) returns
+                        # 'hi 009';
+                        # applies to str,unicode
+o.__mul__(x)            # Implements o * x (repetition); [1,2] * 3 returns [1,2,1,2,1,2];
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray
+o.__ne__(o2)            # Implements o != o2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,
+                        # memoryview,set,frozenset,dict,defaultdict,OrderedDict,Counter,
+                        # deque
+o.__or__(o2)            # Implements o | o2 (union); {1,'a',3} | {'a',3,4} returns
+                        # {1,'a',3,4}; for Counter the union applies to the keys and the
+                        # largest count is chosen for equal keys;
+                        # applies to set,frozenset,Counter
+o.__rand__(o2)          # Implements o2 &amp; o (reverse intersection);
+                        # applies to set,frozenset
+o.__reversed__()        # Implements reversed(o); returns a reverse order <a class="toc_ref" href="#Iterator_Types">iterator</a> for o;
+                        # applies to list,xrange,OrderedDict,deque
+o.__rmod__(o2)          # Implements o2 % o (reverse formatting);
+                        # applies to str,unicode
+o.__rmul__(x)           # Implements x * o (reverse repetition); 3 * [1,2] returns
+                        # [1,2,1,2,1,2];
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray
+o.__ror__(o2)           # Implements o2 | o (reverse union);
+                        # applies to set,frozenset
+o.__rsub__(o2)          # Implements o2 - o (reverse difference);
+                        # applies to set,frozenset
+o.__rxor__(o2)          # Implements o2 ^ o (reverse symmetric difference);
+                        # applies to set,frozenset
+o.__setitem__(x, v)     # Implements o[x] = v;
+                        # o.__setitem__(slice(x,y,z), v) implements o[x:y:z] = v;
+                        # applies to list,bytearray,memoryview,dict,defaultdict,
+                        # OrderedDict,Counter,deque
+<s>o.__setslice__(x, y, v)</s> # Implements o[x:y] = v (obsolete, use __setitem__);
+                        # applies to list
+o.__sub__(o2)           # Implements o - o2 (difference); {1,'a',3} - {'a',3,4} returns {1};
+                        # for Counter the counts of equal keys are subtracted and only keys
+                        # with positive counts are retained;
+                        # applies to set,frozenset,Counter
+o.__xor__(o2)           # Implements o ^ o2 (symmetric difference); {1,'a',3} ^ {'a',3,4}
+                        # returns {1,4};
+                        # applies to set,frozenset
+</pre>
+
+<pre class="code" data-filter-id="containers">
+o._asdict()             # TBD
+                        # applies to namedtuple
+o._fields               # TBD
+                        # applies to namedtuple
+o._formatter_field_name_split() # TBD
+                                # applies to str,unicode
+o._formatter_parser()   # TBD
+                        # applies to str,unicode
+o._make()               # TBD
+                        # applies to namedtuple
+o._replace()            # TBD
+                        # applies to namedtuple
+</pre>
+
+<pre class="code" data-filter-id="containers">
+o.add(x)                # Puts x into o; if o = {3} then o.add(5) makes o {3,5};
+                        # applies to set
+o.append(x)             # Inserts x at end of o; if o = [3] then o.append(5) makes o [3,5];
+                        # applies to list,bytearray,deque
+o.appendleft(x)         # Inserts x at start of o; if o = deque([3]) then o.appendleft(5)
+                        # makes o deque([5, 3]);
+                        # applies to deque
+o.capitalize()          # Returns o with first character capitalized; 'hi ho'.capitalize()
+                        # returns 'Hi ho';
+                        # applies to str,unicode,bytearray
+o.center(w,c)           # Returns o centered in a string of length w filled with c (space
+                        # if no c); returns o if len(o) >= w;
+                        # 'hi'.center(5,'*') returns '**hi*';
+                        # applies to str,unicode,bytearray
+o.clear()               # Makes o empty; if o = {3:9,5:25} then o.clear() makes o {};
+                        # applies to set,dict,defaultdict,OrderedDict,Counter,deque
+o.copy()                # Returns a shallow copy of o (similar to copy.copy(o) but doesn't
+                        # call o.__copy__()); if o = {4:[5]} then o.copy() returns a new
+                        # {4:[5]} referencing the same list [5] as o;
+                        # applies to set,frozenset,dict,defaultdict,OrderedDict,Counter
+o.count(x,a,b)          # Returns count of non-overlapping occurrences of x in o[a:b];
+                        # a,b are optional; 'hohohoho'.count('hoho') returns 2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray,deque
+o.decode(enc,err)       # Returns string equal to o decoded using encoding enc
+                        # (default 'ascii') and error scheme err (default 'strict')
+                        # 'A\xc7\xbf'.decode('utf-8') returns u'A\u01ff';
+                        # 'A\xc0'.decode('utf-8') raises UnicodeDecodeError;
+                        # 'A\xc0'.decode('utf-8','ignore') returns u'A';
+                        # 'A\xc0'.decode('utf-8','replace') returns u'A\ufffd';
+                        # applies to str,unicode,bytearray
+o.default_factory       # TBD
+                        # applies to defaultdict
+o.difference(o2,...)        # Same as o - set(o2) - ... (doesn't call o.__sub__());
+                            # applies to set,frozenset
+o.difference_update(o2,...) # Same as o -= set(o2) | ... (doesn't call o.__isub__());
+                            # applies to set
+o.discard(x)            # Removes item x from o; does nothing if x is not in o;
+                        # if o = {3,5} then o.discard(5) makes o {3};
+                        # applies to set
+o.elements()            # TBD
+                        # applies to Counter
+o.encode(enc,err)       # Returns o encoded using encoding enc (default 'ascii') and error
+                        # scheme err (default 'strict');
+                        # u'A\u01ff'.encode('utf-8') returns 'A\xc7\xbf';
+                        # u'A\u0080'.encode() raises UnicodeEncodeError;
+                        # u'A\u0080'.encode('ascii','ignore') returns 'A';
+                        # u'A\u0080'.encode('ascii','replace') returns 'A?';
+                        # u'A\u0080'.encode('ascii','xmlcharrefreplace') returns 'A&amp;#128;';
+                        # u'A\u0080'.encode('ascii','backslashreplace') returns 'A\\x80';
+                        # applies to str,unicode
+o.endswith(x,a,b)       # Returns True if o[a:b] ends with x (or with an item in tuple x);
+                        # 'abc'.endswith(('bc','z')) returns True;
+                        # applies to str,unicode,bytearray
+o.expandtabs(n)         # Returns a copy of o with tab characters replaced by up to n
+                        # spaces (enough spaces to reach the next tab column);
+                        # '\ta\tbc\td'.expandtabs(3) returns '   a  bc d';
+                        # applies to str,unicode,bytearray
+o.extend(o2)            # Same as o += o2 (doesn't call o.__iadd__());
+                        # applies to list,bytearray,deque
+o.extendleft()          # TBD
+                        # applies to deque
+o.find(o2,a,b)          # Returns index of first occurrence of substring o2 in o[a:b] (a=0,
+                        # b=-1 if not given), or -1 if none found;
+                        # 'abab'.find('ab') returns 0; 'abab'.find('ab',1,3) returns -1;
+                        # applies to str,unicode,bytearray
+o.format(...)           # Returns a string representing the arguments formatted according
+                        # to the directives in o; See <a class="toc_ref" href="#String_Operations">string operations</a>;
+                        # applies to str,unicode,memoryview
+o.fromhex(s)            # Class method; returns object of same class as o containing bytes
+                        # corresponding to pairs of hex digits in string s;
+                        # bytearray.fromhex('4142 43 0a') returns bytearray(b'ABC\n');
+                        # applies to bytearray
+o.fromkeys(o2,x)        # Class method; returns object of same class as o containing all
+                        # items of sequence o2 as keys with all values equal to x (default
+                        # None); dict.fromkeys(('a','b'), 5) returns {'a':5, 'b':5};
+                        # applies to dict,defaultdict,OrderedDict
+o.get()                 # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.has_key()             # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.index(x,a,b)          # Returns index of first occurrence of item x in o[a:b] (a=0, b=-1
+                        # if not given); raises ValueError if x is not in o[a:b];
+                        # for str,unicode,bytearray: x may be a substring of o;
+                        # [4,5,4].index(4) returns 0; 'abab'.index('ab',1) returns 2;
+                        # applies to str,unicode,list,tuple,namedtuple,bytearray
+o.insert(i,x)           # Inserts item x in o at index i; same as o[i:i] = [x];
+                        # if o = [4,5,6] then o.insert(2,'a') makes o [4,5,'a',6];
+                        # applies to list,bytearray
+o.intersection(o2,...)          # Same as o &amp; set(o2) &amp; ... (doesn't call o.__and__());
+                                # applies to set,frozenset
+o.intersection_update(o2,...)   # Same as o &amp;= set(o2) &amp; ... (doesn't call o.__iand__());
+                                # applies to set
+o.isalnum()             # Returns True if o is not empty and contains only alphanumeric
+                        # characters (alphabetic or numeric characters);
+                        # applies to str,unicode,bytearray
+o.isalpha()             # Returns True if o is not empty and contains only alphabetic
+                        # characters;
+                        # applies to str,unicode,bytearray
+o.isdecimal()           # Returns True if o is not empty and contains only decimal
+                        # characters (a subset of digits (the official doc is wrong));
+                        # for characters '2&#xe52;': u'2\u0e52'.isdecimal() returns True;
+                        # for character '&#xb2;':    u'\u00b2'.isdecimal() returns False;
+                        # for character '&#xbd;':    u'\u00bd'.isdecimal() returns False;
+                        # applies to unicode
+o.isdigit()             # Returns True if o is not empty and contains only digits
+                        # (a subset of numeric characters);
+                        # for characters '2&#xe52;': u'2\u0e52'.isdigit() returns True;
+                        # for character '&#xb2;':    u'\u00b2'.isdigit() returns True;
+                        # for character '&#xbd;':    u'\u00bd'.isdigit() returns False;
+                        # applies to str,unicode,bytearray
+o.isdisjoint(o2)        # Returns True if o and o2 have no common items;
+                        # applies to set,frozenset
+o.islower()             # Returns True if o contains at least 1 cased character and all
+                        # cased characters are lowercase; 'ver2.0'.islower() returns True;
+                        # applies to str,unicode,bytearray
+o.isnumeric()           # Returns True if o is not empty and contains only numeric
+                        # characters;
+                        # for characters '2&#xe52;': u'2\u0e52'.isnumeric() returns True;
+                        # for character '&#xb2;':    u'\u00b2'.isnumeric() returns True;
+                        # for character '&#xbd;':    u'\u00bd'.isnumeric() returns True;
+                        # applies to unicode
+o.isspace()             # Returns True if o is not empty and contains only whitespace
+                        # characters; ' \t\n\r\f\v'.isspace() returns True;
+                        # applies to str,unicode,bytearray
+o.issubset(o2)          # Same as o &lt;= o2 (doesn't call o.__le__());
+                        # applies to set,frozenset
+o.issuperset(o2)        # Same as o &gt;= o2 (doesn't call o.__ge__());
+                        # applies to set,frozenset
+o.istitle()             # Returns True if o contains at least 1 uppercase character, no
+                        # uppercase character follows a cased character, and any lowercase
+                        # character follows a cased character;
+                        # '2B|Not 2B'.istitle() returns True;
+                        # applies to str,unicode,bytearray
+o.isupper()             # Returns True if o contains at least 1 cased character and all
+                        # cased characters are uppercase; 'VER2.0'.isupper() returns True;
+                        # applies to str,unicode,bytearray
+o.items()               # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.itemsize              # TBD
+                        # applies to memoryview
+o.iteritems()           # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.iterkeys()            # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.itervalues()          # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.join(o2)              # Returns the string obtained by concatenating all items of o2
+                        # using o as separator; '/'.join('abc') returns 'a/b/c';
+                        # '=='.join(['x','42']) returns 'x==42';
+                        # applies to str,unicode,bytearray
+o.keys()                # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.ljust(w,c)            # Returns o left-justified in a string of length w filled with c
+                        # (space if no c); returns o if len(o) >= w;
+                        # 'hi'.ljust(5,'*') returns 'hi***';
+                        # applies to str,unicode,bytearray
+o.lower()               # Returns a copy of o with all uppercase characters converted to
+                        # lowercase; '2B|Not 2B'.lower() returns '2b|not 2b';
+                        # applies to str,unicode,bytearray
+o.lstrip(s)             # Returns a copy of o with first characters removed if present in
+                        # string s (whitespace if no s); 'abcd'.lstrip('dba') returns 'cd';
+                        # applies to str,unicode,bytearray
+o.maxlen                # TBD
+                        # applies to deque
+o.most_common()         # TBD
+                        # applies to Counter
+o.ndim                  # TBD
+                        # applies to memoryview
+o.partition(o2)         # Returns (o[:i],o[i],o[i+1:]) where i is index of first occurrence
+                        # of o2 in o, or (o[:],type(o)(),type(o)()) if o2 is not found in o;
+                        # 'abba'.partition('b') returns ('a','b','ba');
+                        # u'abba'.partition(u'x') returns (u'abba',u'',u'');
+                        # applies to str,unicode,bytearray
+o.pop(i)                # Removes and returns item o[i] (o[-1] if no i);
+                        # for set: removes and returns arbitrary item (no i allowed);
+                        # raises IndexError (list) or KeyError (set, dict) if no item;
+                        # applies to list,bytearray,set,dict,defaultdict,OrderedDict,
+                        # Counter,deque
+o.popitem()             # Removes and returns arbitrary (key, o[key]) pair; raises KeyError
+                        # if o is empty;
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.popleft()             # TBD
+                        # applies to deque
+o.readonly              # TBD
+                        # applies to memoryview
+o.remove(x)             # Removes item x from o; raises ValueError (KeyError for set) if x
+                        # is not in o; if o = [3,5] then o.remove(5) makes o [3];
+                        # applies to list,bytearray,set,deque
+o.replace(s1,s2,n)      # Returns a copy of o with first n (or all if no n) occurrences of
+                        # s1 replaced with s2; 'boohoo'.replace('oo','*') returns 'b*h*';
+                        # applies to str,unicode,bytearray
+o.reverse()             # Reverses the items of o; same as o[::-1] = o;
+                        # if o = [4,5,6] then o.reverse() makes o [6,5,4];
+                        # applies to list,bytearray,deque
+o.rfind(o2,a,b)         # Same as o.find(), except last occurrence is chosen;
+                        # applies to str,unicode,bytearray
+o.rindex(x,a,b)         # Same as o.index(), except last occurrence is chosen;
+                        # applies to str,unicode,bytearray
+o.rjust(w,c)            # Returns o right-justified in a string of length w filled with c
+                        # (space if no c); returns o if len(o) >= w;
+                        # 'hi'.rjust(5,'*') returns '***hi';
+                        # applies to str,unicode,bytearray
+o.rotate()              # TBD
+                        # applies to deque
+o.rpartition(o2)        # Returns (o[:i],o[i],o[i+1:]) where i is index of last occurrence
+                        # of o2 in o, or (type(o)(),type(o)(),o[:]) if o2 is not found in o;
+                        # 'abba'.rpartition('b') returns ('ab','b','a');
+                        # u'abba'.rpartition(u'x') returns (u'',u'',u'ab');
+                        # applies to str,unicode,bytearray
+o.rsplit()              # TBD
+                        # applies to str,unicode,bytearray
+o.rstrip(s)             # Returns a copy of o with last characters removed if present in
+                        # string s (whitespace if no s); 'abcd'.rstrip('cda') returns 'ab';
+                        # applies to str,unicode,bytearray
+o.setdefault()          # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.shape                 # TBD
+                        # applies to memoryview
+o.sort(cf,kf,r)         # Sorts the items of o using comparison and key functions cf and kf
+                        # (cf works like cmp(x,y) and is cmp(x,y) if not given, kf extracts
+                        # a key for cf from each item and is lambda x:x if not given);
+                        # the sort is reversed if r is True (r is False if not given);
+                        # sort(None,kf,r) is usually faster than an equivalent sort(cf);
+                        # if o = [4,5,10] then o.sort(None,None,True) makes o [10,5,4];
+                        # applies to list
+o.split()               # TBD
+                        # applies to str,unicode,bytearray
+o.splitlines()          # TBD
+                        # applies to str,unicode,bytearray
+o.startswith(x,a,b)     # Returns True if o[a:b] starts with x (or with an item in tuple x);
+                        # 'abc'.startswith(('ab','z')) returns True;
+                        # applies to str,unicode,bytearray
+o.strides               # TBD
+                        # applies to memoryview
+o.strip(s)              # Returns a copy of o with characters removed from both ends if
+                        # present in string s (whitespace if no s);
+                        # '0+a+b!'.strip('!+0') returns 'a+b';
+                        # applies to str,unicode,bytearray
+o.suboffsets            # TBD
+                        # applies to memoryview
+o.subtract()            # TBD
+                        # applies to Counter
+o.swapcase()            # TBD
+                        # applies to str,unicode,bytearray
+o.symmetric_difference(o2)          # Same as o ^ o2 (doesn't call o.__xor__());
+                                    # applies to set,frozenset
+o.symmetric_difference_update(o2)   # Same as o ^= o2 (doesn't call o.__ixor__());
+                                    # applies to set
+o.title()               # TBD
+                        # applies to str,unicode,bytearray
+o.tobytes()             # TBD
+                        # applies to memoryview
+o.tolist()              # TBD
+                        # applies to memoryview
+o.translate()           # TBD
+                        # applies to str,unicode,bytearray
+o.union(o2,...)         # Same as o | set(o2) | ... (doesn't call o.__or__());
+                        # applies to set,frozenset
+o.update(o2,...)        # Updates o with items from o2, ...;
+                        # for set: same as o |= set(o2) | ... (doesn't call o.__ior__());
+                        # applies to set,dict,defaultdict,OrderedDict,Counter
+o.upper()               # Returns a copy of o with all lowercase characters converted to
+                        # uppercase; '2B|Not 2B'.upper() returns '2B|NOT 2B';
+                        # applies to str,unicode,bytearray
+o.values()              # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.viewitems()           # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.viewkeys()            # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.viewvalues()          # TBD
+                        # applies to dict,defaultdict,OrderedDict,Counter
+o.zfill()               # TBD
+                        # applies to str,unicode,bytearray
+</pre>
+
+<h3>Iterator Types</h3>
+
+<pre class="code">
+# Iterator and iterable type detection
+import collections
+isinstance(o, collections.Iterator)  # Returns True if o is an iterator object
+isinstance(o, collections.Iterable)  # Returns True if o is an iterable object (e.g.
+                        # container or iterator), in which case iter(o) returns an iterator
+                        # for o
+
+# Iterator types
+si = iter('hello')      # Assigns a string iterator
+type(si)                # Returns type with name 'iterator'
+next(si)                # Returns 'h', i.e. next item; raises StopIteration exception
+                        # when no more items; iterators normally can't be restarted (one
+                        # exception is a <a class="toc_ref" href="#Files">file</a> f which can be restarted with f.seek(0))
+next(si, '.')           # Returns 'e'; returns '.' when no more items
+
+li = iter([3, 'hi'])    # Assigns a list iterator
+type(li)                # Returns type with name 'listiterator'
+next(li)                # Returns 3
+
+ti = iter((3, 'hi'))    # Assigns a tuple iterator
+type(ti)                # Returns type with name 'tupleiterator'
+next(ti)                # Returns 3
+
+seti = iter({3, 'hi'})  # Assigns a set iterator (iteration sequence is unpredictable)
+type(seti)              # Returns type with name 'setiterator'
+next(seti)              # Returns 3
+
+d = {'a':10, 'b':5}     # Assigns a dictionary (iteration sequence is unpredictable)
+dki = iter(d)           # Assigns a dictionary key iterator (same as d.iterkeys())
+type(dki)               # Returns type with name 'dictionary-keyiterator'
+next(dki)               # Returns 'a'
+dvi = d.itervalues()    # Assigns a dictionary value iterator
+type(dvi)               # Returns type with name 'dictionary-valueiterator'
+next(dvi)               # Returns 10
+dii = d.iteritems()     # Assigns a dictionary item iterator
+type(dii)               # Returns type with name 'dictionary-itemiterator'
+next(dii)               # Returns ('a', 10)
+
+bi = iter(bytearray([65, 0])) # Assigns a bytearray iterator
+type(bi)                # Returns type with name 'bytearray_iterator'
+next(bi)                # Returns 65
+
+xi = iter(xrange(5))    # Assigns an xrange iterator
+type(xi)                # Returns type with name 'rangeiterator'
+next(xi)                # Returns 0
+
+from random import random   # Imports function random from module random
+ci = iter(random, 0.1)  # Assigns a callable iterator that calls function random until that
+                        # function returns 0.1 (very unlikely); note that iter() with 2
+                        # args is quite different from iter() with 1 arg
+type(ci)                # Returns class with name 'callable-iterator'
+next(ci)                # Returns a random float
+
+se = enumerate('hello') # Assigns an enumerate object (iterator) for a string
+type(se)                # Returns type <i>enumerate</i>
+isinstance(se, enumerate)   # Returns True
+next(se)                # Returns (0, 'h'); first item in this tuple is count
+next(se)                # Returns (1, 'e')
+xe = enumerate(xi, 100) # Assigns an enumerate object for an xrange iterator (see above)
+                        # with count starting at 100; xi already iterated once above, so
+                        # first xe iteration triggers second xi iteration
+next(xe)                # Returns (100, 1)
+next(xe)                # Returns (101, 2)
+next(xi)                # Returns 3; xe uses xi to iterate, so xi is also at item 3
+</pre>
+
+Generator objects (see <a class="toc_ref" href="#Generator_Expressions">generator expressions</a>
+and <a class="toc_ref" href="#Generator_Functions">generator functions</a>)
+and <a class="toc_ref" href="#Files">files</a> are also iterators.
+
+<h3>More Types</h3>
+
+"Everything is an object", so see these other object types:
+<ul>
+<li><a class="toc_ref" href="#Functions">Functions</a>
+<li><a class="toc_ref" href="#Classes">Classes</a>
+<li><a class="toc_ref" href="#Property_Attributes">Property attributes</a>
+<li><a class="toc_ref" href="#Modules">Modules</a>
+</ul>
+
+<h2>Control Flow Manipulation</h2>
+
+<h3>Conditional Execution</h3>
+
+<pre class="code">
+# 'If' statement
+if x == 3:
+    x = y               # Lines at same nesting level must have same indentation
+    if not z:           # (see <a class="toc_ref" href="#Compound_Statement_Format">compound statement format</a>)
+        y += 1
+elif y != 4:
+    pass                # Does nothing (placeholder for empty statement list)
+else:
+    y = x
+    # Single-line 'if'
+    if z: x = 1; y = 2  # Semi-colon binds tighter than colon, so doesn't end the 'if'
+    else: y = 1; x = 2
+</pre>
+
+See also <a class="toc_ref" href="#Conditional_Expressions">conditional expressions</a>.
+
+<h3>Loops</h3>
+
+<pre class="code">
+# While loop
+while x &lt; 10:
+    x += 1
+    if x == 5:
+        continue        # Skips rest of loop body and goes back to testing loop condition
+    print x
+    if x == y:
+        break           # Exits loop and skips 'else' part
+else:                   # Optional; does something if loop condition tested false,
+                        # i.e. when no more iterations and no break
+    print 'no break'
+
+# For loop
+for x in alist:         # x becomes each item of alist in turn; alist is evaluated once
+                        # (Note: alist can be any iterable type or <a class="toc_ref" href="#Iterator_Types">iterator</a>)
+    print x
+    for i in range(x):  # Range returns a list of integers from 0 through x - 1
+        print i
+else:                   # Optional; do something when no more iterations and no break
+    pass
+</pre>
+
+<h3>Exception Handling</h3>
+
+<pre class="code">
+# Try (with all parts)
+try:
+    x = 1 / 0           # Raises exception which triggers 1st 'except' &amp; 'finally'
+except ZeroDivisionError as e:  # Executed on specific exception in try part
+    print 'Oops:', e    # Prints 'Oops: integer division or modulo by zero'
+except:                 # Executed on any (not already handled) exception in try part
+    print 'Bad!'
+else:                   # Optional; executed only if no exception in try part; same as
+                        # putting code at end of try part, but exceptions are not handled
+    print 'All OK'
+finally:                # Optional; always executed as last step, even on unhandled
+                        # exception or return/break/continue (in try/except/else parts)
+    print 'Clean up'
+
+# Try (with finally only)
+try:
+    raise RuntimeError  # Raises exception which is not handled here
+finally:                # but finally part is executed
+    print 'Clean up'
+</pre>
+
+<h3>Script Termination</h3>
+
+<pre class="code">
+import sys              # Imports the sys module
+sys.exit()              # Raises a SystemExit exception which terminates the script with
+                        # exit code 0 (usually considered to mean success) -
+                        # unless the exception is caught by a <a class="toc_ref" href="#Exception_Handling">try statement</a>
+sys.exit(2)             # Same as above, but uses the specified exit code
+sys.exit('Oops!')       # Same as above, but prints the specified string and uses
+                        # exit code 1 (usually considered to mean failure)
+sys.exit(obj)           # Same as above, but converts the specified object to a string,
+                        # prints it, and uses exit code 1, unless obj is None, in which
+                        # case nothing is printed and exit code is 0
+exit()                  # Not recommended for use in scripts; intended for use in the
+                        # interactive interpreter where it works like sys.exit()
+</pre>
+
+<h2>Input/Output</h2>
+
+<h3>Script Arguments</h3>
+
+<pre class="code">
+import sys              # Imports the sys module
+sys.argv                # Returns a list containing the script name and command line args
+print sys.argv[0]       # Prints script name (possibly full path)
+if len(sys.argv) > 1:   # If there are any command line arguments, then ...
+    print sys.argv[1]   # ... print first one
+</pre>
+
+<h3>Standard In/Out/Error</h3>
+
+<pre class="code">
+# Stdout
+x = 10
+d = {'a': 4, 'b': 5}
+print 'd =', d          # Prints 'd = {'a': 4, 'b': 5}' + newline to stdout;
+                        # args are separated by a space
+print 'x =', x,         # Prints 'x = 10' to stdout; trailing comma prevents newline
+print '(decimal)'       # Prints '(decimal)', so whole line is 'x = 10 (decimal)'
+
+# Stderr
+import sys                          # Imports sys module
+print &gt;&gt; sys.stderr, 'x =', x,      # Prints 'x = 10' to stderr; trailing ',' prevents
+                                    # newline
+print &gt;&gt; sys.stderr, '(decimal)'    # Prints '(decimal)'; whole line: 'x = 10 (decimal)'
+sys.stderr.write('x = %d' % x)      # Prints 'x = 10' to stderr (never automatic newline)
+sys.stderr.write(' (decimal)\n')    # Prints ' (decimal)' + newline;
+                                    # whole line printed to stderr: 'x = 10 (decimal)'
+a1 = ['hi\n', 'ho\n']               # List of strings incl. newlines
+sys.stderr.writelines(a1)           # Prints 'hi' + newline + 'ho' + newline
+
+# Stdin
+q = raw_input('Q: ')    # Prints 'Q: ' to stdout (without newline), then reads a line from
+                        # stdin as a string, strips the newline, and assigns it to q
+s = sys.stdin.read()    # Reads stdin until end of file and assigns the whole thing
+                        # (incl. newlines) as a string to s
+s = sys.stdin.readline()    # Reads one line from stdin as string incl. newline;
+                            # returns empty string if no more lines
+a = sys.stdin.readlines()   # Reads all lines from stdin as list of strings incl. newlines
+</pre>
+
+<h3>Files</h3>
+
+<pre class="code">
+# Creating/truncating + writing file, and misc. file methods
+fname = 'file.txt'
+f = open(fname, 'w')        # Creates/truncates and opens file for writing from position 0
+                            # (use mode 'wb' for binary files - no newline conversion)
+type(f)                     # Returns type <i>file</i>
+isinstance(f, file)         # Returns True
+f.tell()                    # Returns 0 (position of file pointer in bytes)
+x = 10
+print &gt;&gt; f, 'x =', x,       # Writes 'x = 10' to file; trailing ',' prevents newline
+print &gt;&gt; f, '(decimal)'     # Writes '(decimal)'; whole line: 'x = 10 (decimal)'
+f.write('x = %d' % x)       # Writes 'x = 10' to file (never automatic newline)
+f.write(' (decimal)\n')     # Writes ' (decimal)' + newline; whole line: 'x = 10 (decimal)'
+a1 = ['hi\n', 'ho\n']       # List of strings incl. newlines
+f.writelines(a1)            # Writes 'hi\n' + 'ho\n' to file
+f.tell()                    # Returns 44 (position of file pointer in bytes (Windows))
+f.close()                   # Closes file
+
+# Reading file, and misc. file methods
+f = open(fname, 'r')        # Opens existing file for reading from pos 0 ('r' is optional)
+                            # (use mode 'rb' for binary files - no newline conversion)
+f.tell()                    # Returns 0 (position of file pointer in bytes)
+s = f.read()                # Reads entire file as string
+f.tell()                    # Returns 44 (position of file pointer in bytes (Windows))
+f.seek(-10, 2)              # Moves file pointer 10 bytes back from end of file
+f.tell()                    # Returns 34 (position of file pointer in bytes (Windows))
+f.seek(-10, 1)              # Moves file pointer 10 bytes back from current position
+f.tell()                    # Returns 24 (position of file pointer in bytes (Windows))
+f.seek(10)                  # Moves file pointer 10 bytes forward from start of file
+f.tell()                    # Returns 10 (position of file pointer in bytes (Windows))
+f.seek(0)                   # Moves file pointer back to start of file
+f.tell()                    # Returns 0 (position of file pointer in bytes)
+s = f.readline()            # Reads next line from file as string incl. newline;
+                            # returns empty string if no more lines
+f.tell()                    # Returns 18 (position of file pointer in bytes (Windows))
+a = f.readlines()           # Reads all remaining lines from file as list of strings
+                            # incl. newlines
+f.tell()                    # Returns 44 (position of file pointer in bytes (Windows))
+f.seek(0)                   # Moves file pointer back to start of file
+s = next(f)                 # Same as f.readline() but raises StopIteration at end of file,
+                            # and ValueError if mixed with file read methods without an
+                            # intervening call to f.seek()
+                            # (files are <a class="toc_ref" href="#Iterator_Types">iterators</a> with additional control via f.seek())
+for s in f: print s,        # Iterates through remaining lines in file and prints each one
+f.close()
+
+# 'With' statement (good practice)
+with open(fname) as f:      # 'with' ensures that file is closed when the 'with' suite of
+    s = f.read()            # statements ends or raises an exception
+
+# Appending to file (creating it if needed)
+f = open(fname, 'a')        # (Creates and) opens file for appending (writing at end)
+                            # (use mode 'ab' for binary files - no newline conversion)
+f.tell()                    # Returns 0 (position of file pointer - irrelevant for mode 'a')
+print &gt;&gt; f, 'hum'           # Appends 'hum\n' to end of file
+f.tell()                    # Returns 49 (position of file pointer in bytes (Windows))
+f.close()
+
+# Creating/truncating + writing &amp; reading file
+f = open(fname, 'w+')       # Creates/truncates and opens file for writing and reading
+                            # (use mode 'w+b' for binary files - no newline conversion)
+s = f.read()                # Reads entire file as string: '' because file was truncated
+f.seek(0, 1)                # Doesn't move file pointer (but f.seek is necessary on
+                            # Windows when switching from read to write, else exception)
+print &gt;&gt; f, 'hi'            # Writes 'hi\n' to file
+f.tell()                    # Returns 4 (position of file pointer in bytes (Windows))
+f.close()
+
+# Reading &amp; writing file
+f = open(fname, 'r+')       # Opens existing file for reading and writing (no truncating)
+                            # (use mode 'r+b' for binary files - no newline conversion)
+s = f.read()                # Reads entire file as string: 'hi\n'
+f.seek(0)                   # Moves file pointer back to start of file
+                            # (see also f.seek(0, 1) comment above)
+print &gt;&gt; f, 'ho'            # Writes 'ho\n' to file - overwriting previous 'hi\n'
+f.tell()                    # Returns 4 (position of file pointer in bytes (Windows))
+f.close()
+
+# Appending to &amp; reading file (creating it if needed)
+f = open(fname, 'a+')       # (Creates and) opens file for appending and reading
+                            # (use mode 'a+b' for binary files - no newline conversion)
+s = f.read()                # Reads entire file as string: 'ho\n'
+f.tell()                    # Returns 4 (position of file pointer in bytes (Windows))
+f.seek(0)                   # Moves file pointer back to start of file
+                            # (see also f.seek(0, 1) comment above)
+print &gt;&gt; f, 'hum'           # Appends 'hum\n' to end of file; file is now 'ho\nhum\n'
+f.tell()                    # Returns 9 (position of file pointer in bytes (Windows))
+f.close()
+</pre>
+
+<h2>Expressions</h2>
+
+<h3>Operators</h3>
+
+All operators are listed below (<u>highlighted</u>) in precedence groups from highest to lowest.<br>
+Within each group, x op y op z == (x op y) op z, unless otherwise noted.
+
+<pre class="code">
+###########################################################################################
+<u>(</u>2 + 3<u>)</u>                 # Returns 5
+<u>(</u>2, 3, 4<u>)</u>               # Returns tuple (2, 3, 4)
+<u>[</u>2, 3, 4<u>]</u>               # Returns list [2, 3, 4]
+<u>{</u>2: 3, 4: 5<u>}</u>            # Returns dict {2: 3, 4: 5}
+<u>{</u>2, 3, 4<u>}</u>               # Returns set {2, 3, 4}
+<u>`</u>2+3,chr(65)<u>`</u>           # Returns string "(5, 'A')" (same as repr((2+3,chr(65))))
+###########################################################################################
+x<u>[</u>2<u>]</u>                    # Returns item/value with index/key 2 from tuple/list/dict/string x
+                        # (or other object with __getitem__() method)
+x<u>[</u>1:6:2<u>]</u>                # Returns tuple/list/string by extracting slice (indices 1,3,5)
+                        # from x (x can't be a dict)
+x<u>[</u>2, 6:0:-2,            # Returns item(s) from x selected by expression list of indices/
+    slice(6,0,-2), ...<u>]</u> # slices/Ellipsis; built-in types (tuple/list/...) allow only 1
+                        # item between [] (not Ellipsis); numpy module allows any
+f<u>(</u>2, 3, 4<u>)</u>              # Returns result of calling function f with given arguments
+x<u>.</u>y                     # Returns member y of object x
+###########################################################################################
+2<u>**</u>3                    # Returns 8 (exponentiation); 4**3**2 == 4**(3**2) == 262144;
+                        # -2**-2 == -(2**(-2)) == -0.25
+###########################################################################################
+<u>+</u>1                      # Returns 1
+<u>-</u>1                      # Returns -1
+<u>~</u>1                      # Returns -2 (bitwise NOT)
+###########################################################################################
+2 <u>*</u> 3                   # Returns 6
+'hi' <u>*</u> 3                # Returns 'hihihi' (sequence repetition)
+-5.0 <u>/</u> 2                # Returns -2.5; for int/long: -5 / 2 == -3 (floor div)
+-5.0 <u>//</u> 2               # Returns -3.0 (floor div); for int/long: -5 // 2 == -3
+-5 <u>%</u> 3                  # Returns 1 (modulo); x == floor(x/y)*y + x%y
+'%0*d %X' <u>%</u> (5, 3, 12)  # Returns '00003 C' (<a class="toc_ref" href="#String_Formatting">string formatting</a>)
+###########################################################################################
+2 <u>+</u> 3                   # Returns 5
+[1,2] <u>+</u> [3,4]           # Returns [1, 2, 3, 4] (sequence concatenation)
+2 <u>-</u> 3                   # Returns -1
+{1,2,3} <u>-</u> {3,4}         # Returns {1,2} (set difference)
+###########################################################################################
+6 <u>&lt;&lt;</u> 2                  # Returns 24 (left shift); x &lt;&lt; y == x * 2**y; y &gt;= 0
+-6 <u>&gt;&gt;</u> 2                 # Returns -2 (right shift); x &gt;&gt; y == x // 2**y; y &gt;= 0
+###########################################################################################
+6 <u>&amp;</u> 3                   # Returns 2 (bitwise AND)
+{1,2,3} <u>&amp;</u> {3,4}         # Returns {3} (set intersection)
+###########################################################################################
+6 <u>^</u> 3                   # Returns 5 (bitwise XOR)
+{1,2,3} <u>^</u> {3,4}         # Returns {1,2,4} (set symmetric difference)
+###########################################################################################
+6 <u>|</u> 3                   # Returns 7 (bitwise OR)
+{1,2,3} <u>|</u> {3,4}         # Returns {1,2,3,4} (set union)
+###########################################################################################
+# Comparisons and tests (chainable, i.e. x &lt; y &lt; z means x &lt; y and y &lt; z (but y is
+# evaluated only once)):
+5 <u>in</u> (3, 5, 8)          # Returns True (membership test)
+'a' <u>not in</u> 'hi'         # Returns True (non-membership test)
+[] <u>is</u> []                # Returns False (identity test); these lists are not same object
+                        # (but immutable objects <em>might</em> be identical, e.g. maybe 5 is 5)
+{} <u>is not</u> {}            # Returns True (non-identity test)
+2 <u>&lt;</u> 3                   # Returns True
+'ab' <u>&lt;=</u> 'abc'           # Returns True (lexicographic ASCII/Unicode comparison)
+[2,3] <u>&gt;</u> [2]             # Returns True (lexicographic comparison of corresponding items)
+(3,) <u>&gt;=</u> (2,5)           # Returns True (lexicographic comparison of corresponding items)
+{2,3} <u>&gt;</u> {3}             # Returns True (proper superset)
+<s>2 <u>&lt;&gt;</u> 3</s>                  # Obsolete (use != instead)
+2 <u>!=</u> '2'                # Returns True (different types generally compare unequal)
+2L <u>==</u> 2.0               # Returns True (comparison works across different numeric types)
+###########################################################################################
+<u>not</u> 2                   # Returns False (boolean NOT)
+###########################################################################################
+2 <u>and</u> 3                 # Returns 3 (boolean AND, returns 1st arg if False, else 2nd arg;
+                        # 2nd arg is not evaluated if 1st arg is returned)
+###########################################################################################
+0 <u>or</u> 'a'                # Returns 'a' (boolean OR, returns 1st arg if True, else 2nd arg;
+                        # 2nd arg is not evaluated if 1st arg is returned)
+###########################################################################################
+2 <u>if</u> True <u>else</u> 3        # Returns 2 (<a class="toc_ref" href="#Conditional_Expressions">conditional expression</a>);
+                        # 3rd arg is not evaluated if 1st arg is returned, and vice versa;
+                        # (x if a else y if b else z) == (x if a else (y if b else z))
+###########################################################################################
+<u>lambda</u> x,y<u>:</u> x + y       # Returns anonymous function which will return sum of its 2 args
+                        # (<a class="toc_ref" href="#Lambda_Expressions">lambda expression</a>)
+###########################################################################################
+#=========================================================================================#
+# The "operators" below this point are not officially operators, but are included here to #
+# show their effective relative precedence in the special contexts where they are valid   #
+#=========================================================================================#
+###########################################################################################
+f(x<u>=</u>2)                  # Passes named argument to function f, i.e. binds f's formal param
+                        # x to object 2 regardless of x's position in f's parameter list
+f(<u>*</u>[4, 'hi'])           # Passes all items of given iterable as args to function f
+                        # (same as f(4, 'hi'))
+f(<u>**</u>{'x': 2, 'y':3})    # Passes key/value pairs of given dictionary as named args to f
+                        # (same as f(x=2, y=3))
+###########################################################################################
+2<u>,</u> 3                    # Returns tuple (2, 3) or <a class="toc_ref" href="#Expression_Lists">expression list</a> (see enclosing operators
+                        # above and multiple assignments below for uses)
+###########################################################################################
+<u>yield</u> 2                 # Returns 2 to caller of next() or send() on <a class="toc_ref" href="#Generator_Functions">generator</a> produced by
+                        # function containing this yield, suspends generator until next
+                        # call to next()/send(), then returns None or send's argument as
+                        # return value of yield expression
+###########################################################################################
+# Normal assignments (chainable, i.e. x = y = z means x = z, then y = z (but z is
+# evaluated only once); note the counterintuitive left-to-right assignment order!):
+x <u>=</u> 2                   # <a class="toc_ref" href="#Binding_Names_to_Objects">Binds</a> name x to object 2
+o[0] <u>=</u> 2                # Sets item 0 of mutable object o to object 2
+                        # (by calling o.__setitem__(0, 2))
+o.x <u>=</u> 2                 # Sets attribute x of mutable object o to object 2
+                        # (by calling o.__setattr__('x', 2))
+x <u>=</u> o[x] <u>=</u> o[x]         # Chained assignments; same as tmp = o[x]; x = tmp; o[x] = tmp;
+                        # if x and o are initially 0 and [1, 2], they become 1 and [1, 1]
+                        # (o changes due to left-to-right assignment order)
+x, o[0], o.x <u>=</u> 2, 2, 2  # Multiple assignments using <a class="toc_ref" href="#Expression_Lists">expression lists</a>
+# Augmented assignments (not chainable; supports same targets as above except expression
+# lists):
+x <u>+=</u> 2                  # Same as x = x + 2, but x is evaluated only once and updated in
+                        # place if possible
+x <u>-=</u> 2                  # x = x - 2 (but see x += 2)
+x <u>*=</u> 2                  # x = x * 2 (but see x += 2)
+x <u>/=</u> 2                  # x = x / 2 (but see x += 2)
+x <u>//=</u> 2                 # x = x // 2 (but see x += 2)
+x <u>%=</u> 2                  # x = x % 2 (but see x += 2)
+x <u>**=</u> 2                 # x = x ** 2 (but see x += 2)
+x <u>&gt;&gt;=</u> 2                 # x = x &gt;&gt; 2 (but see x += 2)
+x <u>&lt;&lt;=</u> 2                 # x = x &lt;&lt; 2 (but see x += 2)
+x <u>&amp;=</u> 2                  # x = x &amp; 2 (but see x += 2)
+x <u>^=</u> 2                  # x = x ^ 2 (but see x += 2)
+x <u>|=</u> 2                  # x = x | 2 (but see x += 2)
+###########################################################################################
+</pre>
+
+<h3>String Operations</h3>
+
+<pre class="code">
+'hello' + ' there\n'    # Returns 'hello there\n' ('\n' is a single newline)
+'-' * 5                 # Returns '-----'
+ord('A')                # Returns 65
+chr(65)                 # Returns 'A'
+ord(u'\u0E01')          # Returns 3585
+unichr(3585)            # Returns unicode string u'\u0E01' (1 character)
+</pre>
+
+<h4>String Formatting</h4>
+
+There are several ways in which special codes embedded in a string can be replaced at run-time
+with objects converted to strings. The various methods are listed below in order of increasing
+flexibility (and decreasing simplicity).
+
+<pre class="code">
+# Misc initializations for use below
+nbr, astr = 1, 'thing'
+alist = [nbr, astr]
+adict = {'nbr':nbr, 'astr':astr}
+class Aclass: nbr = nbr; astr = astr
+
+anobj = Aclass()
+
+# Template class formatting; simple approach similar to Unix shell variables
+from string import Template
+Template('$n $x or ${x}y $$').substitute(x=astr, n=nbr)     # Returns '1 thing or thingy $'
+
+# Old C printf-style formatting; many formatting options
+'%(n)03d %(x).4s %(x)sy %%' % {'x':astr, 'n':nbr}           # Returns '001 thin thingy %'
+'%03d %.4s %sy' % (nbr, astr, astr)                         # Returns '001 thin thingy'
+'%0*d %.*s %sy' % (3, nbr, 4, astr, astr)                   # Returns '001 thin thingy'
+'"%-6s" "%6s"' % ('left', 'right')                          # Returns '"left  " " right"'
+'%4.1f %.0e %c' % (9, 500, ord('A'))                        # Returns ' 9.0 5e+02 A'
+'%#x 0x%02X %#o' % (10, 10, 10)                             # Returns '0xa 0x0A 012'
+
+# New str.format() formatting; more formatting and object access options than printf-style
+'{0:03d} {x:.4} {x}y {{'.format(nbr, x=astr)                # Returns '001 thin thingy {'
+'{0:{1}{2}d} {x:.{n}} {x}y'.format(nbr, 0, 3, x=astr, n=4)  # Returns '001 thin thingy'
+'{:03d} {:.4} {}y'.format(nbr, astr, astr)                  # Returns '001 thin thingy'
+'{0[0]:03d} {0[1]:.4} {0[1]}y'.format(alist)                # Returns '001 thin thingy'
+'{0[nbr]:03d} {0[astr]:.4} {0[astr]}y'.format(adict)        # Returns '001 thin thingy'
+'{0.nbr:03d} {0.astr:.4} {0.astr}y'.format(anobj)           # Returns '001 thin thingy'
+'{:#&lt;6} {:#^6} {:#&gt;6}'.format('left', 'mid', 'right')       # Returns 'left## #mid## #right'
+'{:4.1f} {:.0e} {:c}'.format(9, 500, ord('A'))              # Returns ' 9.0 5e+02 A'
+'{:#x} 0x{:02X} {:#o} {:#b}'.format(10, 10, 10, 7)          # Returns '0xa 0x0A 012 0b111'
+'{:,.2f} {:06,d}'.format(8e3, 1234)                         # Returns '8,000.00 01,234'
+</pre>
+
+<h3>Conditional Expressions</h3>
+
+<pre class="code">
+r = x if a else y       # Assigns x to r if a is True (y is not evaluated),
+                        # otherwise assigns y to r (x is not evaluated)
+r = x if a \
+    else y if b \
+    else z              # (Note: backslashes used to break single line)
+</pre>
+
+<h3>Regular Expressions</h3>
+
+Compiled regular expression objects are <u>highlighted</u> below for clarity, as many
+module functions (re.xxx()) have compiled object method equivalents (<u>myobj</u>.xxx()),
+but do not support quite the same parameters (module functions support flags;
+compiled object methods support start/end indexes).
+
+<pre class="code">
+import re                   # Imports regular expression module
+
+# Compile and match
+rs1 = r'(\w)(.*?)([0-5](Z)?)'   # Assigns a (raw) string containing a regular expression
+<u>rc1</u> = re.compile(rs1)       # Compiles regular expr for faster repeated execution
+s1 = 'abc950'               # Some string to search for matches
+m1 = re.match(rs1, s1)      # Finds a match at <b>start</b> of string s1, and returns
+                            # a match object - or None if no match was found
+m1 = <u>rc1</u>.match(s1)          # Same as above, but uses compiled regular expression object
+if m1:                      # If a match was found, then...
+    print m1.group()        # Prints 'abc95' - the part of s1 matched by rs1
+    print m1.group(1)       # Prints 'a' - captured by 1st '()' in rs1
+    print m1.group(3, 2)    # Prints "('5', 'bc9')" - from 3rd &amp; 2nd '()' in rs1
+    print m1.groups()       # Prints "('a', 'bc9', '5', None)" - from all '()' in rs1
+                            # Note: non-matching '()' returns None
+    print m1.start()        # Prints 0 - start index of match in s1
+    print m1.end()          # Prints 5 - end index + 1 of match in s1
+    print m1.span()         # Prints '(0, 5)' - start and end of match
+    print m1.start(2)       # Prints 1 - start index of 2nd '()' capture in s1
+    print m1.end(2)         # Prints 4 - end index + 1 of 2nd '()' capture in s1
+    print m1.span(2)        # Prints '(1, 4)' - start and end of 2nd '()'
+
+# Backreferences
+m1 = re.match(r'(\w+)\1', 'hihi')   # \1 matches same as 1st '()' (can't use \g&lt;1&gt; here)
+print m1.groups()                   # Prints "('hi',)"
+
+# Start/end index parameters
+# (WARNING: ONLY compiled object methods (e.g. rc1.match()) support these!
+# If used with module functions (e.g. re.match()), they may be interpreted
+# as flags and you may not get an error - just strange behavior!)
+m1 = <u>rc1</u>.match(s1, 2)       # Finds a match at <b>start</b> of string s1[2:]
+if m1:                      # If a match was found, then...
+    print m1.groups()       # Prints "('c', '9', '5', None)" - from all '()' in rs1
+print <u>rc1</u>.match(s1, 1, 4)   # Prints 'None' because rs1 does not match s1[1:4] ('bc9')
+
+# Search
+s2 = '.20 391Z'                 # A new string to search for matches
+m2 = <u>rc1</u>.search(s2)             # Finds first match in string s2
+if m2:
+    print m2.groups()           # Prints "('2', '', '0', None)" - from all '()' in rs1
+m2 = <u>rc1</u>.search(s2, m2.end())   # Finds first match in string s2 starting from previous end
+if m2:
+    print m2.groups()           # Prints "('3', '9', '1Z', 'Z')" - from all '()' in rs1
+
+# Finditer
+ri1 = <u>rc1</u>.finditer(s2)          # Returns an <a class="toc_ref" href="#Iterator_Types">iterator</a>
+type(ri1)                       # Returns type with name 'callable-iterator'
+print next(ri1).groups()        # Prints "('2', '', '0', None)"
+print next(ri1).groups()        # Prints "('3', '9', '1Z', 'Z')"
+
+# Findall
+print <u>rc1</u>.findall(s2)           # Prints "[('2', '', '0', ''), ('3', '9', '1Z', 'Z')]"
+                                # Note: non-matching '()' returns '' (not None)
+rs3 = r'\d\d'                   # String containing regular expression with no '()'
+s3 = ' 12.345-6789a'            # A new string to search for matches
+print re.findall(rs3, s3)       # Prints "['12', '34', '67', '89']"
+
+# Split
+print re.split(rs3, s3)         # Prints "[' ', '.', '5-', '', 'a']"
+
+# Sub and subn (substitution)
+print re.sub(rs3, 'xy', s3)         # Prints ' xy.xy5-xyxya'
+print re.subn(rs3, 'xy', s3)        # Prints "(' xy.xy5-xyxya', 4)" (4 substitutions)
+print <u>rc1</u>.sub(r'_\1_\g&lt;1&gt;4_', s1)   # Prints '_a_a4_0' (\1 = \g&lt;1&gt; = 1st captured group)
+print <u>rc1</u>.sub(r'(\g&lt;0&gt;)', s1)       # Prints '(abc95)0' (\g&lt;0&gt; = whole match)
+def f(m): return m.group(1).upper() # Function that returns replacement string for a match
+print <u>rc1</u>.sub(f, s1)                # Prints 'A0' (calls function f for each match)
+
+# Flags
+# (WARNING: ONLY module functions (e.g. re.match()) support these!
+# If used with compiled object methods (e.g. rc1.match()), they may be interpreted
+# as indexes and you may not get an error - just strange behavior!)
+rs4 = r'^hi.\w+$'
+<u>rc4</u> = re.compile(rs4,
+        re.I|re.S|re.M)     # Flags: re.I: ignore case, re.S: '.' matches also newline,
+                            # re.M: '^' and '$' match start/end of each line within string
+s4 = 'Hi\nHo\nHi\nHUM'
+print <u>rc4</u>.findall(s4)       # Prints "['Hi\nHo', 'Hi\nHUM']"
+</pre>
+
+<h3>Comprehensions</h3>
+
+For each iteration of the inner (last) 'for' loop,
+the expression <u>highlighted</u> below is evaluated
+to produce another item in the resulting list
+- unless an 'if' condition is false, in which case no item is produced for that iteration.
+
+<pre class="code">
+# List comprehension
+[<u>x * y</u> for x in [1, -1] for y in range(4) if y > x] # Returns list [2, 3, 0, -1, -2, -3]
+
+# Dictionary comprehension
+{<u>x: y</u> for x, y in ((0, 3), (1, 4), (2, 3))}         # Returns dict {0: 3, 1: 4, 2: 3}
+
+# Set comprehension
+{<u>x**2</u> for x in range(4)}                            # Returns set {0, 1, 4, 9}
+
+# Tuple comprehension - has no dedicated syntax,
+# but a <a class="toc_ref" href="#Generator_Expressions">generator expression</a> can be passed to tuple()
+tuple(<u>chr(x)</u> for x in range(65, 67))                # Returns tuple ('A', 'B')
+</pre>
+
+<h3>Generator Expressions</h3>
+
+<pre class="code">
+g = (x for x in 'hello' if x &lt; 'm')     # Assigns a generator object prepared to produce
+                                        # the sequence 'h', 'e', 'l', 'l';
+                                        # generator objects are also <a class="toc_ref" href="#Iterator_Types">iterators</a>
+type(g)                                 # Returns type <i>types.GeneratorType</i> with name
+                                        # 'generator'
+next(g)                                 # Returns 'h', i.e. next (first) item
+next(g)                                 # Returns 'e', i.e. next item
+list(g)                                 # Returns ['l', 'l'], i.e. all remaining items;
+                                        # g is useless now and can't be restarted
+list(g)                                 # Returns []; no more items
+next(g)                                 # Raises StopIteration exception; no more items
+
+g = (x**2 for x in range(5))            # Assigns a new generator object
+for i in g:                             # Assigns each generated item to i in turn
+    if i == 9:                          # If item is 9, then...
+        try:
+            i = next(g)                 # ... skip to next item if any
+        except StopIteration:
+            i = 'end'                   # If no more, set i to 'end' (will not happen)
+    print i                             # Prints '0', '1', '4', '16', one by one
+</pre>
+
+See also <a class="toc_ref" href="#Generator_Functions">generator functions</a>.
+
+<h3>Lambda Expressions</h3>
+
+<pre class="code">
+f = lambda x, y: x + y  # Assigns a lambda expression (anonymous function) that takes 2
+                        # arguments and returns the sum of these; this is basically the
+                        # same as 'def f(x, y): return x + y', except a lambda doesn't
+                        # need to be bound to a name, and is limited to one expression
+type(f)                 # Returns type <i>types.FunctionType</i> with name 'function'
+f(3,5)                  # Calls lambda expression bound to name f; returns 8
+map(lambda x: x**2, range(4))   # Applies lambda to range and returns [0, 1, 4, 9]
+
+g = lambda x: lambda y: x + y   # Binds g to a function which returns a function
+g(3)                            # Returns a function which adds 3 to stuff
+g(3)(4)                         # Returns 7
+</pre>
+
+<h2>Functions</h2>
+
+<h3>Function Definitions and Calls</h3>
+
+<pre class="code">
+# Function definitions
+def f1(x, y=0):         # Arguments may have default values (calculated only once when
+                        # 'def' is executed, so beware if using mutable values, e.g. y=[])
+
+    # Here's a <a class="toc_ref" href="#Comments_and_Docstrings">docstring</a> for this function:
+    """This docstring is accessible via f1.__doc__
+    """
+
+    print x, y
+    if x &gt; y:
+        return          # Exits function with return value None
+    if x &lt; y:
+        return y, x     # Exits function with expression list as return value
+                        # Return value is None if function ends without 'return'
+
+def f2(x, *args, **keyargs): # special * and ** syntax explained below
+    print x,            # Prints first argument (comma at end skips newline in output)
+    print args,         # Prints a tuple of all remaining unnamed arguments
+    print keyargs       # Prints a dict of all remaining named arguments
+
+def f3(x):
+    def g(y):           # Defines an inner function (function object) inside f3
+        return x + y    # Function g uses object referenced by f3's local x, so keeps that
+                        # object in existence after f3 returns
+    return g            # Function f3 returns the created function object (in this case a
+                        # <b>'closure'</b> because it keeps data (x) in an outer scope (f3) alive
+                        # even though that scope has ended when the function is later
+                        # called)
+
+type(f1)                # Returns type <i>types.FunctionType</i> with name 'function' (functions
+                        # are also objects)
+
+# Function calls
+f1(3)                   # Calls f1 which prints '3 0' and returns None
+print f1(3,5)           # Calls f1 which prints '3 5', then prints result '(5, 3)'
+f1(y=5, x=3)            # Passes named arguments to f1 which prints '3 5'
+a1 = [3, 5]
+f1(a1, [4])             # Passes a1 and [4] to f1 which prints '[3, 5] [4]' and returns
+                        # ([4], [3, 5]) because [3,5] is lexicographically smaller than [4]
+f1(*a1)                 # Passes each item of a1 as an argument to f1 which prints '3 5'
+                        # and returns (5, 3)
+d = {'y':5, 'x':3}      # Creates a dictionary
+f1(**d)                 # Passes values of d as named arguments to f1 which prints '3 5'
+f1(*[3], **{'y':5})     # Passes items of list and values of dictionary as arguments
+                        # to f1 which prints '3 5'
+f2(3)                   # Prints '3 () {}'
+f2(3, 4, 5, a=6)        # Prints "3 (4, 5) {'a': 6}"
+
+add10 = f3(10)          # Calls f3 which returns new function that adds 10 to its argument
+print add10(9)          # Calls function add10 and prints return value '19'
+
+f2 = f1                 # (Re-)binds name f2 to same function object as f1
+f2(3)                   # Calls f2 (now same as f1) which prints '3 0' and returns None
+</pre>
+
+Notes:
+<ul>
+<li>If a function modifies (a mutable part of) an object passed as an argument, the change will
+be visible outside the function. But if the function assigns a new value/object to a parameter name,
+this will NOT be visible outside the function. This is because the parameter names inside the
+function are initially references to the same objects that are referenced by the argument names
+outside the function, and an assignment to a parameter name inside the function will simply make
+that name reference a new object without changing the original object nor the outside argument name
+referencing it.
+<li>See <a class="toc_ref" href="#Name_Scope">Name Scope section</a> for more function
+related info.
+</ul>
+
+<h3>Generator Functions</h3>
+
+<pre class="code">
+# Using 'yield'
+def f1(m):              # The yield statement in the body of this function causes it to
+                        # return a generator object, which produces a new item whenever
+                        # the yield statement is reached;
+                        # generator objects are also <a class="toc_ref" href="#Iterator_Types">iterators</a>
+    print '1st'         # Prints '1st' when first item is requested from generator (first
+                        # call to next())
+    end = 5 * m + 1
+    for x in xrange(m, end, m):
+        yield x                 # Returns x to caller of next() on generator object, and
+                                # stops execution until next() is called again, whereafter
+                                # execution continues after yield statement
+
+g = f1(3)               # Assigns the generator object returned from function f1
+type(g)                 # Returns type <i>types.GeneratorType</i> with name 'generator'
+next(g)                 # Prints '1st' and returns 3, i.e. next (first) item of generator
+next(g)                 # Returns 6, i.e. next item
+list(g)                 # Returns [9, 12, 15], i.e. all remaining items;
+                        # g is useless now and can't be restarted (but f1 can be called
+                        # again to get a new generator object)
+list(g)                 # Returns []; no more items
+next(g)                 # Raises StopIteration exception; no more items
+
+# Using 'send' and return value from 'yield'
+def f3(m):              # Identical to f1 above, but allows values to be sent into the
+                        # generator at any time (and returned from yield) to modify its
+                        # behavior while iterating over it
+    print '1st'
+    end = 5 * m + 1
+    x = m
+    while x &lt; end:
+        y = yield x     # Returns x to caller of next() or send(), stops execution until
+                        # next() or send() is called again, then returns None (for next())
+                        # or argument to send(), and resumes execution here
+        x = x + m if y is None else y   # Update next item or use value provided by send()
+
+g = f3(3)               # Assigns the generator object returned from function f3
+g.send(4)               # Raises TypeError exception; can't send non-None value to
+                        # just-started generator (no yield to receive it)
+next(g)                 # Prints '1st' and returns 3, i.e. next (first) item of generator
+next(g)                 # Returns 6, i.e. next item
+g.send(4)               # Sends 4 into generator, which sets next item to 4 and returns 4
+next(g)                 # Returns 7, i.e. next item
+list(g)                 # Returns [10, 13], i.e. all remaining items;
+</pre>
+
+See also <a class="toc_ref" href="#Generator_Expressions">generator expressions</a>.
+
+<h3>Decorators</h3>
+
+<pre class="code">
+from functools import wraps # Imports the 'wraps' decorator factory which copies attributes
+                            # (__name__, __doc__, __module__) from the wrapped function to
+                            # the wrapper function to make the wrapping more transparent
+
+def deco1(f):               # Defines a function deco1 which takes another function and
+                            # returns a modified version of it; any function that takes a
+                            # function or class as its sole argument can be used as a
+                            # decorator regardless of what it returns (see how to use deco1
+                            # below)
+    @wraps(f)               # Applies the 'wraps' decorator factory to f_wrapper1
+    def f_wrapper1(*args):                      # Defines the wrapper function which
+        return 2 * f(args[0] * 10, *args[1:])   # calls the wrapped/decorated function
+    return f_wrapper1       # Returns the wrapper function which will later be called
+                            # instead of the wrapped/decorated function
+
+def deco_factory(inscale, outscale):    # Defines a function deco_factory which uses its
+                            # arguments to produce a function that can be used as a
+                            # decorator; any function that does this can be used as a
+                            # decorator factory (see how to use deco_factory below)
+    def deco2(f):           # Defines a function deco2 similar to deco1 above, but this
+                            # one is customized based on the arguments to deco_factory
+        @wraps(f)
+        def f_wrapper2(*args):
+            return outscale * f(args[0] * inscale, *args[1:])
+        return f_wrapper2
+    return deco2            # Returns the deco2 function
+
+# The following line decorates the myadd1 function with the deco1 function;
+# same as doing myadd1 = deco1(myadd1) after defining myadd1,
+# so the name myadd1 will end up referring to f_wrapper1 which, when called,
+# will call the original myadd1 defined below
+@deco1
+def myadd1(x, y):
+    return x + y
+
+# The following line calls deco_factory and uses the returned function (deco2)
+# as a decorator for the myadd2 function;
+# same as doing myadd2 = deco_factory(100, 10)(myadd2) after defining myadd2,
+# so the name myadd2 will end up referring to f_wrapper2 which, when called,
+# will call the original myadd2 defined below
+@deco_factory(100, 10)
+def myadd2(x, y):
+    return x + y
+
+# Any number of decorators can be applied to the same function; they are applied
+# in reverse order;
+# the following is the same as doing myadd3 = deco_factory(100, 10)(deco1(myadd3))
+# after defining myadd3
+@deco_factory(100, 10)
+@deco1
+def myadd3(x, y):
+    return x + y
+
+myadd1(3, 4)                # Calls f_wrapper1 which calls the original myadd1 and returns
+                            # 68 (the result of 2 * (3 * 10 + 4))
+myadd2(3, 4)                # Calls f_wrapper2 which calls the original myadd2 and returns
+                            # 3040 (the result of 10 * (3 * 100 + 4))
+myadd3(3, 4)                # Calls f_wrapper2 which calls f_wrapper1 which calls the
+                            # original myadd3; returns 60080 (10 * (2 * (3 * 100 * 10 + 4)))
+</pre>
+
+Examples of standard functions often used as decorators are:
+classmethod(), staticmethod(),
+<a class="toc_ref" href="#Property_Attributes">property()</a>, functools.total_ordering().
+Most decorators take a function and return a function, but property() takes a function and returns
+a property object, and functools.total_ordering() takes a class and returns a class.
+Examples of standard functions often used as decorator factories are: functools.wraps().
+
+<h3>Built-in Functions</h3>
+
+<pre class="code">
+__import__()            # TBD
+abs(-3+4j)              # Returns 5.0
+all([True,4,'0'])       # Returns True (Are all items True after conversion to bool? Yes)
+any([False,0,''])       # Returns False (Are any items True after conversion to bool? No)
+<s>apply()</s>                 # TBD
+bin(12)                 # Returns '0b1100' (binary representation of 12)
+bool()                  # Returns a new bool; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+<s>buffer()</s>                # Returns a new buffer; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+bytearray()             # Returns a new bytearray; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+<s>bytes()</s>                 # Same as str() (for forward compatibility with Python 3)
+callable(f)             # Returns True if f appears to be callable (i.e. a function, class,
+                        # or other object with a __call__ method); note that some objects
+                        # (e.g. basestring) appear to be callable but will fail when called
+chr(65)                 # Returns 'A' (character with ASCII code 65)
+classmethod(f)          # Returns a class method for function f (usually used as decorator
+                        # @classmethod, see <a class="toc_ref" href="#Classes">classes</a>)
+cmp(x,y)                # Returns a negative int, 0, or positive int, if x &lt; y, x == y, or
+                        # x &gt; y, respectively
+<s>coerce()</s>                # TBD
+compile('x=3\nprint x', '', 'exec') # Returns a code object which can be executed by exec
+compile('2+5', '', 'eval')          # Returns a code object which can be evaluated by eval()
+complex()               # Returns a new complex; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+delattr(o, 'x')         # Deletes object o's attribute x; same as del o.x
+dict()                  # Returns a new dict; see <a class="toc_ref" href="#Other_Container_Types">other container types</a>
+dir(o)                  # Returns a list of o's attributes, or a list of names in the
+                        # current local scope if no argument is given
+divmod(-5, 3)           # Returns (-2, 1); same as (-5 // 3, -5 % 3)
+enumerate(x)            # Returns a new enumerate; see <a class="toc_ref" href="#Iterator_Types">iterator types</a>
+eval('2+3')             # Returns 5; evaluates any Python expression (or compile() object)
+execfile('myfile')      # Executes Python code in file 'myfile'
+file()                  # Usually only used for isinstance(f, file); see <a class="toc_ref" href="#Files">files</a>.
+filter(f, 'hello')      # Returns 'hllo' if f(x) returns True when x > 'g'
+filter(None, [3,0,''])  # Returns [3] (all True items in list)
+float()                 # Returns a new float; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+format(4, '&lt;03')        # Returns '400' (same as '{:&lt;03}'.format(4), see <a class="toc_ref" href="#String_Operations">string operations</a>)
+frozenset()             # Returns a new frozenset; see <a class="toc_ref" href="#Other_Container_Types">other container types</a>
+getattr(o, 'x', d)      # Returns the value of object o's attribute x (same as o.x), or, if
+                        # o.x doesn't exist, returns d or raises AttributeError if no d
+globals()               # Returns a dict representing the current global symbol table;
+                        # globals()['x'] = 3 is equivalent to global x; x = 3
+hasattr(o, 'x')         # Returns True if object o has attribute x
+hash(o)                 # Returns a hash value (integer) of immutable object o
+help(o)                 # Prints documentation on object o - or topic o if o is a string
+hex(254)                # Returns '0xfe' (hexadecimal respresentation of 254)
+id(o)                   # Returns the unique id (integer) of object o
+input('Your input: ')   # Same as eval(raw_input('Your input: '))
+int()                   # Returns a new int; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+<s>intern()</s>                # TBD
+isinstance(o, c)        # Returns True if o is an instance of class c or of a subclass of c
+                        # - or of any item in c if c is a tuple of classes
+issubclass(c1, c2)      # Returns True if c1 is a subclass of, or identical to, c2 - or any
+                        # item in c2 if c2 is a tuple of classes; c1 must be a class
+iter(o)                 # Returns an iterator for iterable o; see <a class="toc_ref" href="#Iterator_Types">iterator types</a>
+iter(f,x)               # Returns an iterator that calls f with no args until return value
+                        # equals x; see <a class="toc_ref" href="#Iterator_Types">iterator types</a>
+len([6,7,8])            # Returns 3 (number of items in list/tuple/set/...)
+list()                  # Returns a new list; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+locals()                # Returns a dict representing the current local symbol table (this
+                        # dict should not be modified)
+long()                  # Returns a new long; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+map(f, [5,2,6], (3,4))  # Returns ['53', '24', '6None'] if f(x,y) returns str(x)+str(y);
+                        # the number of sequences must match the number of arguments to f
+map(None, [5,2,6], (3,4))   # Returns [(5, 3), (2, 4), (6, None)]
+max(3,5,2)              # Returns 5
+max([3,5,2])            # Returns 5
+memoryview()            # Returns a new memoryview; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+min(3,5,2)              # Returns 2
+min([3,5,2])            # Returns 2
+next(i,d)               # Returns next item from iterator i, or, if no more items, returns
+                        # d or raises StopIteration if no d; see <a class="toc_ref" href="#Iterator_Types">iterator types</a>
+object()                # Returns a new object; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+oct(8)                  # Returns '010' (octal representation of 8)
+open('file', 'w')       # Opens 'file' for writing and returns a file object; see <a class="toc_ref" href="#Files">files</a>
+ord('A')                # Returns 65 (ASCII code of character 'A')
+ord(u'\u0E01')          # Returns 3585 (Unicode code of character u'\u0E01')
+pow(3.0, 2.0)           # Returns 9.0; same as 3.0**2.0;
+pow(3, 2, 4)            # Returns 1; same as 3**2 % 4 but more efficient; all args must be
+                        # integers
+property()              # Returns a new <a class="toc_ref" href="#Property_Attributes">property</a>
+range(2, 11, 3)         # Returns [2, 5, 8] (from 2 to (and not including) 11 with step 3)
+raw_input('Input: ')    # Prints 'Input: ', reads a line from stdin, and returns the line
+                        # (excluding the final newline)
+reduce(f, [1,2,3,4])    # Returns 10 if f(x,y) returns x + y; same as f(f(f(1,2),3),4)
+reduce(f, [2,3,4], 1)   # Returns 10 if f(x,y) returns x + y; same as f(f(f(1,2),3),4)
+reload(mymodule)        # Reloads previously imported module mymodule
+repr(o)                 # Returns a formal string representation of o, preferably one that
+                        # can be executed by eval() to recreate o
+reversed([1,2,3])       # Returns an iterator for the sequence 3,2,1
+reversed('hello')       # Returns an iterator for the sequence 'o','l','l','e','h'
+round(25.16)            # Returns 25.0 (25.16 rounded to 0 digits after the point)
+round(25.16, 1)         # Returns 25.2 (25.16 rounded to 1 digit after the point)
+round(25.16, -1)        # Returns 30.0 (25.16 rounded to 1 digit before the point)
+set()                   # Returns a new set; see <a class="toc_ref" href="#Other_Container_Types">other container types</a>
+setattr(o, 'x', 3)      # Sets object o's attribute x to 3; same as o.x = 3
+slice()                 # Returns a new slice; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+sorted([10,-1,9])       # Returns [-1, 9, 10] (takes the same additional args as o.sort())
+staticmethod(f)         # Returns a static method for function f (usually used as decorator
+                        # @staticmethod, see <a class="toc_ref" href="#Classes">classes</a>)
+str()                   # Returns a new str; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+sum([1,2,3,4])          # Returns 10 (the sum of all items)
+sum([2,3,4], 1)         # Returns 10 (the sum of all items and the 2nd argument)
+super(C, self).m()      # Calls method m of class C's parent/sibling class (the next class
+                        # after C in the method resolution order of self's class) and
+                        # passes object self to that method; see <a class="toc_ref" href="#Class_Inheritance">class inheritance</a>
+tuple()                 # Returns a new tuple; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+type()                  # Returns a new type; see <a class="toc_ref" href="#Basic_Types__Immutable_">basic types</a>
+unichr(3585)            # Returns u'\u0E01' (character with Unicode code 3585)
+unicode()               # Returns a new unicode string; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+vars(o)                 # Returns o.__dict__, or same as locals() if no o
+xrange()                # Returns a new xrange; see <a class="toc_ref" href="#Sequence_Types">sequence types</a>
+zip([5,2,6], (3,4))     # Returns [(5, 3), (2, 4)]; any number of collections supported;
+                        # zip can also unzip, because if x is a list of same-length tuples,
+                        # and y = zip(*x), then x = zip(*y)
+</pre>
+
+<h2>Classes</h2>
+
+<h3>About Classes/Types and Objects</h3>
+
+Types and (new-style) classes (we're ignoring old-style classes here) are basically two terms for
+the same thing, and they are all instances/objects of type/class <b>type</b> and subclasses of
+(i.e. inherit from) type/class <b>object</b>.
+Even <b>type</b> and <b>object</b> are instances of <b>type</b>.
+<p>
+
+Other objects than types/classes will not be instances of <b>type</b> (their __class__ attribute
+will refer to some other type/class) and will not have a superclass tuple (they will not have the
+__bases__ attribute).
+<p>
+
+The UML diagram below illustrates the relationships between various types of objects
+("int:type" means object <b>int</b> is an instance of type/class <b>type</b>, and arrows point
+from subclasses to their superclasses/bases).
+
+<div id="frame">
+<svg viewBox="64.81813 97.060936 435.10635 322.4407">
+    <defs>
+        <marker
+            id="marker9726"
+            orient="auto"
+            refX="0.0"
+            refY="0.0"
+            style="overflow:visible">
+            <path
+                d="M 5.77,0.0 L -2.88,5.0 L -2.88,-5.0 L 5.77,0.0 z "
+                style="fill:#ffffff;stroke:#000000;stroke-width:1pt"
+                transform="scale(0.8) translate(-6,0)" />
+        </marker>
+    </defs>
+    <g>
+        <rect
+            x="64.81813"
+            y="97.060936"
+            width="435.10635"
+            height="322.4407"
+            rx="18"
+            ry="18"
+            style="color:#000000;fill:#cccccc;stroke:#ffffff;stroke-width:1" />
+        <text
+            x="282.37"
+            y="115.91711"
+            style="fill:#000000"
+            xml:space="preserve"><tspan
+                x="282.37"
+                y="115.91711">Objects</tspan></text>
+    </g>
+    <g>
+        <rect
+            style="color:#000000;fill:#d5e5ff;stroke:#ffffff;stroke-width:1"
+            x="75.62838"
+            y="131.7092"
+            width="414.36456"
+            height="209.77502"
+            ry="18"
+            rx="18" />
+        <text
+            xml:space="preserve"
+            style="fill:#0000ff"
+            x="282.37"
+            y="150.56537"><tspan
+                x="282.37"
+                y="150.56537">Types/Classes</tspan></text>
+    </g>
+    <g>
+        <rect
+            style="color:#000000;fill:#ececec;stroke:#ffffff;stroke-width:1"
+            x="75.62838"
+            y="346.44086"
+            width="414.36456"
+            height="64.582436"
+            ry="18"
+            rx="18" />
+        <text
+            xml:space="preserve"
+            style="fill:#808080"
+            x="282.37"
+            y="365.29703"><tspan
+                x="282.37"
+                y="365.29703">Other Objects</tspan></text>
+    </g>
+    <path class="arrow"
+       d="m 148.28806,237.06807 0,-46.90475" />
+    <path class="arrow"
+       d="m 275.144,237.06807 0,-46.90475" />
+    <path class="arrow"
+       d="m 409.6666,237.06807 0,-46.90475" />
+    <path class="arrow"
+       d="m 399.66661,308.01899 0,-46.90475" />
+    <g>
+        <rect
+            style="fill:#ffffff;stroke:#000000;stroke-width:1"
+            x="96.495262"
+            y="166.42252"
+            width="372.6308"
+            height="23.333336" />
+        <text
+            xml:space="preserve"
+            x="282.82"
+            y="182.23836"><tspan
+                x="282.82"
+                y="182.23836"
+                style="fill:#000000">object:<tspan
+                style="fill:#0000ff">type</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            style="fill:#ffffff;stroke:#0000ff;stroke-width:1"
+            width="104.6308"
+            height="23.333336"
+            x="95.972656"
+            y="237.22568" />
+        <text
+            xml:space="preserve"
+            style="fill:#0000ff"
+            x="148.29"
+            y="252.64966"><tspan
+                x="148.29"
+                y="252.64966">type:type</tspan></text>
+    </g>
+    <g>
+        <rect
+            style="fill:#ffffff;stroke:#008000;stroke-width:1"
+            width="104.6308"
+            height="23.333336"
+            x="222.8286"
+            y="237.22568" />
+        <text
+            xml:space="preserve"
+            x="275.14"
+            y="252.87305"><tspan
+                x="275.14"
+                y="252.87305"
+                style="fill:#008000">int:<tspan
+                style="fill:#0000ff">type</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            style="fill:#ffffff;stroke:#800000;stroke-width:1"
+            width="119.96413"
+            height="23.333336"
+            x="349.68454"
+            y="237.22566" />
+        <text
+            xml:space="preserve"
+            x="409.67"
+            y="253.08177"><tspan
+                x="409.67"
+                y="253.08177"
+                style="fill:#800000">Myclass:<tspan
+                style="fill:#0000ff">type</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            style="fill:#ffffff;stroke:#ff0000;stroke-width:1"
+            width="139.29745"
+            height="23.333336"
+            x="330.01788"
+            y="308.02884" />
+        <text
+            xml:space="preserve"
+            x="399.67"
+            y="323.88495"><tspan
+                x="399.67"
+                y="323.88495"
+                style="fill:#ff0000">Mysubclass:<tspan
+                style="fill:#0000ff">type</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            x="96.97863"
+            y="377.75864"
+            width="57.96175"
+            height="23.333336"
+            style="fill:#ffffff;stroke:#808080;stroke-width:1" />
+        <text
+            x="125.96"
+            y="394"
+            xml:space="preserve"><tspan
+                x="125.96"
+                y="394"
+                style="fill:#808080">42:<tspan
+                style="fill:#008000">int</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            x="167.35657"
+            y="377.75864"
+            width="85.080193"
+            height="23.333336"
+            style="fill:#ffffff;stroke:#808080;stroke-width:1" />
+        <text
+            x="209.90"
+            y="394"
+            xml:space="preserve"><tspan
+                x="209.90"
+                y="394"
+                style="fill:#808080">x:<tspan
+                style="fill:#800000">Myclass</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            x="264.85294"
+            y="377.75864"
+            width="109.59322"
+            height="23.333336"
+            style="fill:#ffffff;stroke:#808080;stroke-width:1" />
+        <text
+            x="319.65"
+            y="394"
+            xml:space="preserve"><tspan
+                x="319.65"
+                y="394"
+                style="fill:#808080">y:<tspan
+                style="fill:#ff0000">Mysubclass</tspan></tspan></text>
+    </g>
+    <g>
+        <rect
+            x="386.86234"
+            y="377.75864"
+            width="81.780357"
+            height="23.333336"
+            style="fill:#ffffff;stroke:#808080;stroke-width:1" />
+        <text
+            x="427.75"
+            y="394"
+            xml:space="preserve"><tspan
+                x="427.75"
+                y="394"
+                style="fill:#808080">o:<tspan
+                style="fill:#000000">object</tspan></tspan></text>
+    </g>
+</svg>
+</div>
+
+<h3>Class Creation and Instantiation</h3>
+
+<pre class="code">
+# Class definitions
+class Myclass(object):  # New-style classes must inherit from 'object' or any other class
+                        # inheriting from 'object' (e.g. any <a class="toc_ref" href="#Types">built-in Python type</a>)
+
+    # Here's a <a class="toc_ref" href="#Comments_and_Docstrings">docstring</a> for this class:
+    """This docstring is accessible via Myclass.__doc__
+    or e.g. o1.__doc__ where o1 is an instance of Myclass.
+    """
+
+    n = 3               # Defines a class variable, shared by all instances of this class
+
+    @staticmethod       # <a class="toc_ref" href="#Decorators">Decorator</a> that defines a static method to be invoked on the class
+    def setn(n):        # itself (or optionally on instances of the class)
+        Myclass.n = n   # Updates the class variable
+
+    @classmethod        # <a class="toc_ref" href="#Decorators">Decorator</a> that defines a class method to be invoked on the class
+    def setn2(cls, n):  # itself (or optionally on instances of the class); first arg is
+                        # the class, conventionally named 'cls'
+        cls.n = n       # Updates the class variable
+
+    def __init__(self, x):  # Defines the instance constructor; first arg is the instance,
+                            # conventionally named 'self' (like 'this' in C++)
+        self.x = x          # Creates an instance variable belonging to the given instance
+
+    def add(self, y):       # Defines an instance method to be invoked on a given instance
+        self.x += (y *      # Updates the previously created instance variable
+            self.n)         # Class variables may be read (not written!) via 'self'
+                            # (if written, a new instance variable is created hiding the
+                            # class variable!)
+
+    def __str__(self):      # Defines informal nicely printable string representation of
+                            # an instance of this class
+        return str(self.x)  # Returns instance variable converted to string
+
+    def __repr__(self):     # Defines formal string representation of an instance of this
+                            # class, preferably executable by eval() to recreate instance
+        return 'Myclass(%d)' % self.x
+
+    def __getitem__(self, item):        # Defines <a class="toc_ref" href="#Special_Methods">special method</a> for getting indexed item
+        print 'get', item
+        t = item if isinstance(item, tuple) else (item,) # Make item a tuple if not already
+        for i in t:                                      # Step through tuple
+            if isinstance(i, slice):                     # Handle slice by expanding it to
+                print range(*i.indices(self.n)),         # list (self.n sets index limit)
+            elif i == Ellipsis:                          # Handle Ellipsis object by just
+                print '...',                             # printing 3 dots
+            else:
+                print i,
+        print
+        return self.x
+
+    def __setitem__(self, key, val):    # Defines <a class="toc_ref" href="#Special_Methods">special method</a> for setting indexed item
+        print 'set', key, val
+
+    def __add__(self, other):           # Defines <a class="toc_ref" href="#Special_Methods">special method</a> overriding '+' operator
+        return self.x + other
+
+    def __radd__(self, other):          # Defines <a class="toc_ref" href="#Special_Methods">special method</a> overriding '+' operator if
+                                        # this object is 2nd arg and other.__add__()
+                                        # returned NotImplemented
+        return self.x + other + self.n
+
+type(Myclass)               # Returns type <i>type</i>; same as Myclass.__class__
+isinstance(Myclass, type)   # Returns True
+issubclass(Myclass, object) # Returns True
+Myclass.__name__            # Returns 'Myclass'
+Myclass.__bases__           # Returns (object,) (tuple of base classes)
+Myclass.mro()               # Returns [Myclass, object]
+                            # (method resolution order: order in which classes are searched
+                            # for a method definition)
+Myclass.n                   # Returns 3
+type(Myclass.setn)          # Returns type <i>types.FunctionType</i> with name 'function'
+type(Myclass.setn2)         # Returns type <i>types.MethodType</i> with name 'instancemethod'
+type(Myclass.add)           # Returns type <i>types.MethodType</i> with name 'instancemethod'
+                            # (unbound method)
+Myclass.add.__self__        # Returns None (this method is not bound to an instance object)
+Myclass.add.__func__        # Returns underlying 'add' function; calling Myclass.add is
+                            # same as calling Myclass.add.__func__
+
+# Old-style classes (can't do as much as new-style classes, so best not to use them)
+class Myoldclass:       # Old-style classes don't inherit from 'object', even indirectly
+    pass
+type(Myoldclass)        # Returns type with name 'classobj'
+
+# Dynamically defined classes
+type('Mydynclass', (Myclass,), {'n': 4})    # Creates and returns a class with __name__ ==
+                        # 'Mydynclass' but not bound to any name in current namespace;
+                        # this class inherits from Myclass and sets class variable n to 4;
+                        # the class will be lost unless a reference to it is saved, e.g.
+                        # Someclass = type('Mydynclass', ...)
+
+# Instantiation
+o1 = Myclass(10)        # Creates an object as an instance of class 'Myclass' and runs
+                        # the __init__ constructor with parameter x = 10
+type(o1)                # Returns class <i>Myclass</i>; same as o1.__class__
+type(o1.add)            # Returns type <i>types.MethodType</i> with name 'instancemethod'; more
+                        # about method objects below
+o2 = Myclass(20)        # Creates a second instance of the same class using x = 20
+o1.x                    # Returns 10
+o2.x                    # Returns 20
+o1.n                    # Returns 3 (the value of class variable n)
+str(o1)                 # Returns '10' (return value from o1.__str__())
+repr(o1)                # Returns 'Myclass(10)' (return value from o1.__repr__())
+dir(o1)                 # Returns list of all o1's attributes: [..., '__doc__', ...,
+                        # '__init__', ..., 'add', 'n', 'setn', 'setn2', 'x']
+
+o1[4]                   # Calls o1.__getitem__(4)
+o1[::-1] = 2            # Calls o1.__setitem__(slice(None,None,-1),2); see <a class="toc_ref" href="#Basic_Types__Immutable_">slice</a>
+o1[2,:3,...]            # Calls o1.__getitem__((2,slice(None,3,None),Ellipsis))
+                        # (note: this extended syntax is not supported by built-in types
+                        # such as list and tuple)
+
+o1 + 4                  # Calls o1.__add__(4) which returns 14
+5 + o1                  # Calls o1.__radd__(5) (when (5).__add__(o1) returns NotImplemented)
+                        # which returns 18
+o1.add(2)               # Passes 2 to the 'add' method of o1 which updates o1's x;
+                        # equivalent to Myclass.add(o1, 2)
+o1.x                    # Returns 16 (2 * 3 was added to the previous value 10)
+o2.x                    # Returns 20 (no change)
+
+Myclass.setn(5)         # Changes the class variable n value to 5
+Myclass.setn2(5)        # Same effect as above (Myclass is automatically passed as 1st arg
+                        # to setn2, and 5 becomes 2nd arg)
+Myclass.n = 5           # Same effect as above
+o1.setn(5)              # Same effect as above (o1 is only used to access Myclass)
+o1.setn2(5)             # Same effect as above (o1 is only used to access Myclass)
+                        # (don't do o1.n = 5, it hides the class variable from o1)
+o1.n                    # Returns 5
+o2.n                    # Returns 5 (same class var n is accessed from any instance)
+
+o2.add(-1)
+o1.x                    # Returns 16
+o2.x                    # Returns 15 (-1 * 5 was added to 20)
+
+o1.s = 'hi'             # Creates a new instance variable on o1 only
+Myclass.k = 100         # Creates a new class variable (visible in all existing and new
+                        # instances)
+
+# Bound method objects
+o1a = o1.add            # Assigns a bound method object referencing o1's 'add' method (a
+                        # new object is created every time a user defined method is
+                        # accessed like this, so (o1.add is o1.add) evaluates to False!)
+type(o1a)               # Returns type <i>types.MethodType</i> with name 'instancemethod'
+o1a.__self__            # Returns o1
+o1a.__func__            # Returns Myclass.add.__func__
+o1a(4)                  # Passes 4 to o1's 'add' method, which updates o1's x
+o1.x                    # Returns 36 (4 * 5 was added to 16)
+
+# Built-in function/method objects
+ss = 'abba'.strip       # Assigns a bound method object referencing the built-in strip
+                        # method of string 'abba'
+type(ss)                # Returns type <i>types.BuiltinFunctionType</i> with name
+                        # 'builtin_function_or_method'
+ss.__self__             # Returns 'abba'
+<s>ss.__func__</s>             # ILLEGAL! Built-in methods don't have the __func__ attribute
+ss('a')                 # Returns 'bb' (same as 'abba'.strip('a'))
+type(len)               # Returns type <i>types.BuiltinFunctionType</i> with name
+                        # 'builtin_function_or_method'; built-in functions belong to the
+                        # '__builtin__' module (which is hidden unless explicitly imported),
+                        # but - unlike in Python 3 - they are not bound methods of that
+                        # module
+len.__self__            # Returns None (built-in functions are not bound)
+</pre>
+
+<h3>Class Inheritance</h3>
+
+<pre class="code">
+class A(list):                          # Defines a class A which inherits from list (which
+                                        # inherits from object)
+    def __str__(self):                  # Overrides list's __str__ method in order to...
+        return ('A:' +                  # ... prepend 'A:' to...
+            super(A, self).__str__())   # ... whatever is returned from __str__() of the
+                                        # next classes in the method resolution order (i.e.
+                                        # the previous classes in the inheritance order);
+                                        # the next class is list when self is an instance
+                                        # of A, but B when self is an instance of C!
+
+class B(list):                          # Defines a class B just like A, except...
+    def __str__(self):
+        return ('B:' +                  # ... prepend 'B:' to...
+            super(B, self).__str__())   # ... whatever is returned from __str__() of the
+                                        # next classes in the method resolution order; the
+                                        # next class is list when self is an instance of
+                                        # either B or C
+
+class C(A, B):                          # Defines a class C which inherits primarily from A
+                                        # and secondarily from B
+    def __str__(self):                  # Overrides the __str__ method in order to...
+        return ('C:' +                  # ... prepend 'C:' to...
+            super(C, self).__str__())   # ... whatever is returned from __str__() of the
+                                        # next classes in the method resolution order; the
+                                        # next class is A when self is an instance of C
+
+C.__bases__ # Returns (A, B)
+
+# Method resolution order (MRO) for classes A, B, and C (see notes)
+A.mro()     # Returns [A, list, object]; this means that A().__str__() will first look for
+            # an __str__ method in class A, then in class list, then in class object, until
+            # a class is found which has the method
+B.mro()     # Returns [B, list, object]
+C.mro()     # Returns [C, A, B, list, object]
+
+a = A([0])  # Assigns an instance of class A initialized by calling a.__init__([0]) which
+            # resolves to list.__init__(a,[0]) (list is 1st class with __init__ in A.mro())
+            # which sets the initial value to [0]
+b = B([1])  # Assigns an instance of class B initialized to [1] by list.__init__(b,[1])
+c = C([2])  # Assigns an instance of class C initialized to [2] by list.__init__(c,[2])
+
+print a     # Prints 'A:[0]', because print calls a.__str__()
+            # which resolves to A.__str__(a) (A is a's class and has __str__)
+            # which calls super(A, a).__str__()
+            # which resolves to list.__str__(a) (list follows A in A.mro() and has __str__)
+            # which returns '[0]' to A.__str__
+            # which returns 'A:[0]' to print
+print b     # Prints 'B:[1]', because print calls b.__str__()
+            # which resolves to B.__str__(b) (B is b's class and has __str__)
+            # which calls super(B, b).__str__()
+            # which resolves to list.__str__(b) (list follows B in B.mro() and has __str__)
+            # which returns '[1]' to B.__str__
+            # which returns 'B:[1]' to print
+print c     # Prints 'C:A:B:[2]', because print calls c.__str__()
+            # which resolves to C.__str__(c) (C is c's class and has __str__)
+            # which calls super(C, c).__str__()
+            # which resolves to A.__str__(c) (A follows C in C.mro() and has __str__)
+            # which calls super(A, c).__str__()
+            # which resolves to B.__str__(c) (B follows A in C.mro() and has __str__)
+            # which calls super(B, c).__str__()
+            # which resolves to list.__str__(c) (list follows B in C.mro() and has __str__)
+            # which returns '[2]' to B.__str__
+            # which returns 'B:[2]' to A.__str__
+            # which returns 'A:B:[2]' to C.__str__
+            # which returns 'C:A:B:[2]' to print
+</pre>
+
+Notes on method resolution order (MRO):
+<ul>
+<li>The MRO is the order in which the inheritance hierarchy of classes is searched for a matching
+method when a method is called on an instance of the given class (e.g. c.__str__() is resolved
+by searching for the method __str__ in the classes given by C's MRO: C, A, B, list, object,
+and in this case it is found already in C).
+
+<li>The MRO is also used by the super() function to search for a matching method in the hierarchy
+above a given class (e.g. super(A, c).__str__() is resolved by searching for the method __str__
+in the classes following A in C's MRO, and in this case it is found in B).
+
+<li>When inheriting from multiple classes (like class C does), those classes are generally
+searched depth-first in the order they are given (first A, then A's ancestors, then B, then B's
+ancestors); however, if there's a common ancestor somewhere in the hierarchy (like list
+for C), then all descendants of that ancestor are searched before searching that ancestor
+itself (so both A and B are searched before list, whereas a depth-first search would have
+searched A, then list, then B).
+</ul>
+
+<h3>Property Attributes</h3>
+
+The built-in function property(), which creates a property object, can be used as a
+<a class="toc_ref" href="#Decorators">decorator</a> to define functions to be called
+whenever a certain class attribute is read, written, or deleted.
+
+<pre class="code">
+class C(object):
+    def __init__(self, v):  # Defines the instance constructor
+        self._x = float(v)  # Initializes an instance variable which is not supposed to be
+                            # accessed directly from outside class C
+
+    @property               # Creates a property attribute x whose __get__() method is
+    def x(self):            # this function (function name becomes property name)
+        return self._x
+
+    @x.setter               # Sets the __set__() method of property x to
+    def x(self, v):         # this function (use same name for function and property)
+        self._x = float(v)
+
+    @x.deleter              # Sets the __delete__() method of property x to
+    def x(self):            # this function (use same name for function and property)
+        del self._x
+
+type(C.x)                   # Returns type <i>property</i>
+isinstance(C.x, property)   # Returns True
+
+c = C(1)                    # Assigns a new instance of class C with c._x set to 1.0
+c._x                        # Returns 1.0 (but we're not supposed to access _x directly)
+c.x                         # Returns 1.0 (calls our getter C.x.__get__(c))
+c.x = 2                     # Sets c._x to 2.0 (calls our setter C.x.__set__(c, 2))
+c.x                         # Returns 2.0 (calls our getter C.x.__get__(c))
+del c.x                     # Deletes c._x (calls our deleter C.x.__delete__(c))
+c.x                         # Raises AttributeError exception because c._x doesn't exist
+c.x = 3                     # Sets c._x to 3.0 (calls our setter C.x.__set__(c, 3))
+c.x                         # Returns 3.0 (calls our getter C.x.__get__(c))
+</pre>
+
+<h3>Special Methods</h3>
+
+Certain special methods - if defined in the class hierarchy of an object (not on the object itself) - are automatically
+called when certain built-in Python functions, statements, or syntax are applied to that object, and such calls are
+never redirected to the __getattr__ or __getattribute__ methods even if those exist.
+Built-in Python classes themselves have many of these special methods.
+<p>
+
+In the list below, all methods are instance methods unless specifically stated to be static methods or class methods
+(the @staticmethod and @classmethod <a class="toc_ref" href="#Decorators">decorators</a> are unnecessary for special
+methods defined within the body of a class definition - the methods are automatically converted to the correct type),
+and the methods are assumed to have been defined in a class C of which object o is in instance, like this:
+
+<pre class="code">
+class C(object):
+    def __new__(cls, *args, **kwargs): pass
+    def __init__(self, *args, **kwargs): pass
+    # ...etc...
+
+o = C()
+</pre>
+
+List of special methods along with examples of code that causes them to be called:
+
+<pre class="code">
+# Object creation/deletion
+o = C.__new__(C)            # Static method; called by <u>o = C()</u> to create object of class C
+o.__init__()                # Called by <u>o = C()</u> to initialize object created by __new__()
+o.__del__()                 # Called by <u>del o; gc.collect()</u>, i.e. when o is garbage
+                            # collected after last reference to it has been removed
+
+# Object attribute access
+y = o.__getattr__('x')      # Called by <u>y = o.x</u> if o.x and o.__getattribute__ don't exist,
+                            # or if o.__getattribute__('x') raises AttributeError
+y = o.__getattribute__('x') # Called by <u>y = o.x</u>
+o.__setattr__('x', 5)       # Called by <u>o.x = 5</u>
+o.__delattr__('x')          # Called by <u>del o.x</u>
+y = o.__dir__()             # Called by <u>y = dir(o)</u>
+
+# Container object item access
+y = o.__len__()             # Called by <u>y = len(o)</u>
+y = o.__getitem__(3)        # Called by <u>y = o[3]</u>
+o.__setitem__(3, 9)         # Called by <u>o[3] = 9</u>
+o.__delitem__(3)            # Called by <u>del o[3]</u>
+y = o.__getslice__(3, 9)    # Deprecated; TBD
+o.__setslice__(3, 9, o2)    # Deprecated; TBD
+o.__delslice__(3, 9)        # Deprecated; TBD
+y = o.__contains__(3)       # Called by <u>y = 3 in o</u>
+y = o.__iter__()            # Called by <u>y = iter(o)</u>
+y = o.__reversed__()        # Called by <u>y = reversed(o)</u>
+y = o.__missing__(3)        # Called by <u>y = o[3]</u> (from within dict.__getitem__(3)) if o's
+                            # class inherits from dict and o[3] doesn't exist
+
+# Object conversion
+y = o.__repr__()            # Called by <u>y = repr(o)</u>
+y = o.__str__()             # Called by <u>y = str(o)</u>
+y = o.__unicode__()         # Called by <u>y = unicode(o)</u>
+y = o.__format__('^6')      # Called by <u>y = format(o, '^6')</u> or <u>y = '{:^6}'.format(o)</u>
+y = o.__nonzero__()         # Called by <u>y = bool(o)</u>
+y = o.__hash__()            # Called by <u>y = hash(o)</u>
+y = o.__int__()             # Called by <u>y = int(o)</u>
+y = o.__long__()            # Called by <u>y = long(o)</u>
+y = o.__float__()           # Called by <u>y = float(o)</u>
+y = o.__complex__()         # Called by <u>y = complex(o)</u>
+y = o.__coerce__()          # TBD
+
+# Object calling
+y = o.__call__()            # Called by <u>y = o()</u>
+
+# Context management
+y = o.__enter__()           # Called when entering <u>with o as y: pass</u>
+o.__exit__(None, None, None)# Called when exiting <u>with o as y: pass</u> (if no exceptions)
+o.__exit__(excp_type, excp_val, traceback)  # Called when exiting <u>with o as y: raise excp</u>
+
+# Object comparison
+y = o.__lt__(o2)            # Called by <u>y = o &lt; o2</u>, or by <u>y = o2 &gt; o</u> if o's type is
+                            # subclass of o2's type or if o2.__gt__(o) returns
+                            # NotImplemented
+y = o.__le__(o2)            # Called by <u>y = o &lt;= o2</u>, or by <u>y = o2 &gt;= o</u> if o's type is
+                            # subclass of o2's type or if o2.__ge__(o) returns
+                            # NotImplemented
+y = o.__eq__(o2)            # Called by <u>y = o == o2</u>, or by <u>y = o2 == o</u> if o's type is
+                            # subclass of o2's type or if o2.__eq__(o) returns
+                            # NotImplemented
+y = o.__ne__(o2)            # Called by <u>y = o != o2</u>, or by <u>y = o2 != o</u> if o's type is
+                            # subclass of o2's type or if o2.__ne__(o) returns
+                            # NotImplemented
+y = o.__gt__(o2)            # Called by <u>y = o &gt; o2</u>, or by <u>y = o2 &lt; o</u> if o's type is
+                            # subclass of o2's type or if o2.__lt__(o) returns
+                            # NotImplemented
+y = o.__ge__(o2)            # Called by <u>y = o &gt;= o2</u>, or by <u>y = o2 &lt;= o</u> if o's type is
+                            # subclass of o2's type or if o2.__le__(o) returns
+                            # NotImplemented
+y = o.__cmp__(o2)           # TBD
+y = o.__rcmp__(o2)          # TBD
+
+# Unary arithmetic operations
+y = o.__neg__()             # Called by <u>y = -o</u>
+y = o.__pos__()             # Called by <u>y = +o</u>
+y = o.__abs__()             # Called by <u>y = abs(o)</u>
+y = o.__invert__()          # Called by <u>y = ~o</u>
+y = o.__trunc__()           # Called by <u>y = math.trunc(o)</u>
+y = o.__index__()           # Called by <u>y = operator.index(o)</u> or <u>'hello'[:o]</u> (returns
+                            # 'hello'[:y]) or <u>bin(o)</u> (returns bin(y)) or wherever an exact
+                            # integer is needed
+y = o.__hex__()             # Called by <u>y = hex(o)</u>
+y = o.__oct__()             # Called by <u>y = oct(o)</u>
+
+# Binary arithmetic operations
+y = o.__add__(o2)           # Called by <u>y = o + o2</u> (but see __radd__)
+y = o.__sub__(o2)           # Called by <u>y = o - o2</u> (but see __rsub__)
+y = o.__mul__(o2)           # Called by <u>y = o * o2</u> (but see __rmul__)
+y = o.__div__(o2)           # Called by <u>y = o / o2</u> (but see __rtruediv__)
+y = o.__floordiv__(o2)      # Called by <u>y = o // o2</u> (but see __rfloordiv__)
+y = o.__mod__(o2)           # Called by <u>y = o % o2</u> (but see __rmod__)
+y = o.__divmod__(o2)        # Called by <u>y = divmod(o, o2)</u> (but see __rdivmod__)
+y = o.__pow__(o2)           # Called by <u>y = o ** o2</u> or <u>y = pow(o, o2)</u> (but see __rpow__)
+y = o.__pow__(o2, 5)        # Called by <u>y = pow(o, o2, 5)</u> (no __rpow__ variant)
+y = o.__lshift__(o2)        # Called by <u>y = o &lt;&lt; o2</u> (but see __rlshift__)
+y = o.__rshift__(o2)        # Called by <u>y = o &gt;&gt; o2</u> (but see __rrshift__)
+y = o.__and__(o2)           # Called by <u>y = o &amp; o2</u> (but see __rand__)
+y = o.__or__(o2)            # Called by <u>y = o | o2</u> (but see __ror__)
+y = o.__xor__(o2)           # Called by <u>y = o ^ o2</u> (but see __rxor__)
+
+# Reverse binary arithmetic operations
+y = o.__radd__(o2)          # Called by <u>y = o2 + o</u> if o's type is subclass of o2's
+                            # type or if o2.__add__(o) returns NotImplemented
+y = o.__rsub__(o2)          # Called by <u>y = o2 - o</u> if o's type is subclass of o2's
+                            # type or if o2.__sub__(o) returns NotImplemented
+y = o.__rmul__(o2)          # Called by <u>y = o2 * o</u> if o's type is subclass of o2's
+                            # type or if o2.__mul__(o) returns NotImplemented
+y = o.__rdiv__(o2)          # Called by <u>y = o2 / o</u> if o's type is subclass of o2's
+                            # type or if o2.__truediv__(o) returns NotImplemented
+y = o.__rfloordiv__(o2)     # Called by <u>y = o2 // o</u> if o's type is subclass of o2's
+                            # type or if o2.__floordiv__(o) returns NotImplemented
+y = o.__rmod__(o2)          # Called by <u>y = o2 % o</u> if o's type is subclass of o2's
+                            # type or if o2.__mod__(o) returns NotImplemented
+y = o.__rdivmod__(o2)       # Called by <u>y = divmod(o2, o)</u> if o's type is subclass of o2's
+                            # type or if o2.__divmod__(o) returns NotImplemented
+y = o.__rpow__(o2)          # Called by <u>y = o2 ** o</u> or <u>y = pow(o2, o)</u> if o's type is
+                            # subclass of o2's type or if o2.__pow__(o) returns
+                            # NotImplemented
+                            # pow(o2, o, 5) always calls o2.__pow__(o, 5), never __rpow__
+y = o.__rlshift__(o2)       # Called by <u>y = o2 &lt;&lt; o</u> if o's type is subclass of o2's
+                            # type or if o2.__lshift__(o) returns NotImplemented
+y = o.__rrshift__(o2)       # Called by <u>y = o2 &gt;&gt; o</u> if o's type is subclass of o2's
+                            # type or if o2.__rshift__(o) returns NotImplemented
+y = o.__rand__(o2)          # Called by <u>y = o2 &amp; o</u> if o's type is subclass of o2's
+                            # type or if o2.__and__(o) returns NotImplemented
+y = o.__ror__(o2)           # Called by <u>y = o2 | o</u> if o's type is subclass of o2's
+                            # type or if o2.__or__(o) returns NotImplemented
+y = o.__rxor__(o2)          # Called by <u>y = o2 ^ o</u> if o's type is subclass of o2's
+                            # type or if o2.__xor__(o) returns NotImplemented
+
+# Augmented arithmetic assignment
+o = o.__iadd__(o2)          # Called by <u>o += o2</u> (falls back to o = o + o2 if no __iadd__)
+o = o.__isub__(o2)          # Called by <u>o -= o2</u>
+o = o.__imul__(o2)          # Called by <u>o *= o2</u>
+o = o.__idiv__(o2)          # Called by <u>o /= o2</u>
+o = o.__ifloordiv__(o2)     # Called by <u>o //= o2</u>
+o = o.__imod__(o2)          # Called by <u>o %= o2</u>
+o = o.__ipow__(o2)          # Called by <u>o **= o2</u>
+o = o.__ilshift__(o2)       # Called by <u>o &lt;&lt;= o2</u>
+o = o.__irshift__(o2)       # Called by <u>o &gt;&gt;= o2</u>
+o = o.__iand__(o2)          # Called by <u>o &amp;= o2</u>
+o = o.__ior__(o2)           # Called by <u>o |= o2</u>
+o = o.__ixor__(o2)          # Called by <u>o ^= o2</u>
+</pre>
+
+<h2>Modules</h2>
+
+<h3>Module Creation and Usage</h3>
+
+File mymodule.py:
+<pre class="code">
+# Here's a <a class="toc_ref" href="#Comments_and_Docstrings">docstring</a> for this module:
+"""Any Python file can be imported as a module,
+or run as a top level script.
+"""
+
+def f(x):
+    return x * 2
+
+if __name__ == '__main__':      # If this file is run as a script, its module name is
+                                # '__main__',
+    print f(10)                 # in which case call f and print the result '20'
+else:                           # Otherwise, this file is imported as a module,
+    print 'Module:', __name__   # so print 'Module: mymodule'
+</pre>
+
+Some other Python file:
+<pre class="code">
+import mymodule         # Runs mymodule.py; puts all its names into namespace 'mymodule';
+                        # the module prints 'Module: mymodule'
+import os, re           # Imports multiple modules in same statement
+type(mymodule)          # Returns type <i>types.ModuleType</i> with name 'module'
+print mymodule.f(8)     # Calls mymodule's function f, and prints result '16'
+print mymodule.__doc__  # Prints mymodule's docstring: 'Any Python file can be ...'
+print __doc__           # Prints 'None' (this module has no docstring)
+</pre>
+
+Some other Python file:
+<pre class="code">
+import mymodule as m    # Runs mymodule.py; puts all its names into namespace 'm';
+                        # the module prints 'Module: mymodule'
+import os as o, re as r # Imports multiple modules in same statement
+print m.f(8)            # Calls mymodule's function f, and prints result '16'
+</pre>
+
+Some other Python file:
+<pre class="code">
+from mymodule import f  # Runs mymodule.py; puts its name f into our namespace;
+                        # the module prints 'Module: mymodule'
+from re import sub, subn    # Imports multiple names from module in same statement
+print f(8)              # Calls function f (defined in mymodule), and prints result '16'
+</pre>
+
+Some other Python file:
+<pre class="code">
+from mymodule import f as g # Runs mymodule.py; binds name g in our namespace to whatever
+                            # mymodule's name f is bound to;
+                            # the module prints 'Module: mymodule'
+from re import sub as s, subn as sn # Imports multiple names from module in same statement
+print g(8)              # Calls function g (f in mymodule), and prints result '16'
+</pre>
+
+Some other Python file:
+<pre class="code">
+from mymodule import *  # Runs mymodule.py; puts all its names into our namespace;
+                        # the module prints 'Module: mymodule'
+print f(8)              # Calls function f (defined in mymodule), and prints result '16'
+</pre>
+
+<h3>Some Standard Modules</h3>
+
+Python has a larger number of standard modules. A few are mentioned here.
+
+<pre class="code">
+import sys              # System functionality, e.g. argv, exit(), stdin, stdout, stderr,
+                        # path, version_info
+import os               # Operating system functions, e.g. getcwd(), chdir(), mkdir(),
+                        # makedirs(), rmdir(), remove(), rename(), walk()
+import os.path          # Path manipulation, e.g. exists(), join(), abspath(), dirname(),
+                        # basename()
+import logging
+import atexit
+
+import math             # Math constants and functions, e.g. pi, e, sqrt(), sin()
+import cmath            # Complex math functions, e.g. sqrt
+import decimal          # Class for precise representation of decimal numbers, e.g. 0.1
+import random           # Random number generation
+import functools        # Function manipulation, e.g. partial(), reduce(), @wraps
+
+import re               # See <a class="toc_ref" href="#Regular_Expressions">regular expressions</a>
+import collections      # See <a class="toc_ref" href="#Container_Types">container types</a>
+import copy             # Object copying functions (deep and shallow copy)
+
+import time
+import datetime
+</pre>
+
+<h2>Names</h2>
+
+<h3>Binding Names to Objects</h3>
+
+Almost everything (values, functions, classes, modules) is an object - mutable or immutable.
+Names are not objects themselves - they come into existence when they are bound (assigned) to
+objects, and may subsequently be rebound to different objects or deleted.
+An object may have multiple names bound to it, and becomes irrelevant (possibly deleted) when
+there are no more references to it.
+Names are NOT permanent references to fixed storage locations which can be filled with values
+as in some other languages (e.g. C).
+
+<pre class="code">
+x = 10                  # (Creates and) binds name x to (immutable) object 10
+y = x                   # Binds name y to same object as name x
+del x                   # Forgets name x; its previously bound object is still bound to y
+z = 10                  # Binds name z to (immutable) object 10 (possibly same object 10
+                        # that y is bound to; mutable objects will never be reused like
+                        # this)
+y = 11                  # Binds name y to a different object than before
+p = q = ['hi']          # Binds names p and q to same (mutable) object (first p, then q!)
+p, z = z, p             # Swaps objects bound to names p and z (so p = 10, z = ['hi'])
+
+def f1(b):              # Binds name f1 to function object defined here, and binds name b
+                        # to object passed as argument to f1
+    b = 3               # Binds name b to different object than was passed to f1 (this
+                        # does not alter the passed object nor rebind whatever name was
+                        # used to refer to that object when calling f1)
+    return b            # Returns object bound to name b (and name b goes out of scope)
+
+x = f1(y)               # Calls function object bound to name f1, and passes object bound
+                        # to name y as argument (name y itself is not passed and can't be
+                        # rebound from within f1);
+                        # also binds name x to object returned by function call
+
+class C1(object):       # Binds name C1 to class object defined here
+    pass
+
+c = C1()                # Binds name c to new instance object created from class object
+                        # bound to name C1
+</pre>
+
+<h3>Name Scope</h3>
+
+<pre class="code">
+def f1(x, y):
+    global d, e             # Allows this function to modify module level names d &amp; e
+    print b, x              # Prints '1 1'; no need for 'global' to read external b, but
+                            # this will fail if b is assigned anywhere within f1
+                            # (UnboundLocalError exception if assigned after this line)
+                            # (except if we cheat and assign to globals()['b'])
+    c, d, e = 10, 11, 12    # Creates local c hiding external c (because no 'global')
+                            # (but we can still cheat and read/write globals()['c']);
+                            # also creates e at module level (did not exist before this!)
+    f[0] = 13               # f refers to mutable object which can be changed even though
+                            # f is not listed as 'global' (but without 'global' external f
+                            # can't be changed to reference another object)
+    x = 14                  # x was same as external b, but is now 14, while b is still 1
+    y[0] = 15               # y refers to same object as external g, and that object can
+                            # be changed via y (but g can't be changed to refer to another
+                            # object)
+    f2()                    # Calls external function f2
+    if x == 14:             # Function definitions may be conditional like any statement
+                            # (the 'if' body does not have its own local name scope)
+        def f3(d):          # f3 is defined within f1, so can read f1's locals
+            print d         # Prints local parameter d which is hiding external d
+            global c        # Gives f3 access to module level c - not local c in f1
+            c = x           # Assigns f1's local x to module level c (now c = 14)
+    f3(30)                  # Calls inner function f3 which prints '30'
+    print b, c, d, e, f, g  # Prints '1 10 11 12 [13] [15]'
+
+def f2():                   # f2 is not defined within f1, so can't read f1's locals
+    pass
+
+b, c, d = 1, 2, 3           # Names read by function f1 must be defined before call to f1
+f, g = [4], [5]             # but not necessarily before definition of f1
+f1(b, g)                    # Calls function f1 and sets parameters x = b and y = g
+print b, c, d, e, f, g      # Prints '1 14 11 12 [13] [15]'; f1 changed d, e, and objects
+                            # referenced by f and g (but didn't change f &amp; g themselves)
+</pre>
+
+Notes:
+<ul>
+<li>See also the info on closures in the <a class="toc_ref" href="#Functions">Functions section</a>.
+</ul>
+
+</div>
+
+</div>
+
+</body>
+</html>

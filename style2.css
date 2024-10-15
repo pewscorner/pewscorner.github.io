@@ -1,0 +1,362 @@
+:root {
+    --style-version: 2;
+}
+
+body {
+    background-color: #EEEEEE;
+    color: #3366AA;
+    padding: 0px;
+    margin: 0px;
+    border: 0px;
+    text-align: center;
+    font-family: Arial, sans-serif;
+}
+
+header {
+    position: fixed;
+    z-index: 1000;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0px;
+    margin: 0px;
+    top: 0px;
+    transition: top 0.2s ease-in-out;
+}
+
+header.hidden {
+    top: -4em; /* <= -height of header */
+}
+
+header div.header_bar {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    -webkit-align-items: baseline;
+    align-items: baseline;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 50em;
+    margin: auto;
+    padding: 0em 0.5em;
+    border: 1px solid #999999;
+    border-radius: 0.6em;
+    background-color: #E0E0E0;
+    box-shadow: 0.2em 0.3em 0.1em rgba(0, 0, 0, 0.5);
+}
+
+.footer {
+    margin: 0.5em;
+    font-size: 0.7em;
+}
+
+div.menu_bg {
+    display: none;
+    position: fixed;
+    z-index: 1001;
+    box-sizing: border-box;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    margin: 0px;
+    padding: 0px;
+    border: none;
+    box-shadow: none;
+    border-radius: 0px;
+    background-color: rgba(0, 0, 0, 0.6);
+}
+
+div.menu_container {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    height: 0px;
+    max-width: 50em;
+    border: none;
+    margin: auto;
+}
+
+div.menu {
+    position: absolute;
+    box-sizing: border-box;
+    top: 0.5em;
+    right: 0.5em;
+    width: auto;
+    max-width: calc(100% - 1em);
+    padding: 0em 0.5em;
+    border: 1px solid #999999;
+    border-radius: 0.2em;
+    background-color: #E0E0E0;
+    box-shadow: 0.2em 0.3em 0.1em rgba(0, 0, 0, 0.5);
+}
+
+body > div.hcontainer {
+    max-width: 50em;
+    padding: 3em 0px 0px 0px; /* top >= height of header */
+    margin: auto;
+    border: 1px solid #BBBBBB;
+    border-radius: 1em;
+    background-color: #F4FFF0;
+}
+
+div.hcontainer {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-flow: row wrap;
+    flex-flow: row wrap;
+    -webkit-justify-content: center;
+    justify-content: center;
+    box-sizing: border-box;
+}
+
+div.vcontainer {
+    display: -webkit-flex;
+    display: flex;
+    -webkit-flex-flow: column nowrap;
+    flex-flow: column nowrap;
+    -webkit-justify-content: space-between;
+    justify-content: space-between;
+    margin: 0px;
+    padding: 0px;
+}
+
+.vcenter {
+    -webkit-align-items: center;
+    align-items: center;
+}
+
+div.box {
+    box-sizing: border-box;
+    text-align: left;
+    padding: 0.5em 1em;
+    margin: 0px;
+    max-width: 100%;
+    overflow: auto;
+}
+
+div.toc {
+    overflow: auto;
+}
+
+div.imgbox {
+    width: 100%; /* Hack to make IE shrink child images to fit div (images seem to ignore container's max-width). */
+}
+
+div.hcontainer > div {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+}
+
+div.vcontainer > div {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+}
+
+a[href]:link, a[href]:visited {
+    color: #50A0D0;
+}
+
+a[href]:hover, a[href]:active {
+    color: #80C8FF;
+}
+
+a[href].navbut, button, select {
+    padding: 0.5em;
+    margin: 0.5em 0em;
+    border: 1px solid #BBBBBB;
+    border-radius: 0.5em;
+    text-align: center;
+    text-decoration: none;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+button.hdrnavbut {
+    padding: 0.1em 0.5em 0em 0.5em;
+    margin: 0.1em 0em;
+}
+
+button + button {
+    margin-left: 1em;
+}
+
+button::-moz-focus-inner {
+    padding: 0px;
+    border: 0px;
+}
+
+a[href].navbut {
+    display: block;
+    width: 100%;
+    max-width: 25em;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.menu .menuitembut {
+    display: block;
+    width: 100%;
+    margin: 0.5em 0em;
+}
+
+/* TODO: Remove this a while after page.js has stopped using BR elements as menu item separators */
+.menu br {
+    display: none;
+}
+
+.hdrnavbut, .menu .menuitembut {
+    background: linear-gradient(#F8F8F8, #A8A8A8);
+    color: #333333;
+    font-size: 1rem;
+}
+
+.hdrnavbut:hover, .hdrnavbut:hover, .menu .menuitembut:hover {
+    background: linear-gradient(#FFFFFF, #CCCCCC);
+    color: #333333;
+}
+
+.hdrnavbut:active, .hdrnavbut:active, .menu .menuitembut:active {
+    background: linear-gradient(#CCCCCC, #FFFFFF);
+    color: #333333;
+}
+
+a[href].navbut, button, select {
+    background: linear-gradient(#FFFAF4, #DDBB99);
+    color: #550000;
+}
+
+a[href].navbut:hover, button:hover, select:hover {
+    background: linear-gradient(#FFFFFF, #EEEEAA);
+    color: #554400;
+}
+
+a[href].navbut:active, button:active, select:active {
+    background: linear-gradient(#A4CC99, #E8FFDD);
+    color: #000000;
+}
+
+button:disabled {
+    background: linear-gradient(#FAFAFA, #BBBBBB);
+    color: #888888;
+}
+
+option {
+    background-color: #B4DDAA;
+    color: #000000;
+}
+
+option:disabled {
+    color: #999999;
+}
+
+a[href].hdrhomebut {
+    padding: 0.2em 0em;
+    margin: 0.1em;
+    border-width: 0px;
+    text-decoration: none;
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #999999;
+    text-align: left;
+}
+
+a[href].hdrhomebut:hover, a.hdrhomebut:active {
+    color: #000000;
+}
+
+br.clear {
+    clear: both;
+}
+
+h1 {
+    display: block;
+    width: 100%;
+    font-weight: bold;
+    font-size: 2em;
+    text-align: center;
+    margin-top: 1.3rem;
+    margin-bottom: 1.3rem;
+}
+
+h2 {
+    font-weight: bold;
+    font-size: 1.2em;
+    text-align: left;
+    margin-top: 1.8rem;
+    margin-bottom: 1.2rem;
+}
+
+h3, h4, h5, h6 {
+    font-weight: bold;
+    font-size: 1em;
+    text-align: left;
+    margin-top: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.page_subtitle {
+    display: block;
+    width: 100%;
+    font-weight: bold;
+    font-size: 1em;
+    text-align: center;
+    margin-top: -0.5rem;
+    margin-bottom: 1.3rem;
+}
+
+ul {
+    list-style: circle;
+    margin: 0.2em 0em;
+    padding: 0em 0em 0em 1em;
+}
+
+li {
+    padding: 0em 0em 0.2em 0em;
+}
+
+img {
+    display: block;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+img.noshrink {
+    max-width: none;
+}
+
+svg.equation {
+    display: block;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    fill: #3366AA;
+}
+
+.fig_caption {
+    text-align: center;
+    margin-top: 0.5em;
+}
+
+canvas {
+    display: block;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+input[type="text"], input[type="number"], textarea {
+    font-family: Arial, sans-serif;
+    background-color: #FFFFEE;
+    padding: 0.3rem;
+}
+
+span.words {
+    display: inline-block;
+}
+
+span.overline {
+    border-top: 1px solid currentColor;
+}

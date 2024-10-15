@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Japanese Translation Practice: Nouns</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+textarea#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 3em;
+    padding: 0.2em;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var nounsEnJp = new Array(
+    "address",            "juusho",
+    "apple",              "ringo",
+    "ashtray",            "haizara",
+    "bag",                "kaban",
+    "battery",            "denchi",
+    "beer",               "biiru",
+    "birthday",           "tanjoobi",
+    "book",               "hon",
+    "building",           "tatemono",
+    "business card",      "meishi",
+    "car",                "kuruma",
+    "carrot",             "ninjin",
+    "clock",              "tokei",
+    "coat",               "uwagi",
+    "company",            "kaisha",
+    "company employee",   "kaishain",
+    "conference",         "kaigi",
+    "department store",   "depaato",
+    "doctor",             "isha",
+    "fish",               "sakana",
+    "flower",             "hana",
+    "grape",              "budoo",
+    "home",               "uchi",
+    "hospital",           "byooin",
+    "key",                "kagi",
+    "lawyer",             "bengoshi",
+    "lunch break",        "hiru-yasumi",
+    "man",                "otoko",
+    "movie",              "eiga",
+    "mushroom",           "kinoko",
+    "name",               "namae",
+    "newspaper",          "shimbun",
+    "number",             "bangoo",
+    "orange",             "orenji",
+    "party",              "paatii",
+    "pencil",             "empitsu",
+    "post office",        "yuubinkyoku",
+    "radio",              "rajio",
+    "receipt",            "reshiito",
+    "school",             "gakkoo",
+    "secretary",          "hisho",
+    "shoe",               "kutsu",
+    "sock",               "kutsushita",
+    "stamp",              "kitte",
+    "store clerk",        "ten'in",
+    "student",            "gakusei",
+    "summer",             "natsu",
+    "tangerine",          "mikan",
+    "tape recorder",      "teepurekoodaa",
+    "telephone",          "denwa",
+    "tv",                 "terebi",
+    "umbrella",           "kasa",
+    "water",              "mizu",
+    "woman",              "onna",
+    "work",               "shigoto"
+);
+
+var permd_indices = new Array(nounsEnJp.length/2);
+for (var i = 0; i < permd_indices.length; i++) permd_indices[i] = i;
+
+function permute()
+{
+    var i,j,t;
+    j = Math.floor(Math.random() * (permd_indices.length - 1));
+    t = permd_indices[0];
+    permd_indices[0] = permd_indices[j];
+    permd_indices[j] = t;
+    for (i = 1; i < permd_indices.length - 1; i++) {
+        j = Math.floor(Math.random() * (permd_indices.length - i)) + i;
+        t = permd_indices[i];
+        permd_indices[i] = permd_indices[j];
+        permd_indices[j] = t;
+    }
+}
+
+permute();
+var permindex = 0;
+
+var output = "";
+var result = "";
+
+function create_new()
+{
+    document.getElementById('do_key').innerHTML = "Check it!";
+    document.getElementById('input').value = "";
+    document.getElementById('input').focus();
+    if (permindex >= permd_indices.length) {
+        permute();
+        permindex = 0;
+    }
+    var nounindex = permd_indices[permindex++];
+
+    if (Math.random() < 1 /* always true */) {
+        output = "Translate the following into Japanese:<br>" + nounsEnJp[2*nounindex];
+        result = nounsEnJp[2*nounindex + 1];
+    } else {
+        output = "Translate the following into English:<br>" + nounsEnJp[2*nounindex + 1];
+        result = nounsEnJp[2*nounindex];
+    }
+    document.getElementById('output').innerHTML = output;
+}
+
+function eval_input()
+{
+    if (document.getElementById('do_key').innerHTML == "Next") {
+        create_new();
+    } else {
+        var s = document.getElementById('input').value.toLowerCase().replace(/[^a-z]/g,"");
+        if (s == result.toLowerCase().replace(/[^a-z]/g,"")) {
+            output += "<br><br>Correct!";
+        } else {
+            output += "<br><br>Wrong! The correct answer is:<br>" + result;
+        }
+        document.getElementById('output').innerHTML = output;
+        document.getElementById('do_key').innerHTML = "Next";
+    }
+}
+
+function init()
+{
+    create_new();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Japanese Translation Practice:<br>Nouns</h1>
+
+<div class="box">
+
+<h2>Task</h2>
+<div id="output"></div>
+
+<h2>Your input</h2>
+<textarea id="input"></textarea>
+
+<button type="button" id="do_key" onClick="eval_input()">Check it!</button>
+
+</div>
+
+</div>
+
+</body>
+</html>

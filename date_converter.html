@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Date Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.linebreak > hr {
+    background-color: #66AA66;
+    border: none;
+    height: 3px;
+    margin: 1em 0em;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 0rem 0rem 0.5rem 0rem;
+}
+
+div.hcontainer {
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+}
+
+div.hcontainer > div.text {
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+div.hcontainer > div.right {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 100%; 
+}
+</style>
+<script type="text/javascript">
+var daysinmonth = new Array(31,28,31,30,31,30,31,31,30,31,30,31);
+var daysum = new Array(0,31,61,92,122,153,184,214,245,275,306,337);
+var firstdayofweek = 1;
+var date1 = new Date();
+var year = date1.getFullYear();
+var month = date1.getMonth() + 1;
+var day = date1.getDate();
+var wyear = 0;
+var week = 0;
+var wday = 0;
+
+function update(changedfield) {
+    var maxdays,s,s0,y,m,ar;
+    
+    switch (changedfield) {
+        case 1:
+            ar = document.getElementById("date").value.split("-");
+            if (ar.length == 3 && !isNaN(ar[0]) && !isNaN(ar[1]) && !isNaN(ar[2])) {
+                year = Math.min(Math.max(ar[0],0),9999);
+                month = Math.min(Math.max(ar[1],1),12);
+                maxdays = daysinmonth[month-1];
+                if (month==2 && year%4==0 && (year%100!=0 || year%400==0)) maxdays++;
+                day = Math.min(Math.max(ar[2],1),maxdays);
+            }
+            document.getElementById("date").focus();
+            break;
+
+        case 4:
+            firstdayofweek = document.getElementById("firstdayofweek").selectedIndex;
+            break;
+    } // switch
+
+    wyear = year;
+    if (month < 3) {
+        m = month+9;
+        y = year-1;
+    } else {
+        m = month-3;
+        y = year;
+    }
+    s = day + daysum[m] + 365*y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400) + 2;
+    wday = s%7;
+    if (month==12 && day-(wday+7-firstdayofweek)%7>28) {
+        week = 1;
+        wyear++;
+    } else {
+        y = year-1;
+        s0 = 309 + 365*y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400);
+        s0 -= (s0+3-firstdayofweek)%7 - 3;
+        if (s<s0) {
+        y -= 1;
+        wyear--
+        s0 = 309 + 365*y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400);
+        s0 -= (s0+3-firstdayofweek)%7 - 3;
+        }
+        week = Math.floor((s-s0)/7) + 1;
+    }
+
+    document.getElementById("date").value =
+        (10000+year).toString().substr(1,4) + "-" +
+        (100+month).toString().substr(1,2) + "-" +
+        (100+day).toString().substr(1,2);
+    document.getElementById("wdate").value =
+        (10000+wyear).toString().substr(1,4) + "-" +
+        (100+week).toString().substr(1,2);
+    document.getElementById("wday").options[wday].selected = 1;
+    document.getElementById("firstdayofweek").options[firstdayofweek].selected = 1;
+}
+
+function init()
+{
+    update(0);
+}
+
+window.addEventListener('load', init, false);
+</script>
+
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Date Converter</h1>
+
+<div class="box hcontainer vcenter">
+
+<h2>Date (yyyy-mm-dd)</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="date" maxlength=10 onFocus="this.select()" onChange="update(1)"></div>
+<div class="right"><button type="button" id="towdate" onClick="update(1)">Convert to week-date</button></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Week-year and week (yyyy-ww)</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="wdate" maxlength=7 onFocus="this.select()" onChange="update(2)"></div>
+<div class="right"><select id="wday" onChange="update(3)">
+  <option> Sunday <option> Monday <option> Tuesday <option> Wednesday
+  <option> Thursday <option> Friday <option> Saturday
+</select></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>First day of week</h2>
+<div class="linebreak"></div>
+<div class="text"><select id="firstdayofweek" onChange="update(4)">
+  <option> Sunday <option> Monday
+</select></div>
+
+</div>
+
+</div>
+
+</body>
+</html>

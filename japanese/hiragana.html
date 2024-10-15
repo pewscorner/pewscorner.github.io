@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Hiragana</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+table {
+    margin: auto;
+    border-spacing: 0.2em;
+}
+
+table td {
+    background-color: #BBFFBB;
+    padding: 0.2em;
+    vertical-align: top;
+}
+
+span.kana {
+    font-size: 300%;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var chars = [
+    "\u3042","\u3044","\u3046","\u3048","\u304a",
+    "\u304b","\u304d","\u304f","\u3051","\u3053",
+    "\u304c","\u304e","\u3050","\u3052","\u3054",
+    "\u3055","\u3057","\u3059","\u305b","\u305d",
+    "\u3056","\u3058","\u305a","\u305c","\u305e",
+    "\u305f","\u3061","\u3064","\u3066","\u3068",
+    "\u3060","\u3062","\u3065","\u3067","\u3069",
+    "\u306a","\u306b","\u306c","\u306d","\u306e",
+    "\u306f","\u3072","\u3075","\u3078","\u307b",
+    "\u3070","\u3073","\u3076","\u3079","\u307c",
+    "\u3071","\u3074","\u3077","\u307a","\u307d",
+    "\u307e","\u307f","\u3080","\u3081","\u3082",
+    "\u3084","","\u3086","","\u3088",
+    "\u3089","\u308a","\u308b","\u308c","\u308d",
+    "\u308f","","","","\u3092"];
+
+var charsounds = [
+    "a","i","u","e","o",
+    "k","k","k","k","k",
+    "g","g","g","g","g",
+    "s","sh","s","s","s",
+    "z","j","z","z","z",
+    "t","ch","ts","t","t",
+    "d","j","z","d","d",
+    "n","n","n","n","n",
+    "h","h","f","h","h",
+    "b","b","b","b","b",
+    "p","p","p","p","p",
+    "m","m","m","m","m",
+    "y","-","y","-","y",
+    "r","r","r","r","r",
+    "w","-","-","-","w"];
+
+function init()
+{
+    var hs = '<table>';
+    for (var i = 0; i < 15; i++)
+    {
+        hs += '<tr>';
+        for (var j = 0; j < 5; j++)
+        {
+            hs += '<td>' + charsounds[i*5+j];
+            if (i >= 1) hs += charsounds[j];
+            hs += '<br><span class="kana">' + chars[i*5+j] + '<\/span>';
+        }
+    }
+    hs += '<tr><td>n<br><span class="kana">\u3093<\/span><td><td><td><td><\/table>';
+    document.getElementById('contentbox').innerHTML = hs;
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Hiragana</h1>
+
+<div id="contentbox" class="box">
+</div>
+
+</div>
+
+</body>
+</html>

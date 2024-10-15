@@ -1,0 +1,45 @@
+table.form {
+  margin-left: auto;
+  margin-right: auto;
+  border-collapse: separate;
+  border: 1px solid #D0D0D0;
+  border-spacing: 0px;
+  background-color: white;
+}
+table.form td {
+  border-color: #D0D0D0;
+  border-style: solid;
+  border-width: 1px 0px 1px 0px;
+  padding: 0.1em 0.3em;
+  text-align: left;
+}
+table.form td.no_bottom_border {
+  border-bottom-width: 0px;
+}
+table.form td.no_top_border {
+  border-top-width: 0px;
+}
+table.form td#result {
+  text-align: center;
+}
+table.result {
+  border-collapse: separate;
+  border: 2px solid #000000;
+  border-spacing: 0px;
+  margin: 0.3em auto;
+}
+table.result th, table.result td {
+  border-color: #D0D0D0;
+  border-style: solid;
+  border-width: 1px;
+  padding: 0.1em 0.3em;
+  text-align: left;
+}
+table.result th {
+  font-weight: bold;
+  background-color: #F0F0F0;
+}
+.note {
+  font-size: 70%;
+  color: #808080;
+}

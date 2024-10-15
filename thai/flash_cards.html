@@ -1,0 +1,346 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Thai Flash Cards</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+div.box { text-align: center; }
+div.explode { -webkit-justify-content: space-between; justify-content: space-between; }
+div#lang1_div, div#lang2_div { padding: 0.5em 0em; }
+.thai { font: 150% sans-serif; }
+.translit { font: 120% sans-serif; }
+div.box#database { display: none; width: 100%; }
+table.database { margin: auto; border-spacing: 0.2em }
+table.database td, table.database th { background-color: #BBFFBB; padding: 0.2em; text-align: center }
+table.database th { font-weight: bold; }
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['up_button', 'Back to overview', 'location.href="index.html"']];
+
+var words = new Array(
+    "&#3585;&#3634;&#3591;&#3648;&#3585;&#3591;", "kaang-keeng", "trousers",
+    "&#3585;&#3640;&#3657;&#3591;", "k&#251;ng", "shrimp",
+    "&#3649;&#3585;&#3632;", "k&#224;e", "sheep",
+    "&#3652;&#3585;&#3656;", "k&#224;i", "chicken",
+    "&#3586;&#3657;&#3634;&#3591;", "kh&#226;ng", "side",
+    "&#3588;&#3609;", "khon", "person",
+    "&#3591;&#3634;&#3609;", "ngaan", "work",
+    "&#3648;&#3591;&#3636;&#3609;", "ngoen", "money",
+    "&#3594;&#3657;&#3629;&#3609;", "ch&#243;orn", "spoon",
+    "&#3648;&#3604;&#3655;&#3585;", "d&#232;k", "child",
+    "&#3605;&#3621;&#3634;&#3604;", "tal&#224;at", "market",
+    "&#3605;&#3629;&#3609;", "toorn", "time",
+    "&#3605;&#3641;&#3657;", "t&#251;u", "closet",
+    "&#3648;&#3605;&#3637;&#3618;&#3591;", "tiang", "bed",
+    "&#3607;&#3657;&#3629;&#3591;", "th&#243;orng", "belly",
+    "&#3607;&#3634;&#3591;", "thaang", "way",
+    "&#3607;&#3637;", "thii", "time/iteration",
+    "&#3608;&#3609;&#3634;&#3588;&#3634;&#3619;", "thanaa-khaan", "bank",
+    "&#3609;&#3657;&#3635;", "n&#225;am", "water",
+    "&#3648;&#3609;&#3639;&#3657;&#3629;", "n&#250;eea", "beef",
+    "&#3611;&#3619;&#3632;&#3605;&#3641;", "pr&#224;-tuu", "door",
+    "&#3611;&#3621;&#3634;", "plaa", "fish",
+    "&#3648;&#3611;&#3655;&#3604;", "p&#232;t", "duck",
+    "&#3652;&#3611;&#3619;&#3625;&#3603;&#3637;&#3618;&#3660;", "prai-sanii", "post office",
+    "&#3612;&#3617;", "ph&#466;m", "hair/I",
+    "&#3612;&#3641;&#3657;&#3594;&#3634;&#3618;", "ph&#251;u-chaay", "man",
+    "&#3612;&#3641;&#3657;&#3627;&#3597;&#3636;&#3591;", "ph&#251;u-y&#464;ng", "woman",
+    "&#3613;&#3609;", "f&#466;n", "rain",
+    "&#3614;&#3656;&#3629;", "ph&#244;or", "father",
+    "&#3648;&#3614;&#3639;&#3656;&#3629;&#3609;", "ph&#251;eean", "friend",
+    "&#3649;&#3614;&#3632;", "ph&#225;e", "goat",
+    "&#3649;&#3615;&#3609;", "faeen", "boy/girlfriend",
+    "&#3652;&#3615;", "fai", "light",
+    "&#3617;&#3657;&#3634;", "m&#225;a", "horse",
+    "&#3617;&#3637;&#3604;", "m&#238;it", "knife",
+    "&#3649;&#3617;&#3656;", "m&#224;ee", "mother",
+    "&#3619;&#3606;", "r&#243;t", "car",
+    "&#3619;&#3629;&#3591;&#3648;&#3607;&#3657;&#3634;", "roorng-th&#225;w", "shoe",
+    "&#3619;&#3657;&#3634;&#3609;", "r&#225;an", "shop",
+    "&#3650;&#3619;&#3591;&#3649;&#3619;&#3617;", "roong-raeem", "hotel",
+    "&#3621;&#3641;&#3585;", "l&#251;uk", "son/daughter",
+    "&#3626;&#3606;&#3634;&#3609;&#3637;", "sath&#462;a-nii", "station",
+    "&#3626;&#3657;&#3629;&#3617;", "s&#244;orm", "fork",
+    "&#3627;&#3609;&#3633;&#3591;&#3626;&#3639;&#3629;", "nang-s&#468;ee", "book",
+    "&#3627;&#3609;&#3657;&#3634;", "n&#226;a", "face",
+    "&#3627;&#3609;&#3657;&#3634;&#3605;&#3656;&#3634;&#3591;", "n&#226;a-t&#224;ang", "window",
+    "&#3627;&#3609;&#3641;", "n&#468;u", "mouse",
+    "&#3627;&#3617;&#3634;", "m&#462;a", "dog",
+    "&#3627;&#3617;&#3641;", "m&#468;u", "pork",
+    "&#3627;&#3621;&#3633;&#3591;", "l&#462;ng", "back",
+    "&#3627;&#3657;&#3629;&#3591;", "h&#244;rng", "room",
+    "&#3629;&#3634;&#3627;&#3634;&#3619;", "aa-h&#462;an", "food",
+
+    "&#3585;&#3621;&#3633;&#3623;", "klua", "afraid",
+    "&#3648;&#3585;&#3656;&#3591;", "k&#232;eng", "skilled",
+    "&#3651;&#3585;&#3621;&#3657;", "kl&#226;i", "near",
+    "&#3652;&#3585;&#3621;", "klai", "far",
+    "&#3586;&#3623;&#3634;", "khw&#462;a", "right",
+    "&#3586;&#3637;&#3657;&#3648;&#3585;&#3637;&#3618;&#3592;", "k&#238;i-g&#236;at", "lazy",
+    "&#3649;&#3586;&#3655;&#3591;", "kh&#462;eng", "hard",
+    "&#3591;&#3656;&#3634;&#3618;", "ng&#226;ay", "easy",
+    "&#3592;&#3619;&#3636;&#3591;", "jing", "true",
+    "&#3594;&#3657;&#3634;", "ch&#225;a", "slow",
+    "&#3595;&#3657;&#3634;&#3618;", "s&#225;ay", "left",
+    "&#3604;&#3637;", "dii", "good",
+    "&#3648;&#3604;&#3637;&#3618;&#3623;", "diaw", "single",
+    "&#3605;&#3619;&#3591;", "trong", "straight",
+    "&#3648;&#3605;&#3637;&#3657;&#3618;", "t&#238;a", "short (height)",
+    "&#3606;&#3641;&#3585;", "th&#249;uk", "correct/cheap",
+    "&#3609;&#3633;&#3657;&#3609;", "n&#225;n", "that",
+    "&#3609;&#3636;&#3656;&#3617;", "n&#238;m", "soft",
+    "&#3609;&#3637;&#3657;", "n&#237;i", "this",
+    "&#3650;&#3609;&#3657;&#3609;", "n&#243;on", "that (over there)",
+    "&#3648;&#3611;&#3637;&#3618;&#3585;", "p&#236;ak", "wet",
+    "&#3612;&#3629;&#3617;", "ph&#466;orm", "thin",
+    "&#3612;&#3636;&#3604;", "ph&#236;t", "wrong",
+    "&#3614;&#3629;&#3651;&#3592;", "phoor-jai", "satisfied/happy",
+    "&#3649;&#3614;&#3591;", "phaeeng", "expensive",
+    "&#3617;&#3639;&#3604;", "m&#251;eet", "dark",
+    "&#3648;&#3617;&#3634;", "maw", "drunk",
+    "&#3618;&#3634;&#3585;", "y&#226;ak", "difficult",
+    "&#3618;&#3634;&#3623;", "yaaw", "long",
+    "&#3648;&#3618;&#3655;&#3609;", "yen", "cold",
+    "&#3619;&#3657;&#3629;&#3609;", "r&#243;orn", "hot",
+    "&#3648;&#3619;&#3655;&#3623;", "rew", "fast",
+    "&#3648;&#3621;&#3655;&#3585;", "l&#233;k", "small",
+    "&#3626;&#3609;&#3640;&#3585;", "san&#249;k", "amusing",
+    "&#3626;&#3623;&#3618;", "s&#468;ay", "beautiful",
+    "&#3626;&#3633;&#3657;&#3609;", "s&#226;n", "short (length)",
+    "&#3626;&#3634;&#3618;", "s&#462;ay", "late",
+    "&#3626;&#3641;&#3591;", "s&#468;ung", "tall",
+    "&#3648;&#3626;&#3637;&#3618;", "s&#464;a", "defective",
+    "&#3627;&#3623;&#3634;&#3609;", "w&#462;an", "sweet",
+    "&#3649;&#3627;&#3657;&#3591;", "h&#226;eeng", "dry",
+    "&#3651;&#3627;&#3597;&#3656;", "y&#224;i", "big",
+    "&#3629;&#3619;&#3656;&#3629;&#3618;", "ar&#242;ry", "delicious",
+    "&#3629;&#3657;&#3623;&#3609;", "&#251;an", "fat",
+    "&#3629;&#3637;&#3585;", "&#236;ik", "another",
+
+    "&#3585;&#3636;&#3609;", "kin", "eat",
+    "&#3650;&#3585;&#3627;&#3585;", "koo-h&#242;k", "lie/deceive",
+    "&#3586;&#3629;", "kh&#466;or", "ask for",
+    "&#3586;&#3633;&#3610;", "kh&#224;p", "drive",
+    "&#3586;&#3634;&#3618;", "kh&#462;ay", "sell",
+    "&#3586;&#3638;&#3657;&#3609;", "kh&#251;en", "ascend",
+    "&#3648;&#3586;&#3657;&#3634;&#3651;&#3592;", "k&#226;w-jai", "understand",
+    "&#3648;&#3586;&#3637;&#3618;&#3609;", "kh&#464;an", "write",
+    "&#3588;&#3629;&#3618;", "khoory", "wait",
+    "&#3592;&#3629;&#3604;", "j&#242;ort", "park/stop",
+    "&#3648;&#3592;&#3655;&#3610;", "j&#232;p", "hurt",
+    "&#3594;&#3656;&#3623;&#3618;", "ch&#251;ay", "help",
+    "&#3594;&#3629;&#3610;", "ch&#244;orp", "like",
+    "&#3594;&#3639;&#3656;&#3629;", "ch&#251;ee", "be named",
+    "&#3651;&#3594;&#3657;", "ch&#225;i", "use",
+    "&#3595;&#3639;&#3657;&#3629;", "s&#250;ee", "buy",
+    "&#3604;&#3639;&#3656;&#3617;", "d&#249;eem", "drink",
+    "&#3648;&#3604;&#3636;&#3609;", "doeen", "walk",
+    "&#3652;&#3604;&#3657;", "d&#226;i", "get",
+    "&#3605;&#3657;&#3629;&#3591;", "t&#244;rng", "must",
+    "&#3605;&#3657;&#3629;&#3591;&#3585;&#3634;&#3619;", "t&#244;rng-kaan", "need",
+    "&#3605;&#3633;&#3604;", "t&#224;t", "cut",
+    "&#3605;&#3639;&#3656;&#3609;", "t&#249;een", "awaken/get up",
+    "&#3606;&#3634;&#3617;", "th&#462;am", "ask",
+    "&#3606;&#3638;&#3591;", "th&#468;eng", "arrive",
+    "&#3606;&#3639;&#3629;", "th&#468;ee", "hold/carry",
+    "&#3607;&#3619;&#3634;&#3610;", "s&#226;ap", "know (info)",
+    "&#3607;&#3629;&#3604;", "th&#244;ort", "fry",
+    "&#3607;&#3635;", "tham", "do",
+    "&#3609;&#3629;&#3609;", "noorn", "sleep",
+    "&#3609;&#3633;&#3656;&#3591;", "n&#226;ng", "sit",
+    "&#3610;&#3629;&#3585;", "b&#242;ork", "tell",
+    "&#3611;&#3636;&#3604;", "p&#236;t", "close",
+    "&#3648;&#3611;&#3655;&#3609;", "pen", "be (something)",
+    "&#3648;&#3611;&#3636;&#3604;", "p&#242;eet", "open",
+    "&#3652;&#3611;", "pai", "go",
+    "&#3614;&#3641;&#3604;", "ph&#251;ut", "talk",
+    "&#3615;&#3633;&#3591;", "fang", "listen",
+    "&#3617;&#3629;&#3591;", "moorng", "look",
+    "&#3617;&#3634;", "maa", "come",
+    "&#3617;&#3637;", "mii", "have",
+    "&#3618;&#3636;&#3609;", "yin", "hear",
+    "&#3618;&#3639;&#3609;", "yueen", "stand",
+    "&#3619;&#3641;&#3657;&#3592;&#3633;&#3585;", "r&#250;u-j&#224;k", "know (person)",
+    "&#3648;&#3619;&#3637;&#3618;&#3585;", "r&#238;ak", "call",
+    "&#3648;&#3619;&#3637;&#3618;&#3609;", "rian", "study",
+    "&#3621;&#3591;", "long", "descend",
+    "&#3621;&#3639;&#3617;", "lueem", "forget",
+    "&#3648;&#3621;&#3637;&#3657;&#3618;&#3623;", "l&#237;aw", "turn",
+    "&#3623;&#3636;&#3656;&#3591;", "w&#238;ng", "run",
+    "&#3626;&#3656;&#3591;", "s&#242;ng", "send",
+    "&#3626;&#3610;&#3634;&#3618;", "sabaay", "be comfortable",
+    "&#3626;&#3629;&#3609;", "s&#466;orn", "teach",
+    "&#3651;&#3626;&#3656;", "s&#224;i", "put",
+    "&#3627;&#3609;&#3634;&#3623;", "n&#462;aw", "be cold",
+    "&#3627;&#3634;", "h&#462;a", "look for",
+    "&#3648;&#3627;&#3655;&#3609;", "h&#283;n", "see",
+    "&#3651;&#3627;&#3657;", "h&#226;i", "give",
+    "&#3629;&#3618;&#3656;&#3634;", "y&#224;a", "don&#8217;t",
+    "&#3629;&#3618;&#3634;&#3585;", "y&#224;ak", "want",
+    "&#3629;&#3618;&#3641;&#3656;", "y&#249;u", "be (somewhere)",
+    "&#3629;&#3656;&#3634;&#3609;", "&#224;an", "read",
+    "&#3648;&#3629;&#3634;", "aw", "receive",
+
+    "&#3585;&#3655;", "k&#244;r", "also (likewise)",
+    "&#3585;&#3623;&#3656;&#3634;", "kw&#224;a", "than",
+    "&#3585;&#3637;&#3656;", "k&#236;i", "how many",
+    "&#3648;&#3586;&#3634; / &#3648;&#3588;&#3657;&#3634;", "kh&#225;w", "he/she",
+    "&#3588;&#3619;&#3633;&#3610;", "khr&#225;p", "(male final particle)",
+    "&#3588;&#3640;&#3603;", "khun", "you",
+    "&#3651;&#3588;&#3619;", "khrai", "who",
+    "&#3592;&#3634;&#3585;", "j&#224;ak", "from",
+    "&#3604;&#3657;&#3623;&#3618;", "d&#251;ay", "also (in addition)",
+    "&#3649;&#3605;&#3656;", "t&#224;ee", "but",
+    "&#3606;&#3657;&#3634;", "th&#226;a", "if",
+    "&#3607;&#3635;&#3652;&#3617;", "tham-mai", "why",
+    "&#3607;&#3637;&#3656;", "th&#238;i", "at",
+    "&#3648;&#3607;&#3656;&#3634;&#3609;&#3633;&#3657;&#3609;", "th&#226;w-n&#225;n", "only",
+    "&#3648;&#3607;&#3656;&#3634;&#3652;&#3627;&#3619;&#3656;", "th&#226;w-r&#224;i", "how much",
+    "&#3610;&#3609;", "bon", "on/upper",
+    "&#3614;&#3629;", "phoor", "enough",
+    "&#3648;&#3614;&#3619;&#3634;&#3632;", "phr&#243;r", "because",
+    "&#3617;&#3634;&#3585;", "m&#226;ak", "much",
+    "&#3652;&#3617;&#3656;", "m&#226;i", "not",
+    "&#3618;&#3633;&#3591;", "yang", "still",
+    "&#3618;&#3633;&#3591;&#3652;&#3591;", "yang-ngai", "how",
+    "&#3648;&#3619;&#3634;", "raw", "we",
+    "&#3621;&#3656;&#3634;&#3591;", "l&#226;ang", "lower",
+    "&#3648;&#3621;&#3618;", "loeey", "extremely/at all",
+    "&#3649;&#3621;&#3657;&#3623;", "l&#225;eew", "already",
+    "&#3649;&#3621;&#3632;", "l&#225;e", "and",
+    "&#3627;&#3609;&#3656;&#3629;&#3618;", "n&#242;ry", "a little",
+    "&#3627;&#3619;&#3639;&#3629;", "r&#250;e", "or",
+    "&#3651;&#3627;&#3617;&#3656;", "m&#224;i", "again",
+    "&#3652;&#3627;&#3609;", "n&#462;i", "where",
+    "&#3652;&#3627;&#3617;", "m&#225;i", "no? (question particle)",
+    "&#3629;&#3632;&#3652;&#3619;", "a-rai", "what"
+);
+
+var div_thai;
+var fields = 3;
+
+var permd_indices = new Array(words.length/fields);
+for (var i = 0; i < permd_indices.length; i++) permd_indices[i] = i;
+
+function permute() {
+    var i,j,t;
+    j = Math.floor(Math.random() * (permd_indices.length - 1));
+    t = permd_indices[0];
+    permd_indices[0] = permd_indices[j];
+    permd_indices[j] = t;
+    for (i = 1; i < permd_indices.length - 1; i++) {
+        j = Math.floor(Math.random() * (permd_indices.length - i)) + i;
+        t = permd_indices[i];
+        permd_indices[i] = permd_indices[j];
+        permd_indices[j] = t;
+    }
+}
+
+var permindex = 0;
+
+function create_new(do_reset) {
+    if (do_reset || (permindex >= permd_indices.length)) {
+        permute();
+        permindex = 0;
+    }
+    var wordindex = permd_indices[permindex++];
+
+    document.getElementById("lang1_div").style.visibility = "visible";
+    document.getElementById("lang2_div").style.visibility = "hidden";
+    var choice = document.getElementById('choice').selectedIndex;
+    div_eng = document.getElementById((choice == 0) ? "lang1_div" : "lang2_div");
+    div_thai = document.getElementById((choice == 0) ? "lang2_div" : "lang1_div");
+    div_eng.innerHTML = "<span class='eng'>" + words[fields*wordindex + 2] + "<\/span>";
+    div_thai.innerHTML = "<span class='thai'>" + words[fields*wordindex + 0] +
+        "<\/span><span id='translit' class='translit' style='display:none'>&nbsp;&nbsp;[" +
+        words[fields*wordindex + 1] + "]<\/span>";
+    document.getElementById("counter").innerHTML = permindex + "/" + (words.length/fields);
+}
+
+function translate_() {
+    document.getElementById("lang2_div").style.visibility = "visible";
+}
+
+function transliterate() {
+    if (div_thai.style.visibility == "visible") {
+        document.getElementById("translit").style.display = "inline";
+    }
+}
+
+function show_all() {
+    document.getElementById("database").style.display = "block";
+    document.getElementById("showhide_but").innerHTML = "Hide all";
+    document.getElementById("showhide_but").onclick = hide_all;
+}
+
+function hide_all() {
+    document.getElementById("database").style.display = "none";
+    document.getElementById("showhide_but").innerHTML = "Show all";
+    document.getElementById("showhide_but").onclick = show_all;
+}
+
+function init()
+{
+    create_new(true);
+    document.getElementById("next_but").onclick = function () {create_new(false);};
+    document.getElementById("translate_but").onclick = translate_;
+    document.getElementById("transliterate_but").onclick = transliterate;
+    hide_all();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Thai Flash Cards</h1>
+
+<div class="box">
+
+<div class="hcontainer explode vcenter">
+<select id="choice" onChange="create_new(true)">
+<option>English -> Thai
+<option selected>Thai -> English
+</select>
+
+<span id="counter"></span>
+</div>
+
+<hr>
+
+<div id="lang1_div"></div>
+<div id="lang2_div"></div>
+
+<hr>
+
+<button type="button" id="next_but">Next</button>
+<button type="button" id="translate_but">Translate</button>
+<button type="button" id="transliterate_but">Transliterate</button>
+<button type="button" id="showhide_but">Show all</button>
+
+</div>
+
+<div id="database" class="box">
+<table class="database">
+<tr><th>Thai<th>Transliteration<th>English
+<script type="text/javascript">
+for (var i = 0; i < words.length; i += fields) {
+    document.write("<tr><td class='thai'>"+words[i+0]);
+    document.write("<td class='translit'>"+words[i+1]);
+    document.writeln("<td class='english'>"+words[i+2]);
+}
+</script>
+</table>
+</div>
+
+</div>
+
+</body>
+</html>
