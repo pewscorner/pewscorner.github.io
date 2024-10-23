@@ -1,0 +1,547 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Music Synthesizer</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+textarea#input {
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    height: 10em;
+    margin: 0px;
+    padding: 0.2em;
+}
+
+.example {
+    color: #000000;
+    background-color: #FFFFEE;
+}
+</style>
+<script type="text/javascript">
+var input_elem;
+var play_pause_button_elem;
+var stop_button_elem;
+var to_file_chkbox_elem;
+
+var START_STOP_MARGIN_TIME = 0.2
+
+var STATE_STOPPED = 0;
+var STATE_PAUSED = 1;
+var STATE_PLAYING = 2;
+
+var state = STATE_STOPPED;
+
+var AudioContext = window.AudioContext || window.webkitAudioContext;
+var OfflineAudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+var audio_ctx;
+
+var Instrument = function(wave_shape, envelope)
+{
+    this.wave_shape = wave_shape;   // 'sine', 'triangle', 'square', 'sawtooth'
+    this.envelope = envelope;       // [[time, ampl], ...]
+}
+
+var instruments = [
+    /* guitar */ new Instrument('sine', [[0.01, 1.5], [0.1, 1], [0.5, 0]]),
+    /* flute */  new Instrument('sine', [[0.1, 1], [-0.1, 1]]),
+    /* piano */  new Instrument('square', [[0.01, 1.5], [0.1, 1], [0.5, 0]]),
+    /* short */  new Instrument('sine', [[0.01, 1], [0.1, 0]]),
+    ];
+
+var auto_volume;
+var volume;
+
+var seqs;
+var tracks;
+var playing_track_count;
+var total_duration;
+
+var NoteSpec = function(tone, duration)
+{
+    this.tone = tone;
+    this.duration = duration;
+}
+
+var RestSpec = function(duration)
+{
+    this.duration = duration;
+}
+
+var VolumeSpec = function(volume)
+{
+    this.volume = volume;
+}
+
+var SeqInfo = function()
+{
+    this.spec_list = [];
+    this.total_duration = 0;
+
+    // Parse-time state variables
+    this.last_octave = 4;
+    this.last_abs_dur = 2.0;
+    this.last_rel_dur = 1/4;
+
+    // Variables specific to tracks
+    this.instrument = null;
+}
+
+var COMMENT_BEGIN_RE = /\/[\/*]/;
+var SINGLE_COMMENT_END_RE = /$/m;
+var MULTI_COMMENT_END_RE = /\*\//;
+var SEP_RE = /^\s+/;
+var TRACK_DEF_RE = /^(\d+)(?:\((\d+)\))?:/;
+var SEQ_DEF_RE = /^([a-z_]\w*):/i;
+var NOTE_RE = /^(\d)?([a-hr])([#b])?(?:(?:(\d+)\*(?=\d))?(\d+)?(?:\/(\d+))?)?(?:\s+|$)/i;
+var VOLUME_RE = /^v((?:\d+\.)?\d+)(?:\s+|$)/;
+var SEQ_REF_RE = /^(\w+)(?:\s+|$)/;
+var ANYTHING_RE = /^\S+/;
+
+function parse_music()
+{
+    var m;
+    seqs = {};
+    tracks = [];
+    var seq_id = 0;
+    tracks[seq_id] = seqs[seq_id] = seqs[seq_id] || new SeqInfo();
+    tracks[seq_id].instrument = instruments[0];
+    var music = input_elem.value;
+
+    // Replace comments with spaces
+    while (m = COMMENT_BEGIN_RE.exec(music))
+    {
+        var start_idx = m.index;
+        var stop_idx = start_idx + m[0].length;
+        if (m[0] == '//')
+        {
+            m = SINGLE_COMMENT_END_RE.exec(music.slice(start_idx + 2));
+        }
+        else if (!(m = MULTI_COMMENT_END_RE.exec(music.slice(start_idx + 2))))
+        {
+            alert('Unterminated comment: \/*');
+            return false;
+        }
+        stop_idx += m.index + m[0].length;
+        music = music.slice(0, start_idx) + Array(stop_idx - start_idx + 1).join(' ') +
+            music.slice(stop_idx);
+    }
+
+    // Convert tokens one by one
+    var last_idx = 0;
+    while (last_idx < music.length)
+    {
+        if (m = SEP_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+        }
+        else if (m = TRACK_DEF_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+            seq_id = +m[1];
+            var instrument_id = m[2] || 0;
+            var instrument = instruments[instrument_id];
+            if (!instrument)
+            {
+                alert('Unknown instrument for track ' + seq_id + ': ' + instrument_id);
+                return false;
+            }
+            tracks[seq_id] = seqs[seq_id] = seqs[seq_id] || new SeqInfo();
+            tracks[seq_id].instrument = instrument;
+        }
+        else if (m = SEQ_DEF_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+            seq_id = m[1];
+            seqs[seq_id] = seqs[seq_id] || new SeqInfo();
+        }
+        else if (m = NOTE_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+            var octave = m[1], note = m[2], modifier = m[3],
+                abs_dur = m[4], rel_dur_numerator = m[5], rel_dur_denominator = m[6];
+            if (octave !== undefined)
+            {
+                seqs[seq_id].last_octave = +octave;
+            }
+            var tone = NaN;
+            if (note != 'r')
+            {
+                tone = seqs[seq_id].last_octave * 12 + 'c d ef g abhC D EF G ABH'.indexOf(note);
+                if (modifier !== undefined)
+                {
+                    tone += (modifier == '#') ? 1 : -1;
+                }
+            }
+            if (abs_dur !== undefined)
+            {
+                seqs[seq_id].last_abs_dur = abs_dur / 1000;
+            }
+            if (rel_dur_numerator !== undefined)
+            {
+                seqs[seq_id].last_rel_dur = +rel_dur_numerator;
+                if (rel_dur_denominator !== undefined)
+                {
+                    seqs[seq_id].last_rel_dur /= rel_dur_denominator;
+                }
+            }
+            else if (rel_dur_denominator !== undefined)
+            {
+                seqs[seq_id].last_rel_dur = 1 / rel_dur_denominator;
+            }
+            var dur = seqs[seq_id].last_abs_dur * seqs[seq_id].last_rel_dur;
+            seqs[seq_id].spec_list.push(isNaN(tone) ? new RestSpec(dur) : new NoteSpec(tone, dur));
+            seqs[seq_id].total_duration += dur;
+        }
+        else if (m = VOLUME_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+            var vol = +m[1];
+            seqs[seq_id].spec_list.push(new VolumeSpec(vol));
+        }
+        // Any other valid identifier is a sequence reference (this case must be the last non-garbage case)
+        else if (m = SEQ_REF_RE.exec(music.slice(last_idx)))
+        {
+            last_idx += m[0].length;
+            var seq_ref_id = m[1];
+            if (!seqs[seq_ref_id])
+            {
+                alert('Undefined sequence reference: ' + seq_ref_id);
+                return false;
+            }
+            Array.prototype.push.apply(seqs[seq_id].spec_list, seqs[seq_ref_id].spec_list);
+            seqs[seq_id].total_duration += seqs[seq_ref_id].total_duration;
+        }
+        // Anything else is garbage
+        else if (m = ANYTHING_RE.exec(music.slice(last_idx)))
+        {
+            alert('Garbage in input: ' + m[0]);
+            return false;
+        }
+    }
+
+    // Remove empty tracks and scale volume to avoid peak clipping
+    var peak = 0;
+    total_duration = 0;
+    tracks.forEach(function(info, track_id)
+    {
+        if (info.total_duration)
+        {
+            peak += 1.5;    // envelope peak value
+            total_duration = Math.max(total_duration, info.total_duration);
+        }
+        else
+        {
+            delete tracks[track_id];
+        }
+    });
+    if (total_duration == 0)
+    {
+        alert('Nothing to play');
+        return false;
+    }
+    auto_volume = 0.9 / peak;
+    return true;
+}
+
+function sched_note(track_info, tone, time, dur)
+{
+    var freq = 440 * Math.pow(2, (tone - (4 * 12 + 9)) / 12);
+    track_info.audio_osc.frequency.setValueAtTime(freq, time);
+    track_info.instrument.envelope.forEach(function(envelope_point)
+    {
+        // Get next envelope event time and amplitude
+        var t = envelope_point[0];
+        var ampl = volume * envelope_point[1];
+        // Negative envelope event times are relative to end of note
+        if (t < 0)
+        {
+            t += dur;
+        }
+        // Envelope times beyond end of note occur at end of note
+        if (t > dur)
+        {
+            t = dur;
+        }
+        // Ramp gain linearly from previous envelope event to new event
+        track_info.audio_gain.gain.linearRampToValueAtTime(ampl, time + t);
+    });
+    // Ramp gain linearly to zero from previous envelope event to end of note
+    track_info.audio_gain.gain.linearRampToValueAtTime(0, time + dur);
+}
+
+function sched_rest(track_info, time, dur)
+{
+    // Ramp gain linearly to zero from start to end of rest
+    track_info.audio_gain.gain.linearRampToValueAtTime(0, time + dur);
+}
+
+function build_and_schedule_audio()
+{
+    // Start first note a little bit after current audio time to avoid turn-on artifacts in some
+    // browsers
+    var start_time = audio_ctx.currentTime + START_STOP_MARGIN_TIME;
+    // Keep track of how many tracks are playing, so we know when the last one has stopped
+    playing_track_count = 0;
+
+    // Handle each track in turn
+    tracks.forEach(function(track_info)
+    {
+        // Build audio path for this track (1 oscillator + 1 gain node)
+        track_info.audio_gain = audio_ctx.createGain();
+        track_info.audio_gain.gain.value = 0;
+        track_info.audio_gain.connect(audio_ctx.destination);
+
+        track_info.audio_osc = audio_ctx.createOscillator();
+        track_info.audio_osc.connect(track_info.audio_gain);
+        track_info.audio_osc.type = track_info.instrument.wave_shape;
+
+        if (audio_ctx instanceof AudioContext)
+        {
+            // Call track_ended when oscillator is stopped
+            track_info.audio_osc.addEventListener('ended', track_ended, false);
+        }
+
+        // Schedule audio path events for this track
+        // Start oscillator immediately (won't be heard until gain becomes non-zero)
+        track_info.audio_osc.start(0);
+        playing_track_count++;
+        var time = start_time;
+        // Make sure gain doesn't start ramping before start_time
+        track_info.audio_gain.gain.setValueAtTime(0, start_time);
+
+        volume = auto_volume;
+
+        // Schedule events for each note in this track
+        track_info.spec_list.forEach(function(spec)
+        {
+            if (spec instanceof NoteSpec)
+            {
+                sched_note(track_info, spec.tone, time, spec.duration);
+                time += spec.duration;
+            }
+            else if (spec instanceof RestSpec)
+            {
+                sched_rest(track_info, time, spec.duration);
+                time += spec.duration;
+            }
+            else if (spec instanceof VolumeSpec)
+            {
+                volume = spec.volume * auto_volume;
+            }
+        });
+
+        // Stop oscillator a little bit after end of last note to avoid turn-off artifacts in
+        // some browsers
+        track_info.audio_osc.stop(time + START_STOP_MARGIN_TIME);
+    });
+}
+
+function track_ended()
+{
+    // A track has finished playing (oscillator stop event occurred)
+    playing_track_count--;
+    if (!playing_track_count)
+    {
+        // No more tracks are playing, so perform a complete stop
+        stop();
+    }
+}
+
+// FIXME: Playing to an MP3 file is not yet possible.
+function play_to_file()
+{
+    // Create new OfflineAudioContext
+    audio_ctx = new OfflineAudioContext(
+        1,                                                      // Number of channels
+        44100 * (total_duration + 2 * START_STOP_MARGIN_TIME),  // Number of sample frames
+        44100);                                                 // Sample frame rate
+
+    // Build audio paths and schedule all events
+    build_and_schedule_audio();
+
+    play_pause_button_elem.innerHTML = 'Pause';
+    stop_button_elem.style.visibility = 'visible';
+    state = STATE_PLAYING;
+
+    // Start generating audio samples
+    audio_ctx.startRendering().then(function(buffer)
+    {
+        var data = buffer.getChannelData(0);
+        var blob = new Blob([data], {type : 'audio/mpeg'});
+        var url = URL.createObjectURL(blob);
+        document.getElementById('file_link').innerHTML = '<a href="' + url + '">Get file<\/a>';
+        stop_button_elem.style.visibility = 'hidden';
+        play_pause_button_elem.innerHTML = 'Play';
+        state = STATE_STOPPED;
+    });
+}
+
+function play()
+{
+    if (audio_ctx)
+    {
+        audio_ctx.close();
+    }
+
+    // Parse input text to extract music and return immediately on parse error
+    if (!parse_music())
+    {
+        return;
+    }
+
+    if (to_file_chkbox_elem && to_file_chkbox_elem.checked)
+    {
+        play_to_file();
+        return;
+    }
+
+    // Create new AudioContext and immediately suspend it to prevent its timer from running
+    // until all events have been scheduled
+    audio_ctx = new AudioContext();
+    audio_ctx.suspend();
+
+    // Build audio paths and schedule all events
+    build_and_schedule_audio();
+
+    // Resume audio timer to start playing music
+    audio_ctx.resume();
+
+    play_pause_button_elem.innerHTML = 'Pause';
+    stop_button_elem.style.visibility = 'visible';
+    state = STATE_PLAYING;
+}
+
+function pause()
+{
+    if (audio_ctx)
+    {
+        // Stop audio timer so all audio playing stops
+        audio_ctx.suspend();
+        play_pause_button_elem.innerHTML = 'Resume';
+        state = STATE_PAUSED;
+    }
+}
+
+function resume()
+{
+    if (audio_ctx)
+    {
+        // Resume audio timer so all audio playing continues where it stopped
+        audio_ctx.resume();
+        play_pause_button_elem.innerHTML = 'Pause';
+        state = STATE_PLAYING;
+    }
+}
+
+function play_pause()
+{
+    if (state == STATE_STOPPED)
+    {
+        play();
+    }
+    else if (state == STATE_PAUSED)
+    {
+        resume();
+    }
+    else if (state == STATE_PLAYING)
+    {
+        pause();
+    }
+}
+
+function stop()
+{
+    if (audio_ctx)
+    {
+        // Close AudioContext to release all audio resources
+        audio_ctx.close();
+        audio_ctx = null;
+    }
+    stop_button_elem.style.visibility = 'hidden';
+    play_pause_button_elem.innerHTML = 'Play';
+    state = STATE_STOPPED;
+}
+
+function init()
+{
+    if (!AudioContext)
+    {
+        document.getElementById('content').innerHTML = "<span style='color:red'>Problem: Your browser doesn't support the Web Audio API!<\/span>";
+        document.getElementById('description').innerHTML = "";
+        return;
+    }
+
+    input_elem = document.getElementById('input');
+    play_pause_button_elem = document.getElementById('play_pause_button');
+    stop_button_elem = document.getElementById('stop_button');
+    play_pause_button_elem.addEventListener('click', play_pause, false);
+    stop_button_elem.addEventListener('click', stop, false);
+    stop_button_elem.style.visibility = 'hidden';
+    to_file_chkbox_elem = document.getElementById('to_file_chkbox');
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Music Synthesizer</h1>
+
+<div class="box" id="content">
+<textarea id='input' name='input'>// Misc. named sequences
+bar1: c/8 e g C
+bar2: 3f/8 a C F
+bar3: 3g/8 h D G/16 F
+t1seq: bar1 bar2 bar3 bar1
+t2seq: 2C/4 G 2f C g D C G
+
+// Tracks
+0: t1seq 0
+1: t2seq 1
+2(1): v0.2 6r2 c3/8 c/8 f3/8 f/8 g/4 g/8 g C/2</textarea>
+<div class="linebreak"></div>
+<button id="play_pause_button" type="button">Play</button>
+<button id="stop_button" type="button">Stop</button>
+<!--input id="to_file_chkbox" type="checkbox"><label for="to_file_chkbox">Output to file</label>
+<div id="file_link"></div-->
+</div>
+
+<div class="box" id="description">
+Syntax:
+<ul>
+<li>24 semi-tones (2 octaves): <span class="example">c c# d d# e f f# g g# a b h C C# D D# E F F# G G# A B H</span>
+<li>Sharp/flat: <span class="example">c# cb</span> (c sharp and c flat, hb = b)
+<li>Octaves: <span class="example">0c 1c 2c 3c 4c 5c 6c 7c 8c 9c</span> (0C = 1c, 4a = 440 Hz)
+<li>Octave defaults to same as for previous note (or rest) in same sequence (initially 4)
+<li>Relative duration: <span class="example">c1 c c/2 c c3/8</span> (whole, whole, half, half, 3/8)
+<li>Relative duration defaults to same as for previous note in same sequence (initially 1/4)
+<li>Absolute duration: <span class="example">c2500*1/4 c</span> (2 quarter notes at 2500 ms per whole note)
+<li>Absolute duration defaults to same as for previous note in same sequence (initially 2000)
+<li>Rests: <span class="example">r1 r r/2</span> (whole, whole, and half rests)
+<li>Tracks: <span class="example">1: c d e 2: g a h</span> (track 1 plays c d e while track 2 plays g a h in parallel, default track is 0)
+<li>Tracks: <span class="example">1: c d 2: g a h 1: e</span> (same as above, except track 1 is defined in 2 parts)
+<li>Instruments: <span class="example">1(2): c d</span> (track 1 uses instrument 2, default instrument is 0)
+<li>Named sequences: <span class="example">hiho: g a 1: c1 1 hiho d</span> (track 1 uses itself and hiho sequence and becomes: c1 c1 g/4 a/4 d1)
+<li>A reference to a named sequence is replaced by all notes in the sequence at the point of
+    reference, i.e. not including notes added to the sequence later
+<li>Volume: <span class="example">v0.5 c d v1 c d</span> (notes c and d at half volume, then at full (auto-scaled) volume)
+<li>Comments: <span class="example">/* Multi-line comment */ c d //&nbsp;Single-line comment</span>
+</ul>
+</div>
+
+</div>
+
+</body>
+</html>

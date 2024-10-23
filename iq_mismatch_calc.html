@@ -1,0 +1,405 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>I/Q Signal Mismatch Calculator</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.box.form_container {
+    -webkit-flex: 100 1 20rem;
+    flex: 100 1 20rem;
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+    -webkit-align-items: baseline;
+    align-items: baseline;
+}
+
+div.box.figure_container {
+    -webkit-flex: 1 1 calc(120px + 2.4em);
+    flex: 1 1 calc(120px + 2.4em);
+    -webkit-justify-content: space-around;
+    justify-content: space-around;
+    -webkit-align-content: space-around;
+    align-content: space-around;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 1rem 0rem 0.5rem 0rem;
+    width: 100%;
+}
+
+div.hcontainer > div.text, div.comment {
+    margin-left: 1rem; 
+    margin-right: 0rem; 
+}
+
+div.output {
+    box-sizing: border-box;
+    width: 100%;
+    text-align: right;
+    border: 1px solid;
+    font-weight: bold;
+    color: #000000;
+    padding: 0.1em 0em;
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 100%; 
+    text-align: right;
+}
+
+div.hcontainer > div.unit {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    margin-left: 0.2em;
+    width: 1.7em;
+}
+
+div.hcontainer > div.comment {
+    font-size: 80%; 
+}
+
+div.box.graphframe {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    padding: 0.2em;
+}
+
+div.canvas {
+    position: relative;
+    width: 100px; height: 100px;
+    background-color: #FFFFFF;
+    overflow: hidden;
+}
+
+div.xaxis {
+    position: absolute;
+    left: 0px; top: 49px;
+    width: 100%; height: 2px;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #666666;
+}
+
+div.xaxis div.arrow {
+    position: absolute;
+    right: 0px; top: -4px;
+    width: 0px; height: 2px;
+    border-top: 4px solid #FFFFFF;
+    border-right: 0px;
+    border-bottom: 4px solid #FFFFFF;
+    border-left: 10px solid #666666;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #FFFFFF;
+}
+
+div.xaxis div.axisname {
+    position: absolute;
+    right: 2px; top: -14px;
+    width: 40px; height: 0px;
+    overflow: visible;
+    font: 10px sans-serif;
+    line-height: 100%;
+    text-align: right;
+    color: #666666;
+}
+
+div.yaxis {
+    position: absolute;
+    left: 49px; top: 0px;
+    width: 2px; height: 100%;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #666666;
+}
+
+div.yaxis div.arrow {
+    position: absolute;
+    left: -4px; top: 0px;
+    width: 2px; height: 0px;
+    border-top: 0px;
+    border-right: 4px solid #FFFFFF;
+    border-bottom: 10px solid #666666;
+    border-left: 4px solid #FFFFFF;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #FFFFFF;
+}
+
+div.yaxis div.axisname {
+    position: absolute;
+    left: 6px; top: 0px;
+    width: 0px; height: 0px;
+    overflow: visible;
+    font: 10px sans-serif;
+    white-space: nowrap;
+    line-height: 100%;
+    color: #666666;
+}
+
+div.pixels {
+    position: absolute;
+    left: 0px; top: 0px;
+}
+
+div.pixel {
+    position: absolute;
+    left: 0px; top: 0px;
+    width: 2px; height: 2px;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #FFFFFF;
+}
+
+div.line {
+    position: absolute;
+    left: 0px; top: 5px;
+    width: 2px; height: 100%;
+    font-size: 0px;
+    line-height: 0px;
+    background-color: #FF0000;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['theory_button', 'Theory', 'window.open("iq_mismatch_theory/doc.html", "_blank")']];
+
+var canvas1_width = 120;
+var canvas1_height = 120;
+var center1_x = canvas1_width/2 - 1;
+var center1_y = canvas1_height/2 - 1;
+var n_pixels = 32;
+var amplitude = 43;
+var canvas2_width = 120;
+var canvas2_height = 120;
+var center2_x = canvas2_width/2 - 1;
+var center2_y = 15;
+var pixelstyle = new Array(n_pixels);
+var headpixcolor = "#FF0000";
+var tailpixcolor = "#FF8888";
+var unwantedstyle;
+var wantedstyle;
+var n_transition_steps = 16;
+var weight = new Array(n_transition_steps);
+var weight_max = 4 * n_transition_steps;
+var coordqueue = new Array(2 * n_pixels);
+coordqueue.read_i = 0;
+coordqueue.write_i = 0;
+
+var i;
+for (i = 0; i < weight.length; i++) {
+    weight[i] = Math.round(weight_max * (1 - Math.cos(Math.PI * i/weight.length))/2);
+}
+
+function update() {
+    var i,ai,aq,newuw,neww;
+    var error = false;
+    var a = 1 * document.getElementById('alpha').value;
+    var e = 1 * document.getElementById('epsilon').value;
+    if (!isFinite(e)) {
+        document.getElementById('result').innerHTML = "Illegal phase mismatch!";
+        error = true;
+    }
+    if (isNaN(a)) {
+        document.getElementById('result').innerHTML = "Illegal amplitude mismatch!";
+        error = true;
+    }
+    if (error) {
+        ai = aq = e = 0;
+        newuw = neww = canvas2_height;
+    } else {
+        a = Math.pow(10,a/20);
+        e = e*Math.PI/180;
+        var uw = 10*Math.log((1+a*a-2*a*Math.cos(e))/(1+a*a+2*a*Math.cos(e)))/Math.log(10);
+        if (isNaN(uw))
+            uw = 0;
+        document.getElementById('result').innerHTML = uw;
+        if (a < 1) {
+            ai = amplitude;
+            aq = amplitude * a;
+        } else {
+            ai = amplitude / a;
+            aq = amplitude;
+        }
+        uw = Math.round(uw);
+        if (uw < 0) {
+            newuw = Math.min(canvas2_height, center2_y - uw);
+            neww = center2_y;
+        } else {
+            newuw = center2_y;
+            neww = Math.min(canvas2_height, center2_y + uw);
+        }
+    }
+    var r_i = coordqueue.read_i;
+    var w_i = r_i;
+    for (i = 0; i < n_transition_steps + n_pixels; i++) {
+        var ph = 2 * Math.PI * (w_i % n_pixels)/n_pixels;
+        var newx = center1_x + Math.round(ai * Math.cos(ph));
+        var newy = center1_y - Math.round(aq * Math.sin(ph + e));
+        var qelem = coordqueue[w_i]; 
+        if (i < n_transition_steps) {
+            qelem.x = (weight[i] * newx
+                + (weight_max - weight[i]) * coordqueue[r_i].x) / weight_max;
+            qelem.y = (weight[i] * newy
+                + (weight_max - weight[i]) * coordqueue[r_i].y) / weight_max;
+            qelem.uwtop = (weight[i] * newuw
+                + (weight_max - weight[i]) * coordqueue[r_i].uwtop) / weight_max;
+            qelem.wtop = (weight[i] * neww
+                + (weight_max - weight[i]) * coordqueue[r_i].wtop) / weight_max;
+            r_i = (r_i + 1) % coordqueue.length;
+            if (r_i == coordqueue.write_i)
+                r_i = (r_i - n_pixels + coordqueue.length) % coordqueue.length;
+        } else {
+            qelem.x = newx;
+            qelem.y = newy;
+            qelem.uwtop = newuw;
+            qelem.wtop = neww;
+        }
+        w_i = (w_i + 1) % coordqueue.length;
+    }
+    coordqueue.write_i = w_i;
+    return true;
+}
+
+function timer() {
+    var qelem, styl;
+    var pix_i = coordqueue.read_i % n_pixels;
+    qelem = coordqueue[coordqueue.read_i];
+    styl = pixelstyle[pix_i];
+    styl.left = qelem.x + "px";
+    styl.top = qelem.y + "px";
+    styl.width = "2px";
+    styl.height = "2px";
+    styl.backgroundColor = tailpixcolor;
+    coordqueue.read_i = (coordqueue.read_i + 1) % coordqueue.length;
+    if (coordqueue.read_i == coordqueue.write_i)
+        coordqueue.read_i = (coordqueue.read_i - n_pixels + coordqueue.length) % coordqueue.length;
+    pix_i = coordqueue.read_i % n_pixels;
+    qelem = coordqueue[coordqueue.read_i];
+    styl = pixelstyle[pix_i];
+    styl.left = (qelem.x - 1) + "px";
+    styl.top = (qelem.y - 1) + "px";
+    styl.width = "4px";
+    styl.height = "4px";
+    styl.backgroundColor = headpixcolor;
+    unwantedstyle.top = qelem.uwtop + "px";
+    wantedstyle.top = qelem.wtop + "px";
+}
+
+function init() {
+    var i,styl;
+    
+    document.getElementById('alpha').value = 0;
+    document.getElementById('epsilon').value = 0;
+    
+    for (i = 0; i < coordqueue.length; i++) {
+        var qelem = coordqueue[i] = new Object;
+        qelem.x = center1_x;
+        qelem.y = center1_y;
+        qelem.uwtop = canvas2_height;
+        qelem.wtop = canvas2_height;
+    }
+
+    // Prepare graph 1
+    
+    var htmlstr = "";
+    for (i = 0; i < n_pixels; i++) {
+        htmlstr += "<div id='pix" + i + "' class='pixel'><\/div>\n";
+    }
+    document.getElementById("pixels1").innerHTML = htmlstr;
+    styl = document.getElementById("canvas1").style;
+    styl.width = canvas1_width + "px";
+    styl.height = canvas1_height + "px";
+    document.getElementById("xaxis1").style.top = center1_y + "px";
+    document.getElementById("yaxis1").style.left = center1_x + "px";
+    for (i = 0; i < n_pixels; i++) {
+        styl = pixelstyle[i] = document.getElementById("pix" + i).style;
+        styl.left = center1_x + "px";
+        styl.top = center1_y + "px";
+        styl.backgroundColor = tailpixcolor;
+    }
+
+    // Prepare graph 2
+    
+    styl = document.getElementById("canvas2").style;
+    styl.width = canvas2_width + "px";
+    styl.height = canvas2_height + "px";
+    document.getElementById("xaxis2").style.top = center2_y + "px";
+    document.getElementById("yaxis2").style.left = center2_x + "px";
+    styl = unwantedstyle = document.getElementById("unwanted").style;
+    styl.left = "20px";
+    styl.top = canvas2_height + "px";
+    styl = wantedstyle = document.getElementById("wanted").style;
+    styl.left = (canvas2_width - 22) + "px";
+    styl.top = canvas2_height + "px";
+    
+    update();
+    
+    setInterval(timer, 80);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>I/Q Signal Mismatch Calculator</h1>
+
+<div class="box hcontainer form_container">
+
+<h2>Amplitude mismatch</h2>
+<div class="text"><input id="alpha" type="text" value=0 maxlength=30 onKeyUp="update()" onBlur="update()"></div><div class="unit">dB</div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is Q amplitude / I amplitude, converted to dB.</div>
+
+<h2>Phase mismatch</h2>
+<div class="text"><input id="epsilon" type="text" value=0 maxlength=30 onKeyUp="update()" onBlur="update()"></div><div class="unit">&deg;</div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is Q phase - (I phase - 90&deg;).</div>
+
+<h2>Resulting unwanted signal</h2>
+<div class="text"><div id="result" class="output"></div></div><div class="unit">dB</div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is magnitude of unwanted spectral component (at frequency -f) relative to wanted component (at frequency f), in dB.</div>
+
+</div>
+
+<div class="box hcontainer figure_container">
+
+<div class="box graphframe">
+<div id="canvas1" class="canvas">
+<div id="xaxis1" class="xaxis"><div class="arrow"></div><div class="axisname">I</div></div>
+<div id="yaxis1" class="yaxis"><div class="arrow"></div><div class="axisname">Q</div></div>
+<div id="pixels1" class="pixels"></div>
+</div>
+</div>
+
+<div class="box graphframe">
+<div id="canvas2" class="canvas">
+<div id="xaxis2" class="xaxis"><div class="arrow"></div><div class="axisname">f</div></div>
+<div id="yaxis2" class="yaxis"><div class="arrow"></div><div class="axisname">mag(dB)</div></div>
+<div id="unwanted" class="line"></div>
+<div id="wanted" class="line"></div>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="../favicon.ico">
+<link rel="stylesheet" type="text/css" href="../style2.css">
+<title>Code 128 Barcode Generator</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+#input {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+#output {
+    text-align: center;
+}
+
+a[href].downloadbut {
+    display: inline-block;
+    width: auto;
+}
+
+#error_msg {
+    display: none;
+    color: red;
+}
+
+#raw_codes {
+    background-color: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 10em;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+class Code128Barcode
+{
+    // Widths (in "modules") of bars and spaces for each symbol
+    static SYMBOL_ENCODING = [
+        [2,1,2,2,2,2],  // 0
+        [2,2,2,1,2,2],
+        [2,2,2,2,2,1],
+        [1,2,1,2,2,3],
+        [1,2,1,3,2,2],
+        [1,3,1,2,2,2],
+        [1,2,2,2,1,3],
+        [1,2,2,3,1,2],
+        [1,3,2,2,1,2],
+        [2,2,1,2,1,3],
+        [2,2,1,3,1,2],
+        [2,3,1,2,1,2],
+        [1,1,2,2,3,2],
+        [1,2,2,1,3,2],
+        [1,2,2,2,3,1],
+        [1,1,3,2,2,2],
+        [1,2,3,1,2,2],
+        [1,2,3,2,2,1],
+        [2,2,3,2,1,1],
+        [2,2,1,1,3,2],
+        [2,2,1,2,3,1],
+        [2,1,3,2,1,2],
+        [2,2,3,1,1,2],
+        [3,1,2,1,3,1],
+        [3,1,1,2,2,2],
+        [3,2,1,1,2,2],
+        [3,2,1,2,2,1],
+        [3,1,2,2,1,2],
+        [3,2,2,1,1,2],
+        [3,2,2,2,1,1],
+        [2,1,2,1,2,3],
+        [2,1,2,3,2,1],
+        [2,3,2,1,2,1],
+        [1,1,1,3,2,3],
+        [1,3,1,1,2,3],
+        [1,3,1,3,2,1],
+        [1,1,2,3,1,3],
+        [1,3,2,1,1,3],
+        [1,3,2,3,1,1],
+        [2,1,1,3,1,3],
+        [2,3,1,1,1,3],
+        [2,3,1,3,1,1],
+        [1,1,2,1,3,3],
+        [1,1,2,3,3,1],
+        [1,3,2,1,3,1],
+        [1,1,3,1,2,3],
+        [1,1,3,3,2,1],
+        [1,3,3,1,2,1],
+        [3,1,3,1,2,1],
+        [2,1,1,3,3,1],
+        [2,3,1,1,3,1],
+        [2,1,3,1,1,3],
+        [2,1,3,3,1,1],
+        [2,1,3,1,3,1],
+        [3,1,1,1,2,3],
+        [3,1,1,3,2,1],
+        [3,3,1,1,2,1],
+        [3,1,2,1,1,3],
+        [3,1,2,3,1,1],
+        [3,3,2,1,1,1],
+        [3,1,4,1,1,1],
+        [2,2,1,4,1,1],
+        [4,3,1,1,1,1],
+        [1,1,1,2,2,4],
+        [1,1,1,4,2,2],
+        [1,2,1,1,2,4],
+        [1,2,1,4,2,1],
+        [1,4,1,1,2,2],
+        [1,4,1,2,2,1],
+        [1,1,2,2,1,4],
+        [1,1,2,4,1,2],
+        [1,2,2,1,1,4],
+        [1,2,2,4,1,1],
+        [1,4,2,1,1,2],
+        [1,4,2,2,1,1],
+        [2,4,1,2,1,1],
+        [2,2,1,1,1,4],
+        [4,1,3,1,1,1],
+        [2,4,1,1,1,2],
+        [1,3,4,1,1,1],
+        [1,1,1,2,4,2],
+        [1,2,1,1,4,2],
+        [1,2,1,2,4,1],
+        [1,1,4,2,1,2],
+        [1,2,4,1,1,2],
+        [1,2,4,2,1,1],
+        [4,1,1,2,1,2],
+        [4,2,1,1,1,2],
+        [4,2,1,2,1,1],
+        [2,1,2,1,4,1],
+        [2,1,4,1,2,1],
+        [4,1,2,1,2,1],
+        [1,1,1,1,4,3],
+        [1,1,1,3,4,1],
+        [1,3,1,1,4,1],
+        [1,1,4,1,1,3],  // 95
+        [1,1,4,3,1,1],  // 96:  FNC 3   | FNC 3   | 96
+        [4,1,1,1,1,3],  // 97:  FNC 2   | FNC 2   | 97
+        [4,1,1,3,1,1],  // 98:  Shift B | Shift A | 98
+        [1,1,3,1,4,1],  // 99:  Code C  | Code C  | 99
+        [1,1,4,1,3,1],  // 100: Code B  | FNC 4   | Code B
+        [3,1,1,1,4,1],  // 101: FNC 4   | Code A  | Code A
+        [4,1,1,1,3,1],  // 102: FNC 1
+        [2,1,1,4,1,2],  // 103: Start Code A
+        [2,1,1,2,1,4],  // 104: Start Code B
+        [2,1,1,2,3,2],  // 105: Start Code C
+        [2,3,3,1,1,1],  // 106: Stop
+    ];
+
+    static FNC1_VALUE = 102;
+    static FNC2_VALUE = 97;
+    static FNC3_VALUE = 96;
+    static FNC4_A_VALUE = 101;
+    static FNC4_B_VALUE = 100;
+    static CODE_A_SWITCH_VALUE = 101;
+    static CODE_B_SWITCH_VALUE = 100;
+    static CODE_C_SWITCH_VALUE = 99;
+    static SHIFT_AB_VALUE = 98;
+    static START_CODE_A_VALUE = 103;
+    static START_CODE_B_VALUE = 104;
+    static START_CODE_C_VALUE = 105;
+    static STOP_CODE_VALUE = 106;
+
+    static FNC1_CODEPOINT = 0x2460; // Use Unicode "CIRCLED DIGIT ONE" etc. to represent FNC1-3
+    static FNC2_CODEPOINT = 0x2461;
+    static FNC3_CODEPOINT = 0x2462;
+    static FNC4_CODEPOINT = 0x2463;
+    static CODE_A_CODEPOINT = 0x24B6; // Use Unicode "CIRCLED LATIN CAPITAL LETTER A" etc. to represent Code A-C
+    static CODE_B_CODEPOINT = 0x24B7;
+    static CODE_C_CODEPOINT = 0x24B8;
+    static SHIFT_AB_CODEPOINT = 0x24C8; // Use Unicode "CIRCLED LATIN CAPITAL LETTER S" etc. to represent Shift A/B
+
+    static QUIET_ZONE_WIDTH = 10; // unit: modules
+    static SYMBOL_PATTERN_WIDTH = 11; // unit: modules
+    static FINAL_BAR_WIDTH = 2;
+    static SYMBOL_PITCH = 5.5; // unit: modules
+    static SYMBOL_HEIGHT = 10; // unit: modules
+
+    are_codes_visible = true;
+    plaintext;
+    label_items = [];
+    raw_codes = [];
+    codeset;
+    temp_shift_active = false;
+    temp_fnc4_active = false;
+    permanent_fnc4_active = false;
+    error;
+    bar_widths = [];
+    total_width;
+
+    /**
+    * Returns a string that is the specified string with all escape sequences converted to their corresponding
+    * characters, i.e. '\\n' to '\n', '\\t' to '\t', and similarly for all other Javascript escapes.
+    * The special non-standard escapes '\\F1', '\\F2', '\\F3', '\\F4' are also supported as representations of FNC codes.
+    */
+    apply_escapes(str)
+    {
+        // Replace \F1, \F2, \F3, \F4 with suitable unicode characters (representing FNC1, FNC2, FNC3, FNC4 codes)
+        str = str.replace(/(?<!\\)((?:\\\\)*)\\F([1-4])/g, (match, p1, p2) =>
+            p1 + String.fromCodePoint(Code128Barcode.FNC1_CODEPOINT + parseInt(p2) - 1));
+        str = str.replace(/(?<!\\)((?:\\\\)*)\\C([A-C])/g, (match, p1, p2) =>
+            p1 + String.fromCodePoint(Code128Barcode.CODE_A_CODEPOINT + p2.codePointAt() - 'A'.codePointAt()));
+        str = str.replace(/(?<!\\)((?:\\\\)*)\\S/g, '$1' +  String.fromCodePoint(Code128Barcode.SHIFT_AB_CODEPOINT));
+        // Evaluate the string as a javascript string - after ensuring that all quotes are escaped (so we don't risk
+        // executing arbitrary javascript code found in the string)
+        return eval('"' + str.replace(/(?<!\\)((?:\\\\)*)"/g, '$1\\"') + '"');
+    }
+
+    create(plaintext, codeset, are_codes_visible)
+    {
+        this.are_codes_visible = are_codes_visible;
+        this.codeset = codeset;
+        this.error = null;
+        this.label_items.length = 0;
+        this.raw_codes.length = 0;
+        try {
+            this.plaintext = this.apply_escapes(plaintext);
+        } catch (e) {
+            this.error = "Invalid backslash escape!";
+            return;
+        }
+        this.bar_widths.length = 0;
+        this.temp_shift_active = false;
+        this.temp_fnc4_active = false;
+        this.permanent_fnc4_active = false;
+
+        this.total_width = Code128Barcode.QUIET_ZONE_WIDTH;
+        var sum = 0;
+        var symbol_position = 1;
+        var that = this;
+
+        function append_symbol(value, char, raw_code_comment)
+        {
+            if (value != null) {
+                that.bar_widths.push(...Code128Barcode.SYMBOL_ENCODING[value]);
+                that.total_width += Code128Barcode.SYMBOL_PATTERN_WIDTH;
+                sum += value * symbol_position;
+                symbol_position++;
+                raw_code_comment = raw_code_comment.replace(/[\x00-\x1F\x7F-\x9F\xAD]/g,
+                    (match) => '\\x' + match.codePointAt().toString(16).toUpperCase().padStart(2, '0'));
+                that.raw_codes.push('Value ' + value.toString().padStart(3) + ': ' + raw_code_comment);
+            }
+            if (char != null) {
+                if (char.length > 1 || char >= ' ' && char <= '~' || char >= '\xA1' && char <= '\xFF' && char != '\xAD') {
+                    that.label_items.push(char);
+                } else {
+                    that.label_items.push(char.codePointAt().toString(16).toUpperCase().padStart(4, '0'));
+                }
+            }
+        }
+
+        // Append bars for start symbol to bar_widths
+        var start_code_value = Code128Barcode.START_CODE_A_VALUE + this.codeset.charCodeAt() - 'A'.charCodeAt();
+        append_symbol(start_code_value, null, 'Start Code ' + this.codeset);
+        symbol_position = 1; // reset symbol position back to 1 (according to spec)
+
+        var is_first_half_symbol = true; // used for code set C only
+        var value;
+
+        for (const char of this.plaintext) {
+            var codepoint = char.codePointAt();
+            if (codepoint == Code128Barcode.FNC1_CODEPOINT) {
+                if (symbol_position != 1) {
+                    this.error = 'FNC1 is only allowed at start of text!';
+                    return;
+                }
+                append_symbol(Code128Barcode.FNC1_VALUE, 'FNC1', 'FNC1');
+            } else if (codepoint == Code128Barcode.FNC2_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC2 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC2 is not a supported code in code set C!';
+                    return;
+                }
+                append_symbol(Code128Barcode.FNC2_VALUE, 'FNC2', 'FNC2');
+            } else if (codepoint == Code128Barcode.FNC3_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC3 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC3 is not a supported code in code set C!';
+                    return;
+                }
+                append_symbol(Code128Barcode.FNC3_VALUE, 'FNC3', 'FNC3');
+            } else if (codepoint == Code128Barcode.FNC4_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC4 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC4 is not a supported code in code set C!';
+                    return;
+                }
+                if (this.temp_fnc4_active) {
+                    this.permanent_fnc4_active = !this.permanent_fnc4_active;
+                }
+                this.temp_fnc4_active = !this.temp_fnc4_active;
+                append_symbol(this.codeset == 'A' ? Code128Barcode.FNC4_A_VALUE : Code128Barcode.FNC4_B_VALUE, null, 'FNC4');
+            } else if (codepoint == Code128Barcode.CODE_A_CODEPOINT) {
+                if (!is_first_half_symbol) {
+                    this.error = 'Odd number of digits is not supported in code set C!';
+                    return;
+                }
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code A is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'A') {
+                    this.error = 'Code A is not a supported code in code set A!';
+                    return;
+                }
+                this.codeset = 'A';
+                append_symbol(Code128Barcode.CODE_A_SWITCH_VALUE, null, 'Code A');
+            } else if (codepoint == Code128Barcode.CODE_B_CODEPOINT) {
+                if (!is_first_half_symbol) {
+                    this.error = 'Odd number of digits is not supported in code set C!';
+                    return;
+                }
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code B is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'B') {
+                    this.error = 'Code B is not a supported code in code set B!';
+                    return;
+                }
+                this.codeset = 'B';
+                append_symbol(Code128Barcode.CODE_B_SWITCH_VALUE, null, 'Code B');
+            } else if (codepoint == Code128Barcode.CODE_C_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code C is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'Code C is not a supported code in code set C!';
+                    return;
+                }
+                this.codeset = 'C';
+                append_symbol(Code128Barcode.CODE_C_SWITCH_VALUE, null, 'Code C');
+            } else if (codepoint == Code128Barcode.SHIFT_AB_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Shift A/B is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'Shift A/B is not a supported code in code set C!';
+                    return;
+                }
+                this.temp_shift_active = true;
+                append_symbol(Code128Barcode.SHIFT_AB_VALUE, null, this.codeset == 'A' ? 'Shift B' : 'Shift A');
+            } else {
+                switch (this.temp_shift_active ? (this.codeset == 'A' ? 'B' : 'A') : this.codeset) {
+                    case 'A':
+                        if (this.temp_fnc4_active != this.permanent_fnc4_active) {
+                            // ISO-8859-1 codes
+                            if (codepoint < 0x80 || codepoint > 0xDF) {
+                                this.error = '"' + char + '" is not a supported character in code set A, ISO-8859-1!';
+                                return;
+                            }
+                            if (codepoint < 0xA0) {
+                                // Map codepoints 0x80-0x9F to values 0x40-0x5F
+                                value = codepoint - 0x40;
+                            } else {
+                                // Map codepoints 0xA0-0xDF to values 0x00-0x3F
+                                value = codepoint - 0xA0;
+                            }
+                        } else {
+                            if (char > '_') {
+                                this.error = '"' + char + '" is not a supported character in code set A!';
+                                return;
+                            }
+                            if (char < ' ') {
+                                // Map codepoints 0x00-0x1F to values 0x40-0x5F
+                                value = codepoint + 0x40;
+                            } else {
+                                // Map codepoints 0x20-0x5F to values 0x00-0x3F
+                                value = codepoint - 0x20;
+                            }
+                        }
+                        this.temp_fnc4_active = false;
+                        this.temp_shift_active = false;
+                        // Append bars for this symbol to bar_widths
+                        append_symbol(value, char, '"' + char + '"');
+                        break;
+                    case 'B':
+                        if (this.temp_fnc4_active != this.permanent_fnc4_active) {
+                            // ISO-8859-1 codes
+                            if (codepoint < 0xA0 || codepoint > 0xFF) {
+                                this.error = '"' + char + '" is not a supported character in code set B, ISO-8859-1!';
+                                return;
+                            }
+                            // Map codepoints 0xA0-0xFF to values 0x00-0x5F
+                            value = codepoint - 0xA0;
+                        } else {
+                            if (char < ' ' || char > '\x7F') {
+                                this.error = '"' + char + '" is not a supported character in code set B!';
+                                return;
+                            }
+                            // Map codepoints 0x20-0x7F to values 0x00-0x5F
+                            value = codepoint - 0x20;
+                        }
+                        this.temp_fnc4_active = false;
+                        this.temp_shift_active = false;
+                        // Append bars for this symbol to bar_widths
+                        append_symbol(value, char, '"' + char + '"');
+                        break;
+                    case 'C':
+                        if (char < '0' || char > '9') {
+                            this.error = '"' + char + '" is not a supported character in code set C!';
+                            return;
+                        }
+                        if (is_first_half_symbol) {
+                            value = codepoint - '0'.codePointAt();
+                            is_first_half_symbol = false;
+                        } else {
+                            // Append first digit in digit pair without bars
+                            append_symbol(null, String.fromCodePoint('0'.codePointAt() + value), null);
+                            value = 10 * value + codepoint - '0'.codePointAt();
+                            is_first_half_symbol = true;
+                            // Append bars for both digits in digit pair
+                            append_symbol(value, char, '"' + value.toString().padStart(2, '0') + '"');
+                            break;
+                        }
+                }
+            }
+        }
+
+        // Handle last orphan digit for code set C if plaintext contains an odd number of digits
+        if (!is_first_half_symbol) {
+            // Append symbol for switching to code set A
+            append_symbol(Code128Barcode.CODE_A_SWITCH_VALUE, null, 'Code A');
+            // Convert value of last digit from code set C to A, and append bars for this symbol
+            append_symbol(
+                value + '0'.codePointAt() - ' '.codePointAt(),
+                String.fromCodePoint('0'.codePointAt() + value),
+                '"' + value + '"');
+        }
+
+        var check_value = sum % 103;
+        append_symbol(check_value, null, 'Checksum')
+
+        append_symbol(Code128Barcode.STOP_CODE_VALUE, null, 'Stop')
+
+        this.bar_widths.push(Code128Barcode.FINAL_BAR_WIDTH);
+        this.total_width += Code128Barcode.FINAL_BAR_WIDTH;
+
+        this.total_width += Code128Barcode.QUIET_ZONE_WIDTH;
+    }
+
+    draw_on_canvas(canvas_context)
+    {
+        var module_width = Math.floor(canvas_context.canvas.width / this.total_width);
+        var bar_top = 2 * module_width;
+        var bar_height = canvas_context.canvas.height - 15 * module_width;
+        var x = Math.floor((canvas_context.canvas.width - this.total_width * module_width) / 2);
+        x += Code128Barcode.QUIET_ZONE_WIDTH * module_width;
+        var symbol_pitch = Code128Barcode.SYMBOL_PITCH * module_width;
+        var symbol_height = Code128Barcode.SYMBOL_HEIGHT * module_width;
+        var symbol_x = x + symbol_pitch;
+        var symbol_y = bar_top + bar_height + symbol_height;
+        var is_bar = true;
+        for (var i = 0; i < this.bar_widths.length; i++) {
+            var bar_width = this.bar_widths[i] * module_width;
+            if (is_bar) {
+                canvas_context.fillRect(x, bar_top, bar_width, bar_height);
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        for (var label_item of this.label_items) {
+            if (label_item.length == 1) {
+                canvas_context.font = symbol_height + 'px monospace';
+                canvas_context.fillText(label_item, symbol_x, symbol_y);
+                symbol_x += symbol_pitch;
+            } else if (this.are_codes_visible) {
+                canvas_context.font = symbol_height/2 + 'px monospace';
+                canvas_context.fillText(label_item.slice(0, 2), symbol_x, symbol_y - symbol_height/2);
+                canvas_context.fillText(label_item.slice(2), symbol_x, symbol_y);
+                // Put a bar under the code to indicate where the code starts and ends
+                canvas_context.fillRect(
+                    symbol_x + module_width,
+                    symbol_y + module_width,
+                    symbol_pitch - 2 * module_width,
+                    module_width);
+                symbol_x += symbol_pitch;
+            }
+        }
+    }
+
+    to_svg()
+    {
+        var aspect_ratio = canvas_context.canvas.height / canvas_context.canvas.width;
+        var total_height = Math.ceil(aspect_ratio * this.total_width);
+        var bar_top = 2;
+        var bar_height = total_height - 15;
+        var x = Code128Barcode.QUIET_ZONE_WIDTH;
+        var symbol_pitch = Code128Barcode.SYMBOL_PITCH;
+        var symbol_x = x + symbol_pitch;
+        var symbol_y = bar_top + bar_height + Code128Barcode.SYMBOL_HEIGHT;
+        var is_bar = true;
+        var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg width="' +
+            (5 / aspect_ratio) + 'cm" height="5cm" viewBox="0 0 ' +
+            this.total_width + ' ' + total_height +'" version="1.1" xmlns="http://www.w3.org/2000/svg">\n' +
+            '<style>text {font-size:' + Code128Barcode.SYMBOL_HEIGHT + 'px;font-family:monospace}\n' +
+            'text.small {font-size:' + Code128Barcode.SYMBOL_HEIGHT/2 + 'px;font-family:monospace}</style>\n' +
+            '<rect style="fill:white" x="0" y="0" width="100%" height="100%"/>\n';
+        for (var i = 0; i < this.bar_widths.length; i++) {
+            var bar_width = this.bar_widths[i];
+            if (is_bar) {
+                svg += '<rect x="' + x + '" y="' + bar_top +
+                    '" width="' + bar_width + '" height="' + bar_height + '"/>\n';
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        for (var label_item of this.label_items) {
+            if (label_item.length == 1) {
+                svg += '<text x="' + symbol_x + '" y="' + symbol_y + '">&#' + label_item.charCodeAt() + ';</text>\n';
+                symbol_x += symbol_pitch;
+            } else if (this.are_codes_visible) {
+                svg += '<text class="small" x="' + symbol_x + '" y="' + (symbol_y - Code128Barcode.SYMBOL_HEIGHT/2) +
+                    '">' + label_item.slice(0, 2) + '</text>\n';
+                svg += '<text class="small" x="' + symbol_x + '" y="' + symbol_y +
+                    '">' + label_item.slice(2) + '</text>\n';
+                // Put a bar under the code to indicate where the code starts and ends
+                svg += '<rect x="' + (symbol_x + 1) + '" y="' + (symbol_y + 1) +
+                    '" width="' + (symbol_pitch - 2) + '" height="' + 1 + '"/>\n';
+                symbol_x += symbol_pitch;
+            }
+        }
+        svg += '</svg>';
+        return svg;
+    }
+}
+
+function input_focus_handler()
+{
+    input_elem.select();
+}
+
+function png_download_link_click_handler(ev)
+{
+    png_download_link_elem.href = barcode_canvas_elem.toDataURL();
+    png_download_link_elem.download = 'code128.png';
+}
+
+function svg_download_link_click_handler(ev)
+{
+    svg_download_link_elem.href = 'data:image/svg+xml,' + encodeURIComponent(code.to_svg());
+    svg_download_link_elem.download = 'code128.svg';
+}
+
+function show_code()
+{
+    input_elem.focus();
+    code.create(input_elem.value, codeset_elem.value, codes_visible_elem.checked);
+    if (code.error)
+    {
+        barcode_output_elem.style.display = 'none';
+        error_msg_elem.innerHTML = 'ERROR: ' + code.error;
+        error_msg_elem.style.display = 'block';
+        raw_codes_elem.value = '';
+        return;
+    }
+    error_msg_elem.style.display = 'none';
+    barcode_output_elem.style.display = 'block';
+    var canvas_width = code.total_width * 3;
+    barcode_canvas_elem.width = canvas_width;
+    canvas_context.fillStyle = '#FFFFFF';
+    canvas_context.fillRect(0, 0, barcode_canvas_elem.width, barcode_canvas_elem.height);
+    canvas_context.fillStyle = '#000000';
+    code.draw_on_canvas(canvas_context);
+    raw_codes_elem.value = code.raw_codes.join('\n');
+}
+
+var codeset_elem;
+var input_elem;
+var generate_button_elem;
+var codes_visible_elem;
+var barcode_output_elem;
+var barcode_canvas_elem;
+var png_download_link_elem;
+var svg_download_link_elem;
+var error_msg_elem;
+var raw_codes_elem;
+var canvas_context;
+// Instantiate Code128Barcode (and reuse this instance for all codes)
+var code = new Code128Barcode();
+
+function init()
+{
+    codeset_elem = document.getElementById('codeset');
+    codeset_elem.addEventListener('change', show_code, false);
+    input_elem = document.getElementById('input');
+    input_elem.addEventListener('keyup', show_code, false);
+    input_elem.addEventListener('focus', input_focus_handler, false);
+    generate_button_elem = document.getElementById('generate_button');
+    generate_button_elem.addEventListener('click', show_code, false);
+    codes_visible_elem = document.getElementById('codes_visible');
+    codes_visible_elem.addEventListener('change', show_code, false);
+    barcode_output_elem = document.getElementById('output');
+    barcode_canvas_elem = document.getElementById('canvas');
+    png_download_link_elem = document.getElementById('png_download_link');
+    svg_download_link_elem = document.getElementById('svg_download_link');
+    error_msg_elem = document.getElementById('error_msg');
+    raw_codes_elem = document.getElementById('raw_codes');
+    canvas_context = barcode_canvas_elem.getContext("2d");
+    show_code();
+    png_download_link_elem.addEventListener('click', png_download_link_click_handler, false);
+    svg_download_link_elem.addEventListener('click', svg_download_link_click_handler, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+<body>
+
+<div class="hcontainer">
+
+<h1>Code 128 Barcode Generator</h1>
+
+<div id="main" class="box">
+<p>
+Supported characters/codes:
+</p>
+<ul>
+<li><b>Code set A:</b> ASCII codes 0-95 (chars 0-9, A-Z, special, control), or 128-223 with FNC4.</li>
+<li><b>Code set B:</b> ASCII codes 32-127 (chars 0-9, A-Z, a-z, special), or 160-255 with FNC4.</li>
+<li><b>Code set C:</b> ASCII codes 48-57 (chars 0-9 in double density).</li>
+</ul>
+<ul>
+<li>Javascript backslash escapes are supported, e.g. \n, \x0a, \u000a (use \\ to get a literal backslash).</li>
+<li>FNC codes 1-4 may be specified as \F1, \F2, \F3, \F4.</li>
+<li>Code set A-C switch codes may be specified as \CA, \CB, \CC, and Shift A/B as \S.</li>
+<li>If the input ends with an odd number of digits in code set C, an automatic switch to code set A is inserted before
+    the last digit (for convenience).</li>
+</ul>
+Code set selection: <select id="codeset">
+    <option value="A">Manual, start with code set A</option>
+    <option value="B" selected>Manual, start with code set B</option>
+    <option value="C">Manual, start with code set C</option>
+</select>
+<br>
+Input text:
+<input type="text" id="input" value="Code 128">
+<label><input id="codes_visible" type="checkbox" checked> Show non-printable (but not code set selection) codes in barcode label</label><br>
+<button id="generate_button" type="button">Generate</button>
+</div>
+
+<div class="box imgbox">
+<div id="output">
+<canvas id="canvas" width=339 height=200><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+<a id="png_download_link" class="navbut downloadbut" href="">Download PNG</a>
+<a id="svg_download_link" class="navbut downloadbut" href="">Download SVG</a>
+</div>
+<div id="error_msg"></div>
+</div>
+
+<div class="box">
+Raw codes:<br>
+<textarea id="raw_codes" readonly></textarea>
+</div>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,1919 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Text Input Assistant and Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+.max_width {
+    width: 100%;
+}
+
+div.box {
+    text-align: center;
+}
+
+div#softkeys {
+    display: inline-block;
+}
+
+table.softkeys {
+    margin-left: auto;
+    margin-right: auto;
+    margin-top: 1em; /* Room for top key row popups */
+    border-collapse: collapse;
+    border: 0px solid black;
+    border-spacing: 0px;
+}
+
+table.softkeys td {
+    border: 0px solid black;
+    padding: 0px;
+    text-align: center;
+    width: 2.5em;
+    min-width: 2.5em;
+    height: 2.5em;
+    min-height: 2.5em;
+}
+
+table.softkeys td.emptycell {
+    width: 1em;
+    min-width: 1em;
+    height: 1em;
+    min-height: 1em;
+}
+
+span.button_container {
+    position: relative;
+    display: inline-block;
+    width: 100%;
+    height: 100%;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+span.button_container button {
+    width: 100%;
+    height: 100%;
+    font-size: 1.7em;
+    margin: 0px;
+    padding: 0em;
+    border-radius: 0.2em;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+textarea#input {
+    font-size: 1.5em;
+    position: relative;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 5em;
+    margin: 0px;
+    padding: 0.2em;
+}
+
+span.button_popup {
+    display: none;
+    position: absolute;
+    left: 0px;
+    top: -1.5em;
+    z-index: 1000;
+    border: 1px solid black;
+    border-radius: 0.2em;
+    box-shadow: 0.2em 0.2em 0.2em black;
+    padding: 0.2em;
+    line-height: 1em;
+    font-size: 1em;
+    font-weight: bold;
+    background-color: #EEAA88;
+    color: #000000;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.dia_group {
+    display: inline-block;
+    position: relative;
+}
+
+.dia_group.combination {
+    color: #AA8888;
+}
+
+.combining_overlay {
+    position: absolute;
+    left: 0px;
+    color: #FFFFFF;
+}
+
+#convert_button {
+    font-weight: bold;
+}
+
+#help {
+    text-align: left;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+var selection_start = 0;
+var selection_end = 0;
+var scroll_top = 0;
+var popup = null;
+
+var latin_diacritics_defs = {};
+
+latin_diacritics_defs.included_languages = [
+    'Albanian',
+    'Catalan',
+    'Czech',
+    'Danish',
+    'Dutch',
+    'English',
+    'Estonian',
+    'Faroese',
+    'Finnish',
+    'French',
+    'German',
+    'Hungarian',
+    'Icelandic',
+    'Irish',
+    'Italian',
+    'Latvian',
+    'Lithuanian',
+    'Luxembourgish',
+    'Maltese',
+    'Norwegian',
+    'Polish',
+    'Portuguese',
+    'Romanian',
+    'Slovak',
+    'Slovene',
+    'Spanish',
+    'Swedish',
+    'Turkish',
+    'Welsh',
+];
+
+latin_diacritics_defs.info = 'Covers ' + latin_diacritics_defs.included_languages.length + ' languages: ' +
+    latin_diacritics_defs.included_languages.join(', ') +
+    ".<br>&nbsp;<br><label><input id='latin_dia_sgl_code_checkbox' type='checkbox' " +
+    "onChange='latin_diacritics_defs.single_code_option_changed();'>Only single-code characters<\/label>";
+
+latin_diacritics_defs.char_table = [
+    // 3-char ascii sequences
+    { ascii_str : "eth" , uni_chars : [0x00f0]},
+    { ascii_str : "Eth" , uni_chars : [0x00d0]},
+    { ascii_str : "ae'" , uni_chars : [0x01fd]},
+    { ascii_str : "Ae'" , uni_chars : [0x01fc]},
+    { ascii_str : "ae-" , uni_chars : [0x01e3]},
+    { ascii_str : "Ae-" , uni_chars : [0x01e2]},
+
+    // 2-char ascii sequences
+    { ascii_str : "ae"  , uni_chars : [0x00e6]},
+    { ascii_str : "Ae"  , uni_chars : [0x00c6]},
+    { ascii_str : "oe"  , uni_chars : [0x0153]},
+    { ascii_str : "Oe"  , uni_chars : [0x0152]},
+    { ascii_str : "th"  , uni_chars : [0x00fe]},
+    { ascii_str : "Th"  , uni_chars : [0x00de]},
+    { ascii_str : "ss"  , uni_chars : [0x00df]},
+    { ascii_str : "Ss"  , uni_chars : [0x1e9e]},
+    { ascii_str : "ij"  , uni_chars : [0x0133]},
+    { ascii_str : "IJ"  , uni_chars : [0x0132]},
+    // Remaining 2-char sequences are generated programmatically in initialize method
+
+    // 1-char ascii sequences are added here from next table
+    // Remaining 1-char sequences are generated programmatically in initialize method
+];
+
+latin_diacritics_defs.char_table_1_char_entries = [
+    // 1-char ascii sequences
+    { ascii_str : "i"   , uni_chars : [0x0131]},
+    { ascii_str : "!"   , uni_chars : [0x00a1]},
+    { ascii_str : "?"   , uni_chars : [0x00bf]},
+];
+
+latin_diacritics_defs.char_table_modifier_keys =
+    /* acute  grave  circum caron  tilde  diaere dblacu macron breve  dotabo ringab cedill ogonek comma  stroke*/
+        "'" +  "'" +  'v' +  'v' +  's' +  '"' +  '"' +  '-' +  'u' +  '.' +  'o' +  ',' +  ',' +  ',' +  '/';
+
+latin_diacritics_defs.is_case_insensitive = false;
+
+latin_diacritics_defs.key_layout = [
+    /*      acute  grave  circum caron  tilde  diaere dblacu macron breve  dotabo ringab cedill ogonek comma  stroke*/
+    [0x00a0,0x00b4,0x0060,0x02c6,0x02c7,0x02dc,0x00a8,0x02dd,0x02c9,0x02d8,0x02d9,0x02da,0x00b8,0x02db,0x002c,0x002f],
+    [null],
+    [0x0041,0x0042,0x0043,0x0044,0x0045,0x0046,0x0047,0x0048,0x0049,0x004a,0x004b,0x004c,0x004e,0x004d,0x004f,0x0050],
+    [0x0061,0x0062,0x0063,0x0064,0x0065,0x0066,0x0067,0x0068,0x0069,0x006a,0x006b,0x006c,0x006e,0x006d,0x006f,0x0070],
+    [0x0051,0x0052,0x0053,0x0054,0x0055,0x0056,0x0057,0x0058,0x0059,0x005a,0x00c6,null  ,null  ,null  ,null  ,null  ],
+    [0x0071,0x0072,0x0073,0x0074,0x0075,0x0076,0x0077,0x0078,0x0079,0x007a,0x00e6,null  ,null  ,null  ,null  ,0x0020],
+    [null],
+    [0x0152,0x1e9e,0x00d0,0x00de,0x0132,null  ,0x00a1,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+    [0x0153,0x00df,0x00f0,0x00fe,0x0133,0x0131,0x00bf,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+];
+
+latin_diacritics_defs.last_modifier_key_row = 0;
+
+latin_diacritics_defs.last_modifiable_key_row = 5;
+
+latin_diacritics_defs.key_info = {
+    /*    acute  grave  circum caron  tilde  diaere dblacu macron breve  dotabo ringab cedill ogonek comma  stroke*/
+    ' ': [0x00b4,0x0060,0x02c6,0x02c7,0x02dc,0x00a8,0x02dd,0x02c9,0x02d8,0x02d9,0x02da,0x00b8,0x02db,null  ,null  ],
+    'A': [0x00c1,0x00c0,0x00c2,0x01cd,0x00c3,0x00c4,null  ,0x0100,0x0102,0x0226,0x00c5,null  ,0x0104,null  ,0x023a],
+    'a': [0x00e1,0x00e0,0x00e2,0x01ce,0x00e3,0x00e4,null  ,0x0101,0x0103,0x0227,0x00e5,null  ,0x0105,null  ,0x2c65],
+    'B': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e02,null  ,null  ,null  ,null  ,0x0243],
+    'b': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e03,null  ,null  ,null  ,null  ,0x0180],
+    'C': [0x0106,null  ,0x0108,0x010c,null  ,null  ,null  ,null  ,null  ,0x010a,null  ,0x00c7,null  ,null  ,0x023b],
+    'c': [0x0107,null  ,0x0109,0x010d,null  ,null  ,null  ,null  ,null  ,0x010b,null  ,0x00e7,null  ,null  ,0x023c],
+    'D': [null  ,null  ,null  ,0x010e,null  ,null  ,null  ,null  ,null  ,0x1e0a,null  ,0x1e10,null  ,null  ,0x0110],
+    'd': [null  ,null  ,null  ,0x010f,null  ,null  ,null  ,null  ,null  ,0x1e0b,null  ,0x1e11,null  ,null  ,0x0111],
+    'E': [0x00c9,0x00c8,0x00ca,0x011a,0x1ebc,0x00cb,null  ,0x0112,0x0114,0x0116,null  ,0x0228,0x0118,null  ,0x0246],
+    'e': [0x00e9,0x00e8,0x00ea,0x011b,0x1ebd,0x00eb,null  ,0x0113,0x0115,0x0117,null  ,0x0229,0x0119,null  ,0x0247],
+    'F': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e1e,null  ,null  ,null  ,null  ,null  ],
+    'f': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e1f,null  ,null  ,null  ,null  ,null  ],
+    'G': [0x01f4,null  ,0x011c,0x01e6,null  ,null  ,null  ,0x1e20,0x011e,0x0120,null  ,0x0122,null  ,null  ,0x01e4],
+    'g': [0x01f5,null  ,0x011d,0x01e7,null  ,null  ,null  ,0x1e21,0x011f,0x0121,null  ,0x0123,null  ,null  ,0x01e5],
+    'H': [null  ,null  ,0x0124,0x021e,null  ,0x1e26,null  ,null  ,null  ,0x1e22,null  ,0x1e28,null  ,null  ,0x0126],
+    'h': [null  ,null  ,0x0125,0x021f,null  ,0x1e27,null  ,null  ,null  ,0x1e23,null  ,0x1e29,null  ,null  ,0x0127],
+    'I': [0x00cd,0x00cc,0x00ce,0x01cf,0x0128,0x00cf,null  ,0x012a,0x012c,0x0130,null  ,null  ,0x012e,null  ,0x0197],
+    'i': [0x00ed,0x00ec,0x00ee,0x01d0,0x0129,0x00ef,null  ,0x012b,0x012d,null  ,null  ,null  ,0x012f,null  ,0x0268],
+    'J': [null  ,null  ,0x0134,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x0248],
+    'j': [null  ,null  ,0x0135,0x01f0,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x0249],
+    'K': [0x1e30,null  ,null  ,0x01e8,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x0136,null  ,null  ,null  ],
+    'k': [0x1e31,null  ,null  ,0x01e9,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x0137,null  ,null  ,null  ],
+    'L': [0x0139,null  ,null  ,0x013d,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x013b,null  ,null  ,0x0141],
+    'l': [0x013a,null  ,null  ,0x013e,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x013c,null  ,null  ,0x0142],
+    'M': [0x1e3e,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e40,null  ,null  ,null  ,null  ,null  ],
+    'm': [0x1e3f,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e41,null  ,null  ,null  ,null  ,null  ],
+    'N': [0x0143,0x01f8,null  ,0x0147,0x00d1,null  ,null  ,null  ,null  ,0x1e44,null  ,0x0145,null  ,null  ,null  ],
+    'n': [0x0144,0x01f9,null  ,0x0148,0x00f1,null  ,null  ,null  ,null  ,0x1e45,null  ,0x0146,null  ,null  ,null  ],
+    'O': [0x00d3,0x00d2,0x00d4,0x01d1,0x00d5,0x00d6,0x0150,0x014c,0x014e,0x022e,null  ,null  ,0x01ea,null  ,0x00d8],
+    'o': [0x00f3,0x00f2,0x00f4,0x01d2,0x00f5,0x00f6,0x0151,0x014d,0x014f,0x022f,null  ,null  ,0x01eb,null  ,0x00f8],
+    'P': [0x1e54,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e56,null  ,null  ,null  ,null  ,null  ],
+    'p': [0x1e55,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,0x1e57,null  ,null  ,null  ,null  ,null  ],
+    'Q': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+    'q': [null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+    'R': [0x0154,null  ,null  ,0x0158,null  ,null  ,null  ,null  ,null  ,0x1e58,null  ,0x0156,null  ,null  ,0x024c],
+    'r': [0x0155,null  ,null  ,0x0159,null  ,null  ,null  ,null  ,null  ,0x1e59,null  ,0x0157,null  ,null  ,0x024d],
+    'S': [0x015a,null  ,0x015c,0x0160,null  ,null  ,null  ,null  ,null  ,0x1e60,null  ,0x015e,null  ,0x0218,null  ],
+    's': [0x015b,null  ,0x015d,0x0161,null  ,null  ,null  ,null  ,null  ,0x1e61,null  ,0x015f,null  ,0x0219,null  ],
+    'T': [null  ,null  ,null  ,0x0164,null  ,null  ,null  ,null  ,null  ,0x1e6a,null  ,0x0162,null  ,0x021a,0x0166],
+    't': [null  ,null  ,null  ,0x0165,null  ,0x1e97,null  ,null  ,null  ,0x1e6b,null  ,0x0163,null  ,0x021b,0x0167],
+    'U': [0x00da,0x00d9,0x00db,0x01d3,0x0168,0x00dc,0x0170,0x016a,0x016c,null  ,0x016e,null  ,0x0172,null  ,null  ],
+    'u': [0x00fa,0x00f9,0x00fb,0x01d4,0x0169,0x00fc,0x0171,0x016b,0x016d,null  ,0x016f,null  ,0x0173,null  ,null  ],
+    'V': [null  ,null  ,null  ,null  ,0x1e7c,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+    'v': [null  ,null  ,null  ,null  ,0x1e7d,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+    'W': [0x1e82,0x1e80,0x0174,null  ,null  ,0x1e84,null  ,null  ,null  ,0x1e86,null  ,null  ,null  ,null  ,null  ],
+    'w': [0x1e83,0x1e81,0x0175,null  ,null  ,0x1e85,null  ,null  ,null  ,0x1e87,0x1e98,null  ,null  ,null  ,null  ],
+    'X': [null  ,null  ,null  ,null  ,null  ,0x1e8c,null  ,null  ,null  ,0x1e8a,null  ,null  ,null  ,null  ,null  ],
+    'x': [null  ,null  ,null  ,null  ,null  ,0x1e8d,null  ,null  ,null  ,0x1e8b,null  ,null  ,null  ,null  ,null  ],
+    'Y': [0x00dd,0x1ef2,0x0176,null  ,0x1ef8,0x0178,null  ,null  ,null  ,0x1e8e,null  ,null  ,null  ,null  ,0x024e],
+    'y': [0x00fd,0x1ef3,0x0177,null  ,0x1ef9,0x00ff,null  ,null  ,null  ,0x1e8f,null  ,null  ,null  ,null  ,0x024f],
+    'Z': [0x0179,null  ,0x1e90,0x017d,null  ,null  ,null  ,null  ,null  ,0x017b,null  ,null  ,null  ,null  ,0x01b5],
+    'z': [0x017a,null  ,0x1e91,0x017e,null  ,null  ,null  ,null  ,null  ,0x017c,null  ,null  ,null  ,null  ,0x01b6],
+'\u00c6':[0x01fc,null  ,null  ,null  ,null  ,null  ,null  ,0x01e2,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+'\u00e6':[0x01fd,null  ,null  ,null  ,null  ,null  ,null  ,0x01e3,null  ,null  ,null  ,null  ,null  ,null  ,null  ],
+};
+
+latin_diacritics_defs.combining_codes = [
+    /*    acute  grave  circum caron  tilde  diaere dblacu macron breve  dotabo ringab cedill ogonek comma  stroke*/
+    null, 0x0301,0x0300,0x0302,0x030c,0x0303,0x0308,0x030b,0x0304,0x0306,0x0307,0x030a,0x0327,0x0328,0x0326,null
+];
+
+latin_diacritics_defs.combining_helper_char = 'X';
+
+latin_diacritics_defs.single_code_checkbox_elem;
+
+latin_diacritics_defs.single_code_only = false;
+
+latin_diacritics_defs.current_modifier_code = latin_diacritics_defs.key_layout[0][0];
+
+latin_diacritics_defs.initialize = function()
+{
+    // Create 2-char ascii sequences
+    var sequence_to_code = {};
+    for (var ch in latin_diacritics_defs.key_info)
+    {
+        var key_info_row = latin_diacritics_defs.key_info[ch];
+        for (var mod_index = 0; mod_index < key_info_row.length; mod_index++)
+        {
+            var code = key_info_row[mod_index];
+            if (code)
+            {
+                var seq = ch + latin_diacritics_defs.char_table_modifier_keys.charAt(mod_index);
+                if (!sequence_to_code[seq])
+                {
+                    sequence_to_code[seq] = [];
+                }
+                sequence_to_code[seq].push(code);
+            }
+        }
+    }
+    // Add created sequences to char_table
+    for (var seq in sequence_to_code)
+    {
+        latin_diacritics_defs.char_table.push({ascii_str: seq, uni_chars: sequence_to_code[seq]});
+    }
+
+    // Add predefined 1-char ascii sequences to char_table
+    latin_diacritics_defs.char_table =
+        latin_diacritics_defs.char_table.concat(latin_diacritics_defs.char_table_1_char_entries);
+    // Save current char_table length as length to use when combining chars are not allowed
+    latin_diacritics_defs.char_table_length_without_combining_chars = latin_diacritics_defs.char_table.length;
+
+    // Create 1-char ascii sequences for combining characters
+    sequence_to_code = {};
+    for (var modifier_index = 1; modifier_index < latin_diacritics_defs.combining_codes.length; modifier_index++)
+    {
+        var code = latin_diacritics_defs.combining_codes[modifier_index];
+        if (code)
+        {
+            var seq = latin_diacritics_defs.char_table_modifier_keys.charAt(modifier_index - 1);
+            if (!sequence_to_code[seq])
+            {
+                sequence_to_code[seq] = [];
+            }
+            sequence_to_code[seq].push(code);
+        }
+    }
+    // Add created sequences to char_table
+    for (var seq in sequence_to_code)
+    {
+        latin_diacritics_defs.char_table.push({ascii_str: seq, uni_chars: sequence_to_code[seq]});
+    }
+    // Initially all table entries are allowed
+    latin_diacritics_defs.char_table_current_length = latin_diacritics_defs.char_table.length;
+};
+
+latin_diacritics_defs.create_softkeys = function()
+{
+    latin_diacritics_defs.single_code_checkbox_elem = document.getElementById('latin_dia_sgl_code_checkbox');
+    latin_diacritics_defs.single_code_checkbox_elem.checked = latin_diacritics_defs.single_code_only;
+    var hs = "<table class='softkeys'>";
+    for (var row = 0; row < latin_diacritics_defs.key_layout.length; row++)
+    {
+        var defs_row_cells = latin_diacritics_defs.key_layout[row];
+        hs += "<tr>";
+        for (var column = 0; column < defs_row_cells.length; column++)
+        {
+            hs += make_softkey_cell(defs_row_cells[column]);
+        }
+    }
+    hs += "<\/table>";
+    return hs;
+};
+
+latin_diacritics_defs.update_softkeys = function()
+{
+    var modifier_index = latin_diacritics_defs.key_layout[0].indexOf(latin_diacritics_defs.current_modifier_code);
+    var combining_code = latin_diacritics_defs.combining_codes[modifier_index];
+    // Update all modifier and modifiable keys
+    for (var row = 0; row <= latin_diacritics_defs.last_modifiable_key_row; row++)
+    {
+        var defs_row_cells = latin_diacritics_defs.key_layout[row];
+        for (var column = 0; column < defs_row_cells.length; column++)
+        {
+            var code = defs_row_cells[column];
+            if (code)
+            {
+                var modified_code = code;
+                if (modifier_index > 0)
+                {
+                    if (row <= latin_diacritics_defs.last_modifier_key_row)
+                    {
+                        // This is a modifier key, so if it is the currently selected modifier, then apply its combining
+                        // appearance
+                        if (combining_code && column == modifier_index)
+                        {
+                            modified_code = combining_code;
+                        }
+                    }
+                    else
+                    {
+                        // This is a modifiable non-modifier key, so apply its modified or non-modified appearance
+                        // depending on the selected modifier
+                        var key_char = code_point_to_utf16_string(code);
+                        modified_code = latin_diacritics_defs.key_info[key_char][modifier_index - 1];
+                        if (!modified_code)
+                        {
+                            modified_code =
+                                combining_code && !latin_diacritics_defs.single_code_only ?
+                                    [code, combining_code] :
+                                    0x0020;
+                        }
+                    }
+                }
+                update_softkey(code, modified_code);
+            }
+        }
+    }
+};
+
+latin_diacritics_defs.button_click = function(key_char)
+{
+    var code = key_char.charCodeAt(0);
+    var modifier_index = latin_diacritics_defs.key_layout[0].indexOf(code);
+    if (modifier_index >= 0)
+    {
+        // A modifier key was clicked
+        var combining_code = latin_diacritics_defs.combining_codes[modifier_index];
+        if (code == latin_diacritics_defs.current_modifier_code)
+        {
+            // Clicked modifier key is already in combining state, so insert combining char if available
+            if (combining_code)
+            {
+                insert_char(code_point_to_utf16_string(combining_code));
+            }
+        }
+        else
+        {
+            // Clicked modifier key is not in combining state, so set it as current modifier
+            latin_diacritics_defs.current_modifier_code = code;
+            // Change appearance of all modifier and modifiable keys according to new modifier
+            latin_diacritics_defs.update_softkeys();
+        }
+    }
+    else
+    {
+        // A non-modifier key was clicked
+        var modifier_index = latin_diacritics_defs.key_layout[0].indexOf(latin_diacritics_defs.current_modifier_code);
+        if (modifier_index > 0)
+        {
+            var key_info_row = latin_diacritics_defs.key_info[key_char];
+            if (key_info_row)
+            {
+                // A modifiable key was clicked, so modify it with modifier
+                var modified_code = key_info_row[modifier_index - 1];
+                if (modified_code)
+                {
+                    key_char = code_point_to_utf16_string(modified_code);
+                }
+                else
+                {
+                    var combining_code = latin_diacritics_defs.combining_codes[modifier_index];
+                    if (!combining_code || latin_diacritics_defs.single_code_only)
+                    {
+                        // No available combining code, or combining not allowed, so don't insert anything
+                        return;
+                    }
+                    key_char = key_char + code_point_to_utf16_string(combining_code);
+                }
+            }
+        }
+        insert_char(key_char);
+    }
+};
+
+latin_diacritics_defs.single_code_option_changed = function()
+{
+    latin_diacritics_defs.single_code_only = latin_diacritics_defs.single_code_checkbox_elem.checked;
+    // If only single-code characters are desired, then hide combining chars from char_table
+    latin_diacritics_defs.char_table_current_length =
+        latin_diacritics_defs.single_code_only ?
+            latin_diacritics_defs.char_table_length_without_combining_chars :
+            latin_diacritics_defs.char_table.length;
+    // Change appearance of modifiable keys using combining characters, and also change the key sequence of the current
+    // modifier key
+    latin_diacritics_defs.update_softkeys();
+};
+
+var greek_defs = {};
+
+greek_defs.char_table = [
+    // 3-char ascii sequences
+    { ascii_str : "i'\"", uni_chars : [0x0390]},
+    { ascii_str : "u'\"", uni_chars : [0x03b0]},
+
+    // 2-char ascii sequences
+    { ascii_str : "th"  , uni_chars : [0x03b8]},
+    { ascii_str : "Th"  , uni_chars : [0x0398]},
+    { ascii_str : "ph"  , uni_chars : [0x03c6]},
+    { ascii_str : "Ph"  , uni_chars : [0x03a6]},
+    { ascii_str : "ps"  , uni_chars : [0x03c8]},
+    { ascii_str : "Ps"  , uni_chars : [0x03a8]},
+    { ascii_str : "a'"  , uni_chars : [0x03ac]},
+    { ascii_str : "A'"  , uni_chars : [0x0386]},
+    { ascii_str : "e'"  , uni_chars : [0x03ad,0x03ae]},
+    { ascii_str : "E'"  , uni_chars : [0x0388,0x0389]},
+    { ascii_str : "i'"  , uni_chars : [0x03af]},
+    { ascii_str : "I'"  , uni_chars : [0x038a]},
+    { ascii_str : "o'"  , uni_chars : [0x03ce,0x03cc]},
+    { ascii_str : "O'"  , uni_chars : [0x038f,0x038c]},
+    { ascii_str : "u'"  , uni_chars : [0x03cd]},
+    { ascii_str : "U'"  , uni_chars : [0x038e]},
+    { ascii_str : "i\"" , uni_chars : [0x03ca]},
+    { ascii_str : "I\"" , uni_chars : [0x03aa]},
+    { ascii_str : "u\"" , uni_chars : [0x03cb]},
+    { ascii_str : "U\"" , uni_chars : [0x03ab]},
+
+    // 1-char ascii sequences
+    { ascii_str : "a"   , uni_chars : [0x03b1]},
+    { ascii_str : "A"   , uni_chars : [0x0391]},
+    { ascii_str : "b"   , uni_chars : [0x03b2]},
+    { ascii_str : "B"   , uni_chars : [0x0392]},
+    { ascii_str : "g"   , uni_chars : [0x03b3]},
+    { ascii_str : "G"   , uni_chars : [0x0393]},
+    { ascii_str : "d"   , uni_chars : [0x03b4]},
+    { ascii_str : "D"   , uni_chars : [0x0394]},
+    { ascii_str : "e"   , uni_chars : [0x03b5, 0x03b7]},
+    { ascii_str : "E"   , uni_chars : [0x0395, 0x0397]},
+    { ascii_str : "z"   , uni_chars : [0x03b6]},
+    { ascii_str : "Z"   , uni_chars : [0x0396]},
+    { ascii_str : "t"   , uni_chars : [0x03c4]},
+    { ascii_str : "T"   , uni_chars : [0x03a4]},
+    { ascii_str : "i"   , uni_chars : [0x03b9]},
+    { ascii_str : "I"   , uni_chars : [0x0399]},
+    { ascii_str : "k"   , uni_chars : [0x03ba]},
+    { ascii_str : "K"   , uni_chars : [0x039a]},
+    { ascii_str : "l"   , uni_chars : [0x03bb]},
+    { ascii_str : "L"   , uni_chars : [0x039b]},
+    { ascii_str : "m"   , uni_chars : [0x03bc]},
+    { ascii_str : "M"   , uni_chars : [0x039c]},
+    { ascii_str : "n"   , uni_chars : [0x03bd]},
+    { ascii_str : "N"   , uni_chars : [0x039d]},
+    { ascii_str : "x"   , uni_chars : [0x03be]},
+    { ascii_str : "X"   , uni_chars : [0x039e]},
+    { ascii_str : "o"   , uni_chars : [0x03c9, 0x03bf]},
+    { ascii_str : "O"   , uni_chars : [0x03a9, 0x039f]},
+    { ascii_str : "p"   , uni_chars : [0x03c0]},
+    { ascii_str : "P"   , uni_chars : [0x03a0]},
+    { ascii_str : "r"   , uni_chars : [0x03c1]},
+    { ascii_str : "R"   , uni_chars : [0x03a1]},
+    { ascii_str : "s"   , uni_chars : [0x03c3, 0x03c2]},
+    { ascii_str : "S"   , uni_chars : [0x03a3]},
+    { ascii_str : "u"   , uni_chars : [0x03c5]},
+    { ascii_str : "U"   , uni_chars : [0x03a5]},
+    { ascii_str : "c"   , uni_chars : [0x03c7]},
+    { ascii_str : "C"   , uni_chars : [0x03a7]},
+    { ascii_str : ":"   , uni_chars : [0x00b7]},
+];
+
+greek_defs.is_case_insensitive = false;
+
+greek_defs.key_layout = [
+    [0x0391,0x0392,0x0393,0x0394,0x0395,0x0396,0x0397,0x0398,0x0399,0x039a,0x039b,0x039c],
+    [0x03b1,0x03b2,0x03b3,0x03b4,0x03b5,0x03b6,0x03b7,0x03b8,0x03b9,0x03ba,0x03bb,0x03bc],
+    [null],
+    [0x039d,0x039e,0x039f,0x03a0,0x03a1,0x03a3,0x03a4,0x03a5,0x03a6,0x03a7,0x03a8,0x03a9],
+    [0x03bd,0x03be,0x03bf,0x03c0,0x03c1,0x03c3,0x03c4,0x03c5,0x03c6,0x03c7,0x03c8,0x03c9],
+    [null  ,null  ,null  ,null  ,null  ,0x03C2,null  ,null  ,null  ,null  ,null  ,null  ],
+    [null],
+    [0x0386,0x0388,0x0389,0x038a,0x038c,0x038e,0x038f,0x03aa,0x03ab,0x00b7,null  ,null  ],
+    [0x03ac,0x03ad,0x03ae,0x03af,0x03cc,0x03cd,0x03ce,0x03ca,0x03cb,0x0390,0x03b0,null  ],
+];
+
+greek_defs.create_softkeys = function()
+{
+    var hs = "<table class='softkeys'>";
+    for (var row = 0; row < greek_defs.key_layout.length; row++)
+    {
+        hs += "<tr>";
+        for (var column = 0; column < greek_defs.key_layout[row].length; column++)
+        {
+            hs += make_softkey_cell(greek_defs.key_layout[row][column]);
+        }
+    }
+    hs += "<\/table>";
+    return hs;
+};
+
+var thai_defs = {};
+
+thai_defs.combining_codes = [
+    0x0E31, 0x0E33, 0x0E34, 0x0E35, 0x0E36, 0x0E37, 0x0E38, 0x0E39, 0x0E3A, 0x0E47, 0x0E48, 0x0E49, 0x0E4A, 0x0E4B,
+    0x0E4C, 0x0E4D, 0x0E4E,
+];
+
+thai_defs.combining_helper_char = '&#3629;';
+
+thai_defs.char_table = [
+    // 3-char ascii sequences
+    { ascii_str : "uee" , uni_chars : [0x0E37]},
+    { ascii_str : "aee" , uni_chars : [0x0E41]},
+    { ascii_str : "rue" , uni_chars : [0x0E24]},
+    { ascii_str : "lue" , uni_chars : [0x0E26]},
+
+    // 2-char ascii sequences
+    { ascii_str : "kh"  , uni_chars : [0x0E02, 0x0E04, 0x0E06, 0x0E03, 0x0E05]},
+    { ascii_str : "ng"  , uni_chars : [0x0E07]},
+    { ascii_str : "ch"  , uni_chars : [0x0E0A, 0x0E09, 0x0E0C]},
+    { ascii_str : "th"  , uni_chars : [0x0E17, 0x0E16, 0x0E18, 0x0E10, 0x0E11, 0x0E12]},
+    { ascii_str : "ph"  , uni_chars : [0x0E1C, 0x0E1E, 0x0E20]},
+    { ascii_str : "or"  , uni_chars : [0x0E2D]},
+    { ascii_str : "aa"  , uni_chars : [0x0E32]},
+    { ascii_str : "am"  , uni_chars : [0x0E33]},
+    { ascii_str : "ii"  , uni_chars : [0x0E35]},
+    { ascii_str : "ue"  , uni_chars : [0x0E36]},
+    { ascii_str : "uu"  , uni_chars : [0x0E39]},
+    { ascii_str : "ee"  , uni_chars : [0x0E40]},
+    { ascii_str : "oo"  , uni_chars : [0x0E42]},
+    { ascii_str : "ai"  , uni_chars : [0x0E44, 0x0E43]},
+
+    // 1-char ascii sequences
+    { ascii_str : "k"   , uni_chars : [0x0E01]},
+    { ascii_str : "j"   , uni_chars : [0x0E08]},
+    { ascii_str : "d"   , uni_chars : [0x0E14, 0x0E0E]},
+    { ascii_str : "t"   , uni_chars : [0x0E15, 0x0E0F]},
+    { ascii_str : "n"   , uni_chars : [0x0E19, 0x0E13]},
+    { ascii_str : "m"   , uni_chars : [0x0E21]},
+    { ascii_str : "b"   , uni_chars : [0x0E1A]},
+    { ascii_str : "p"   , uni_chars : [0x0E1B]},
+    { ascii_str : "f"   , uni_chars : [0x0E1D, 0x0E1F]},
+    { ascii_str : "y"   , uni_chars : [0x0E22, 0x0E0D]},
+    { ascii_str : "r"   , uni_chars : [0x0E23]},
+    { ascii_str : "l"   , uni_chars : [0x0E25, 0x0E2C]},
+    { ascii_str : "w"   , uni_chars : [0x0E27]},
+    { ascii_str : "s"   , uni_chars : [0x0E2A, 0x0E28, 0x0E29, 0x0E0B]},
+    { ascii_str : "h"   , uni_chars : [0x0E2B, 0x0E2E]},
+    { ascii_str : "a"   , uni_chars : [0x0E31, 0x0E30]},
+    { ascii_str : "i"   , uni_chars : [0x0E34]},
+    { ascii_str : "u"   , uni_chars : [0x0E38]},
+    { ascii_str : "@"   , uni_chars : [0x0E45]},
+    { ascii_str : "~"   , uni_chars : [0x0E47]},
+    { ascii_str : "'"   , uni_chars : [0x0E48]},
+    { ascii_str : "\""  , uni_chars : [0x0E49]},
+    { ascii_str : "&"   , uni_chars : [0x0E4A]},
+    { ascii_str : "+"   , uni_chars : [0x0E4B]},
+    { ascii_str : "%"   , uni_chars : [0x0E4C]},
+    { ascii_str : ":"   , uni_chars : [0x0E46]},
+    { ascii_str : "."   , uni_chars : [0x0E2F]},
+    { ascii_str : "0"   , uni_chars : [0x0E50]},
+    { ascii_str : "1"   , uni_chars : [0x0E51]},
+    { ascii_str : "2"   , uni_chars : [0x0E52]},
+    { ascii_str : "3"   , uni_chars : [0x0E53]},
+    { ascii_str : "4"   , uni_chars : [0x0E54]},
+    { ascii_str : "5"   , uni_chars : [0x0E55]},
+    { ascii_str : "6"   , uni_chars : [0x0E56]},
+    { ascii_str : "7"   , uni_chars : [0x0E57]},
+    { ascii_str : "8"   , uni_chars : [0x0E58]},
+    { ascii_str : "9"   , uni_chars : [0x0E59]},
+    { ascii_str : "$"   , uni_chars : [0x0E3F]},
+];
+
+thai_defs.is_case_insensitive = true;
+
+thai_defs.create_softkeys = function()
+{
+    var hs = "<table class='softkeys'>";
+    var consonant_code = 0x0E01;
+    var vowel_code = 0x0E30;
+    var punct_code = 0x0E46;
+    var digit_code = 0x0E50;
+    var code;
+    for (var row = 0; row < 8; row++)
+    {
+        hs += "<tr>";
+        for (var column = 0; column < 15; column++)
+        {
+            if (column == 6 || column == 9 || column == 12)
+            {
+                code = null;
+            }
+            else
+            {
+                if (column < 6 && consonant_code <= 0x0E2E)
+                {
+                    code = consonant_code;
+                    consonant_code++;
+                }
+                else if (column > 6 && column < 9)
+                {
+                    code = vowel_code;
+                    vowel_code++;
+                    if (vowel_code == 0x0E3A) vowel_code = 0x0E40;
+                }
+                else if (column > 9 && column < 12 && punct_code != 0x0E40)
+                {
+                    code = punct_code;
+                    punct_code++;
+                    if (punct_code == 0x0E4F) punct_code = 0x0E2F;
+                    if (punct_code == 0x0E30) punct_code = 0x0E3A;
+                    if (punct_code == 0x0E3B) punct_code = 0x0E3F;
+                }
+                else if (column > 12 && column < 15 && digit_code != 0x0E5C)
+                {
+                    code = digit_code;
+                    digit_code++;
+                }
+            }
+            hs += make_softkey_cell(code);
+        }
+    }
+    hs += "<\/table>";
+    return hs;
+}
+
+var japanese_defs = {};
+
+japanese_defs.char_table = [
+    // 4-char ascii sequences
+    { ascii_str : "yori", uni_chars : [0x309F]},
+    { ascii_str : "1000", uni_chars : [0x5343]},
+    { ascii_str : "shi!", uni_chars : [0x30B7]},
+    { ascii_str : "chi!", uni_chars : [0x30C1]},
+    { ascii_str : "tsu!", uni_chars : [0x30C4, 0x30C3]},
+    { ascii_str : "koto", uni_chars : [0x30FF]},
+
+    // 3-char ascii sequences
+    { ascii_str : "shi" , uni_chars : [0x3057]},
+    { ascii_str : "chi" , uni_chars : [0x3061]},
+    { ascii_str : "tsu" , uni_chars : [0x3064, 0x3063]},
+    { ascii_str : "100" , uni_chars : [0x767E]},
+    { ascii_str : "e12" , uni_chars : [0x5146]},
+    { ascii_str : "e16" , uni_chars : [0x4EAC]},
+    { ascii_str : "e20" , uni_chars : [0x5793]},
+    { ascii_str : "ka!" , uni_chars : [0x30AB, 0x30F5]},
+    { ascii_str : "ki!" , uni_chars : [0x30AD]},
+    { ascii_str : "ku!" , uni_chars : [0x30AF]},
+    { ascii_str : "ke!" , uni_chars : [0x30B1, 0x30F6]},
+    { ascii_str : "ko!" , uni_chars : [0x30B3]},
+    { ascii_str : "ga!" , uni_chars : [0x30AC]},
+    { ascii_str : "gi!" , uni_chars : [0x30AE]},
+    { ascii_str : "gu!" , uni_chars : [0x30B0]},
+    { ascii_str : "ge!" , uni_chars : [0x30B2]},
+    { ascii_str : "go!" , uni_chars : [0x30B4]},
+    { ascii_str : "sa!" , uni_chars : [0x30B5]},
+    { ascii_str : "si!" , uni_chars : [0x30B7]},
+    { ascii_str : "su!" , uni_chars : [0x30B9]},
+    { ascii_str : "se!" , uni_chars : [0x30BB]},
+    { ascii_str : "so!" , uni_chars : [0x30BD]},
+    { ascii_str : "za!" , uni_chars : [0x30B6]},
+    { ascii_str : "ji!" , uni_chars : [0x30B8]},
+    { ascii_str : "zi!" , uni_chars : [0x30B8]},
+    { ascii_str : "zu!" , uni_chars : [0x30BA]},
+    { ascii_str : "ze!" , uni_chars : [0x30BC]},
+    { ascii_str : "zo!" , uni_chars : [0x30BE]},
+    { ascii_str : "ta!" , uni_chars : [0x30BF]},
+    { ascii_str : "ti!" , uni_chars : [0x30C1]},
+    { ascii_str : "tu!" , uni_chars : [0x30C4, 0x30C3]},
+    { ascii_str : "te!" , uni_chars : [0x30C6]},
+    { ascii_str : "to!" , uni_chars : [0x30C8]},
+    { ascii_str : "da!" , uni_chars : [0x30C0]},
+    { ascii_str : "di!" , uni_chars : [0x30C2]},
+    { ascii_str : "du!" , uni_chars : [0x30C5]},
+    { ascii_str : "de!" , uni_chars : [0x30C7]},
+    { ascii_str : "do!" , uni_chars : [0x30C9]},
+    { ascii_str : "na!" , uni_chars : [0x30CA]},
+    { ascii_str : "ni!" , uni_chars : [0x30CB]},
+    { ascii_str : "nu!" , uni_chars : [0x30CC]},
+    { ascii_str : "ne!" , uni_chars : [0x30CD]},
+    { ascii_str : "no!" , uni_chars : [0x30CE]},
+    { ascii_str : "ha!" , uni_chars : [0x30CF]},
+    { ascii_str : "hi!" , uni_chars : [0x30D2]},
+    { ascii_str : "fu!" , uni_chars : [0x30D5]},
+    { ascii_str : "he!" , uni_chars : [0x30D8]},
+    { ascii_str : "ho!" , uni_chars : [0x30DB]},
+    { ascii_str : "ba!" , uni_chars : [0x30D0]},
+    { ascii_str : "bi!" , uni_chars : [0x30D3]},
+    { ascii_str : "bu!" , uni_chars : [0x30D6]},
+    { ascii_str : "be!" , uni_chars : [0x30D9]},
+    { ascii_str : "bo!" , uni_chars : [0x30DC]},
+    { ascii_str : "pa!" , uni_chars : [0x30D1]},
+    { ascii_str : "pi!" , uni_chars : [0x30D4]},
+    { ascii_str : "pu!" , uni_chars : [0x30D7]},
+    { ascii_str : "pe!" , uni_chars : [0x30DA]},
+    { ascii_str : "po!" , uni_chars : [0x30DD]},
+    { ascii_str : "ma!" , uni_chars : [0x30DE]},
+    { ascii_str : "mi!" , uni_chars : [0x30DF]},
+    { ascii_str : "mu!" , uni_chars : [0x30E0]},
+    { ascii_str : "me!" , uni_chars : [0x30E1]},
+    { ascii_str : "mo!" , uni_chars : [0x30E2]},
+    { ascii_str : "ya!" , uni_chars : [0x30E4, 0x30E3]},
+    { ascii_str : "yu!" , uni_chars : [0x30E6, 0x30E5]},
+    { ascii_str : "yo!" , uni_chars : [0x30E8, 0x30E7]},
+    { ascii_str : "ra!" , uni_chars : [0x30E9]},
+    { ascii_str : "ri!" , uni_chars : [0x30EA]},
+    { ascii_str : "ru!" , uni_chars : [0x30EB]},
+    { ascii_str : "re!" , uni_chars : [0x30EC]},
+    { ascii_str : "ro!" , uni_chars : [0x30ED]},
+    { ascii_str : "wa!" , uni_chars : [0x30EF, 0x30EE]},
+    { ascii_str : "wi!" , uni_chars : [0x30F0]},
+    { ascii_str : "we!" , uni_chars : [0x30F1]},
+    { ascii_str : "wo!" , uni_chars : [0x30F2]},
+    { ascii_str : "va!" , uni_chars : [0x30F7]},
+    { ascii_str : "vi!" , uni_chars : [0x30F8]},
+    { ascii_str : "vu!" , uni_chars : [0x30F4]},
+    { ascii_str : "ve!" , uni_chars : [0x30F9]},
+    { ascii_str : "vo!" , uni_chars : [0x30FA]},
+
+    // 2-char ascii sequences
+    { ascii_str : "ka"  , uni_chars : [0x304B, 0x3095]},
+    { ascii_str : "ki"  , uni_chars : [0x304D]},
+    { ascii_str : "ku"  , uni_chars : [0x304F]},
+    { ascii_str : "ke"  , uni_chars : [0x3051, 0x3096]},
+    { ascii_str : "ko"  , uni_chars : [0x3053]},
+    { ascii_str : "ga"  , uni_chars : [0x304C]},
+    { ascii_str : "gi"  , uni_chars : [0x304E]},
+    { ascii_str : "gu"  , uni_chars : [0x3050]},
+    { ascii_str : "ge"  , uni_chars : [0x3052]},
+    { ascii_str : "go"  , uni_chars : [0x3054]},
+    { ascii_str : "sa"  , uni_chars : [0x3055]},
+    { ascii_str : "si"  , uni_chars : [0x3057]},
+    { ascii_str : "su"  , uni_chars : [0x3059]},
+    { ascii_str : "se"  , uni_chars : [0x305B]},
+    { ascii_str : "so"  , uni_chars : [0x305D]},
+    { ascii_str : "za"  , uni_chars : [0x3056]},
+    { ascii_str : "ji"  , uni_chars : [0x3058]},
+    { ascii_str : "zi"  , uni_chars : [0x3058]},
+    { ascii_str : "zu"  , uni_chars : [0x305A]},
+    { ascii_str : "ze"  , uni_chars : [0x305C]},
+    { ascii_str : "zo"  , uni_chars : [0x305E]},
+    { ascii_str : "ta"  , uni_chars : [0x305F]},
+    { ascii_str : "ti"  , uni_chars : [0x3061]},
+    { ascii_str : "tu"  , uni_chars : [0x3064, 0x3063]},
+    { ascii_str : "te"  , uni_chars : [0x3066]},
+    { ascii_str : "to"  , uni_chars : [0x3068]},
+    { ascii_str : "da"  , uni_chars : [0x3060]},
+    { ascii_str : "di"  , uni_chars : [0x3062]},
+    { ascii_str : "du"  , uni_chars : [0x3065]},
+    { ascii_str : "de"  , uni_chars : [0x3067]},
+    { ascii_str : "do"  , uni_chars : [0x3069]},
+    { ascii_str : "na"  , uni_chars : [0x306A]},
+    { ascii_str : "ni"  , uni_chars : [0x306B]},
+    { ascii_str : "nu"  , uni_chars : [0x306C]},
+    { ascii_str : "ne"  , uni_chars : [0x306D]},
+    { ascii_str : "no"  , uni_chars : [0x306E]},
+    { ascii_str : "ha"  , uni_chars : [0x306F]},
+    { ascii_str : "hi"  , uni_chars : [0x3072]},
+    { ascii_str : "fu"  , uni_chars : [0x3075]},
+    { ascii_str : "he"  , uni_chars : [0x3078]},
+    { ascii_str : "ho"  , uni_chars : [0x307B]},
+    { ascii_str : "ba"  , uni_chars : [0x3070]},
+    { ascii_str : "bi"  , uni_chars : [0x3073]},
+    { ascii_str : "bu"  , uni_chars : [0x3076]},
+    { ascii_str : "be"  , uni_chars : [0x3079]},
+    { ascii_str : "bo"  , uni_chars : [0x307C]},
+    { ascii_str : "pa"  , uni_chars : [0x3071]},
+    { ascii_str : "pi"  , uni_chars : [0x3074]},
+    { ascii_str : "pu"  , uni_chars : [0x3077]},
+    { ascii_str : "pe"  , uni_chars : [0x307A]},
+    { ascii_str : "po"  , uni_chars : [0x307D]},
+    { ascii_str : "ma"  , uni_chars : [0x307E]},
+    { ascii_str : "mi"  , uni_chars : [0x307F]},
+    { ascii_str : "mu"  , uni_chars : [0x3080]},
+    { ascii_str : "me"  , uni_chars : [0x3081]},
+    { ascii_str : "mo"  , uni_chars : [0x3082]},
+    { ascii_str : "ya"  , uni_chars : [0x3084, 0x3083]},
+    { ascii_str : "yu"  , uni_chars : [0x3086, 0x3085]},
+    { ascii_str : "yo"  , uni_chars : [0x3088, 0x3087]},
+    { ascii_str : "ra"  , uni_chars : [0x3089]},
+    { ascii_str : "ri"  , uni_chars : [0x308A]},
+    { ascii_str : "ru"  , uni_chars : [0x308B]},
+    { ascii_str : "re"  , uni_chars : [0x308C]},
+    { ascii_str : "ro"  , uni_chars : [0x308D]},
+    { ascii_str : "wa"  , uni_chars : [0x308F, 0x308E]},
+    { ascii_str : "wi"  , uni_chars : [0x3090]},
+    { ascii_str : "we"  , uni_chars : [0x3091]},
+    { ascii_str : "wo"  , uni_chars : [0x3092]},
+    { ascii_str : "vu"  , uni_chars : [0x3094]},
+    { ascii_str : "10"  , uni_chars : [0x5341]},
+    { ascii_str : "e4"  , uni_chars : [0x4E07]},
+    { ascii_str : "e8"  , uni_chars : [0x5104]},
+    { ascii_str : "a!"  , uni_chars : [0x30A2, 0x30A1]},
+    { ascii_str : "i!"  , uni_chars : [0x30A4, 0x30A3]},
+    { ascii_str : "u!"  , uni_chars : [0x30A6, 0x30A5]},
+    { ascii_str : "e!"  , uni_chars : [0x30A8, 0x30A7]},
+    { ascii_str : "o!"  , uni_chars : [0x30AA, 0x30A9]},
+    { ascii_str : "n!"  , uni_chars : [0x30F3]},
+    { ascii_str : ":!"  , uni_chars : [0x30FD, 0x30FE]},
+
+    // 1-char ascii sequences
+    { ascii_str : "a"   , uni_chars : [0x3042, 0x3041]},
+    { ascii_str : "i"   , uni_chars : [0x3044, 0x3043]},
+    { ascii_str : "u"   , uni_chars : [0x3046, 0x3045]},
+    { ascii_str : "e"   , uni_chars : [0x3048, 0x3047]},
+    { ascii_str : "o"   , uni_chars : [0x304A, 0x3049]},
+    { ascii_str : "n"   , uni_chars : [0x3093]},
+    { ascii_str : ":"   , uni_chars : [0x309D, 0x309E]},
+    { ascii_str : "0"   , uni_chars : [0x96F6, 0x3007]},
+    { ascii_str : "1"   , uni_chars : [0x4E00]},
+    { ascii_str : "2"   , uni_chars : [0x4E8C]},
+    { ascii_str : "3"   , uni_chars : [0x4E09]},
+    { ascii_str : "4"   , uni_chars : [0x56DB]},
+    { ascii_str : "5"   , uni_chars : [0x4E94]},
+    { ascii_str : "6"   , uni_chars : [0x516D]},
+    { ascii_str : "7"   , uni_chars : [0x4E03]},
+    { ascii_str : "8"   , uni_chars : [0x516B]},
+    { ascii_str : "9"   , uni_chars : [0x4E5D]},
+    { ascii_str : "-"   , uni_chars : [0x30FC]},
+    { ascii_str : "="   , uni_chars : [0x30A0]},
+    { ascii_str : "."   , uni_chars : [0x30FB]},
+    { ascii_str : "$"   , uni_chars : [0x00A5]},
+];
+
+japanese_defs.is_case_insensitive = true;
+
+japanese_defs.key_layout = [
+    [0x3042,0x3044,0x3046,0x3048,0x304A,null,0x3093,null,0x30A2,0x30A4,0x30A6,0x30A8,0x30AA,null,0x30F3,0x30FC,0x5343],
+    [0x304B,0x304D,0x304F,0x3051,0x3053,null,0x3041,null,0x30AB,0x30AD,0x30AF,0x30B1,0x30B3,null,0x30A1,0x30A0,0x4E07],
+    [0x304C,0x304E,0x3050,0x3052,0x3054,null,0x3043,null,0x30AC,0x30AE,0x30B0,0x30B2,0x30B4,null,0x30A3,0x30FB,0x5104],
+    [0x3055,0x3057,0x3059,0x305B,0x305D,null,0x3045,null,0x30B5,0x30B7,0x30B9,0x30BB,0x30BD,null,0x30A5,0x3007,0x5146],
+    [0x3056,0x3058,0x305A,0x305C,0x305E,null,0x3047,null,0x30B6,0x30B8,0x30BA,0x30BC,0x30BE,null,0x30A7,0x96F6,0x4EAC],
+    [0x305F,0x3061,0x3064,0x3066,0x3068,null,0x3049,null,0x30BF,0x30C1,0x30C4,0x30C6,0x30C8,null,0x30A9,0x4E00,0x5793],
+    [0x3060,0x3062,0x3065,0x3067,0x3069,null,0x3095,null,0x30C0,0x30C2,0x30C5,0x30C7,0x30C9,null,0x30F5,0x4E8C,0xA5],
+    [0x306A,0x306B,0x306C,0x306D,0x306E,null,0x3096,null,0x30CA,0x30CB,0x30CC,0x30CD,0x30CE,null,0x30F6,0x4E09],
+    [0x306F,0x3072,0x3075,0x3078,0x307B,null,0x3063,null,0x30CF,0x30D2,0x30D5,0x30D8,0x30DB,null,0x30C3,0x56DB],
+    [0x3070,0x3073,0x3076,0x3079,0x307C,null,0x3083,null,0x30D0,0x30D3,0x30D6,0x30D9,0x30DC,null,0x30E3,0x4E94],
+    [0x3071,0x3074,0x3077,0x307A,0x307D,null,0x3085,null,0x30D1,0x30D4,0x30D7,0x30DA,0x30DD,null,0x30E5,0x516D],
+    [0x307E,0x307F,0x3080,0x3081,0x3082,null,0x3087,null,0x30DE,0x30DF,0x30E0,0x30E1,0x30E2,null,0x30E7,0x4E03],
+    [0x3084,null  ,0x3086,null  ,0x3088,null,0x308E,null,0x30E4,null  ,0x30E6,null  ,0x30E8,null,0x30EE,0x516B],
+    [0x3089,0x308A,0x308B,0x308C,0x308D,null,0x309D,null,0x30E9,0x30EA,0x30EB,0x30EC,0x30ED,null,0x30FD,0x4E5D],
+    [0x308F,0x3090,null  ,0x3091,0x3092,null,0x309E,null,0x30EF,0x30F0,null  ,0x30F1,0x30F2,null,0x30FE,0x5341],
+    [null  ,null  ,0x3094,null  ,null  ,null,0x309F,null,0x30F7,0x30F8,0x30F4,0x30F9,0x30FA,null,0x30FF,0x767E],
+];
+
+japanese_defs.create_softkeys = function()
+{
+    var hs = "<table class='softkeys'>";
+    for (var row = 0; row < japanese_defs.key_layout.length; row++)
+    {
+        hs += "<tr>";
+        for (var column = 0; column < japanese_defs.key_layout[row].length; column++)
+        {
+            hs += make_softkey_cell(japanese_defs.key_layout[row][column]);
+        }
+    }
+    hs += "<\/table>";
+    return hs;
+}
+
+var emoticon_defs = {};
+
+emoticon_defs.char_table = [
+];
+
+emoticon_defs.is_case_insensitive = true;
+
+emoticon_defs.key_layout = [
+    [0x1F910,0x1F911,0x1F912,0x1F913,0x1F914,0x1F915,0x1F916,0x1F917,0x1F920,0x1F921,0x1F922,0x1F923,0x1F924,0x1F925,0x1F926,0x1F927],
+    [0x1F928,0x1F929,0x1F92A,0x1F92B,0x1F92C,0x1F92D,0x1F92E,0x1F92F,0x1F970,0x1F971,0x1F972,0x1F973,0x1F974,0x1F975,0x1F976,0x1F977],
+    [0x1F978,0x1F979,0x1F97A,0x1F9D0,0x1FAE0,0x1FAE1,0x1FAE2,0x1FAE3,0x1FAE4,0x1FAE5,0x1FAE8],
+];
+
+emoticon_defs.create_softkeys = function()
+{
+    var hs = "<table class='softkeys'>";
+    for (var row = 0; row < 5; row++)
+    {
+        hs += "<tr>";
+        for (var column = 0; column < 16; column++)
+        {
+            hs += make_softkey_cell(0x1F600 + row * 16 + column);
+        }
+    }
+    for (var row = 0; row < emoticon_defs.key_layout.length; row++)
+    {
+        hs += "<tr>";
+        for (var column = 0; column < emoticon_defs.key_layout[row].length; column++)
+        {
+            hs += make_softkey_cell(emoticon_defs.key_layout[row][column]);
+        }
+    }
+    hs += "<\/table>";
+    return hs;
+}
+
+var def_table = {
+    greek: greek_defs,
+    thai: thai_defs,
+    japanese: japanese_defs,
+    emoticons: emoticon_defs,
+    latindiacritics: latin_diacritics_defs,
+};
+
+var defs;
+
+function activate_keypad()
+{
+    defs = def_table[keypad_sel_elem.value];
+    if (defs.info)
+    {
+        keypad_info_elem.innerHTML = defs.info;
+        keypad_info_elem.style.display = 'block';
+    }
+    else
+    {
+        keypad_info_elem.style.display = 'none';
+    }
+    soft_keys_elem.innerHTML = defs.create_softkeys();
+    if (defs.update_softkeys)
+    {
+        defs.update_softkeys();
+    }
+}
+
+function char_to_key_sequence(ch)
+{
+    for (var i = 0; i < (defs.char_table_current_length || defs.char_table.length); i++)
+    {
+        var ch_def = defs.char_table[i];
+        for (var j = 0; j < ch_def.uni_chars.length; j++)
+        {
+            if (ch == code_point_to_utf16_string(ch_def.uni_chars[j]))
+            {
+                return ch_def.ascii_str.replace(' ', '&lt;sp&gt;') + Array(j + 2).join(';');
+            }
+        }
+    }
+    return "none";
+}
+
+function make_softkey_cell(codes)
+{
+    if (!codes)
+    {
+        return "<td class='emptycell'>";
+    }
+    if (!(codes instanceof Array))
+    {
+        codes = [ codes ];
+    }
+    var ch = unicode_to_utf16_string(codes);
+    var key_text = '';
+    var key_text_class = 'dia_group' + ((codes.length > 1) ? ' combination' : '');
+    var key_text_id = 'keytext';
+    var popup_id = 'keypopup';
+    for (var i = 0; i < codes.length; i++)
+    {
+        key_text += '&#' + codes[i] + ';';
+        key_text_id += '_' + codes[i];
+        popup_id += '_' + codes[i];
+    }
+    if (codes.length == 1 && defs.combining_codes && defs.combining_codes.indexOf(codes[0]) > -1)
+    {
+        key_text = defs.combining_helper_char + key_text +
+            "<span class='combining_overlay'>" + defs.combining_helper_char + "<\/span>";
+    }
+    var hs = "<td><span class='button_container'><button type='button' onclick='button_click(\"" + ch +
+        "\")' onmousedown='button_down(\"" + popup_id +
+        "\")' ontouchstart='button_down(\"" + popup_id +
+        "\")'><div id='" + key_text_id + "' class='" + key_text_class + "'>" + key_text +
+        "<\/div><\/button><span id='" + popup_id +
+        "' class='button_popup'>Keys:&nbsp;" + char_to_key_sequence(ch) + "<\/span><\/span>";
+    return hs;
+}
+
+function update_softkey(orig_codes, new_codes)
+{
+    if (!(orig_codes instanceof Array))
+    {
+        orig_codes = [ orig_codes ];
+    }
+    if (!(new_codes instanceof Array))
+    {
+        new_codes = [ new_codes ];
+    }
+    var ch = unicode_to_utf16_string(new_codes);
+    var key_text = '';
+    var key_text_class = 'dia_group' + ((new_codes.length > 1) ? ' combination' : '');
+    var key_text_id = 'keytext';
+    var popup_id = 'keypopup';
+    for (var i = 0; i < orig_codes.length; i++)
+    {
+        key_text_id += '_' + orig_codes[i];
+        popup_id += '_' + orig_codes[i];
+    }
+    for (var i = 0; i < new_codes.length; i++)
+    {
+        key_text += '&#' + new_codes[i] + ';';
+    }
+    if (new_codes.length == 1 && defs.combining_codes && defs.combining_codes.indexOf(new_codes[0]) > -1)
+    {
+        key_text = defs.combining_helper_char + key_text +
+            "<span class='combining_overlay'>" + defs.combining_helper_char + "<\/span>";
+    }
+    var key_text_elem = document.getElementById(key_text_id);
+    var popup_elem = document.getElementById(popup_id);
+    key_text_elem.innerHTML = key_text;
+    key_text_elem.className = key_text_class;
+    popup_elem.innerHTML = 'Keys:&nbsp;' + char_to_key_sequence(ch);
+}
+
+function hex(val, n_digits)
+{
+    return ((n_digits > 0 ? '0000000' : '') + val.toString(16)).slice(-n_digits).toUpperCase();
+}
+
+function utf16_string_to_unicode_list(s)
+{
+    var unicode_list = [];
+    for (var i = 0; i < s.length; i++)
+    {
+        // Get next UTF-16 value (this is the final Unicode codepoint if not part of a
+        // surrogate pair)
+        var unicode_code = s.charCodeAt(i);
+        if (unicode_code >= 0xD800 && unicode_code < 0xDC00 && i < s.length - 1)
+        {
+            // The UTF-16 value was part of a surrogate pair (high surrogate) so get 2nd
+            // part (low surrogate)
+            var utf16_2nd_code = s.charCodeAt(++i);
+            if (utf16_2nd_code < 0xDC00 || utf16_2nd_code >= 0xE000)
+            {
+                // Low surrogate is invalid, so just keep both surrogates as separate code points
+                i--;
+            }
+            else
+            {
+                // Combine high and low surrogates to form final Unicode codepoint
+                unicode_code = (((unicode_code - 0xD800) << 10) | (utf16_2nd_code - 0xDC00)) +
+                    0x10000;
+            }
+        }
+        unicode_list.push(unicode_code);
+    }
+    return unicode_list;
+}
+
+function unicode_to_utf8_list(unicode_list)
+{
+    var utf8_list = [];
+    for (var i = 0; i < unicode_list.length; i++)
+    {
+        var code = unicode_list[i];
+        if (code < 0x80)
+        {
+            // UTF-8 code is 1 byte
+            utf8_list.push(code);
+        }
+        else
+        {
+            // UTF-8 code is 2-4 bytes; calculate and store last byte
+            utf8_list.push(code & 0x3F | 0x80);
+            code >>= 6;
+            var n_bytes_stored = 1;
+            if (code > 0x1F)
+            {
+                // UTF-8 code is 3-4 bytes; calculate and store 2nd last byte
+                utf8_list.splice(-1, 0, code & 0x3F | 0x80);
+                code >>= 6;
+                n_bytes_stored++;
+                if (code > 0x0F)
+                {
+                    // UTF-8 code is 4 bytes; calculate and store 3rd last byte
+                    utf8_list.splice(-2, 0, code & 0x3F | 0x80);
+                    code >>= 6;
+                    n_bytes_stored++;
+                }
+            }
+            // Calculate and store 1st byte
+            utf8_list.splice(-n_bytes_stored, 0,
+                code | ((0x7F >> n_bytes_stored) ^ 0xFF));
+        }
+    }
+    return utf8_list;
+}
+
+function unicode_to_utf16_list(unicode_list)
+{
+    var utf16_list = [];
+    for (var i = 0; i < unicode_list.length; i++)
+    {
+        var code = unicode_list[i];
+        if (code >= 0x10000)
+        {
+            // Calculate and store high surrogate
+            code -= 0x10000;
+            utf16_list.push((code >> 10) + 0xD800);
+            // Calculate low surrogate
+            code = (code & 0x3FF) + 0xDC00;
+        }
+        // Store UTF-16 code (or low surrogate of surrogate pair)
+        utf16_list.push(code);
+    }
+    return utf16_list;
+}
+
+function to_bytes(code_list, n_bytes_per_value, is_bigendian)
+{
+    var byte_list = [];
+    var start_offset = 0;
+    var end_offset = n_bytes_per_value - 1;
+    var step = 1;
+    if (is_bigendian)
+    {
+        start_offset = end_offset;
+        end_offset = 0;
+        step = -1
+    }
+    for (var i = 0; i < code_list.length; i++)
+    {
+        var code = code_list[i];
+        var start = byte_list.length + start_offset;
+        var stop = byte_list.length + end_offset + step;
+        for (var b = start; b != stop; b += step)
+        {
+            byte_list[b] = code & 0xFF;
+            code >>= 8;
+        }
+    }
+    return byte_list;
+}
+
+function code_point_to_utf16_string(code)
+{
+    if (code < 0x10000)
+    {
+        return String.fromCharCode(code);
+    }
+    else if (code >= 0x110000)
+    {
+        // Code is out of range, so use replacement character instead
+        return '\uFFFD';
+    }
+    else
+    {
+        // Convert to high and low UTF-16 surrogates
+        code -= 0x10000;
+        return String.fromCharCode((code >> 10) + 0xD800, (code & 0x3FF) + 0xDC00);
+    }
+}
+
+function unicode_to_utf16_string(unicode_list)
+{
+    return unicode_list.map(code_point_to_utf16_string).join('');
+}
+
+function from_bytes(in_str, n_bytes_per_value, is_bigendian)
+{
+    var out_str = '';
+    var code = 0;
+    var n_bytes_acquired = 0;
+    for (var i = 0; i < in_str.length; i++)
+    {
+        var new_code = in_str.charCodeAt(i);
+        if (new_code >= 0x100)
+        {
+            // New code is outside byte range so complete conversion of existing code and add it
+            // to output, then add new code to output
+            if (n_bytes_acquired > 0)
+            {
+                out_str += code_point_to_utf16_string(code);
+                code = 0;
+                n_bytes_acquired = 0;
+            }
+            out_str += String.fromCharCode(new_code);
+        }
+        else
+        {
+            // Include new code byte in existing code
+            if (is_bigendian)
+            {
+                code = (code << 8) | new_code;
+            }
+            else
+            {
+                code |= new_code << (8 * n_bytes_acquired);
+            }
+            n_bytes_acquired++;
+            // If existing code has all needed bytes, then complete conversion and add it to
+            // output
+            if (n_bytes_acquired == n_bytes_per_value)
+            {
+                out_str += code_point_to_utf16_string(code);
+                code = 0;
+                n_bytes_acquired = 0;
+            }
+        }
+    }
+    // Complete conversion of any incomplete code at end of string
+    if (n_bytes_acquired > 0)
+    {
+        out_str += code_point_to_utf16_string(code);
+    }
+    return out_str;
+}
+
+function from_utf8(in_str)
+{
+    var out_str = '';
+    var code;
+    var new_code;
+    var n_bytes_expected;
+    var n_bytes_acquired = 0;
+    for (var i = 0; i < in_str.length; i++)
+    {
+        new_code = in_str.charCodeAt(i);
+        if (n_bytes_acquired > 0 && (new_code < 0x80 || new_code >= 0xC0))
+        {
+            // New code is not a valid UTF-8 continuation byte so discard existing code and use
+            // replacement character instead
+            out_str += '\uFFFD';
+            n_bytes_acquired = 0;
+        }
+        if (new_code < 0x80 || new_code >= 0xF8 || n_bytes_acquired == 0 && new_code < 0xC0)
+        {
+            // New code is ASCII or invalid UTF-8 so add it directly to output
+            out_str += String.fromCharCode(new_code);
+        }
+        else if (n_bytes_acquired == 0)
+        {
+            // New code is valid first byte of multi-byte UTF-8 sequence
+            n_bytes_expected = new_code >= 0xF0 ? 4 : new_code >= 0xE0 ? 3 : 2;
+            code = new_code & (0x7F >> n_bytes_expected);
+            n_bytes_acquired = 1;
+        }
+        else
+        {
+            // New code is valid continuation byte of multi-byte UTF-8 sequence, so include it in
+            // existing code
+            code = (code << 6) | (new_code & 0x3F);
+            n_bytes_acquired++;
+            // If existing code has all needed bytes, then complete conversion and add it to output
+            if (n_bytes_acquired == n_bytes_expected)
+            {
+                out_str += code_point_to_utf16_string(code);
+                n_bytes_acquired = 0;
+            }
+        }
+    }
+    // Discard any incomplete code at end of string and use replacement character instead
+    if (n_bytes_acquired > 0)
+    {
+        out_str += '\uFFFD';
+    }
+    return out_str;
+}
+
+function save_cursor()
+{
+    selection_start = input_elem.selectionStart;
+    selection_end = input_elem.selectionEnd;
+    scroll_top = input_elem.scrollTop;
+}
+
+function restore_cursor()
+{
+    input_elem.selectionStart = selection_start;
+    input_elem.selectionEnd = selection_end;
+    input_elem.scrollTop = scroll_top;
+}
+
+function textarea_blurred()
+{
+    save_cursor();
+    if (!lock_focus_elem.checked)
+    {
+        input_elem.readOnly = true;
+    }
+}
+
+function textarea_focussed()
+{
+    input_elem.readOnly = false;
+    setTimeout(restore_cursor, 0);
+    is_focus_locked = lock_focus_elem.checked;
+}
+
+function ascii_to_lower_case(s)
+{
+    return s.replace(/[A-Z]+/g, function(match)
+    {
+        return match.toLowerCase();
+    });
+}
+
+function change_char(forward)
+{
+    var changed = false;
+    var pos = input_elem.selectionEnd;
+    if (pos == 0) return false;
+    var i_start, i_end, step;
+    var input = input_elem.value.substring(0, pos);
+    if (defs.is_case_insensitive)
+    {
+        input = ascii_to_lower_case(input);
+    }
+    var input_codes = utf16_string_to_unicode_list(input);
+    var total_len = input_elem.value.length;
+    var old_len = 0;
+    var new_str;
+    var old_str;
+    var changed_to_ascii = false;
+    var j = -1;
+    var code;
+    if (forward)
+    {
+        i_start = 0;
+        i_end = defs.char_table_current_length || defs.char_table.length;
+        step = 1;
+    }
+    else
+    {
+        i_start = (defs.char_table_current_length || defs.char_table.length) - 1;
+        i_end = -1;
+        step = -1;
+    }
+
+    for (var i = i_start; i != i_end;)
+    {
+        var ch_def = defs.char_table[i];
+        var has_trailing_semi = pos > 1 && input.charAt(pos - 1) == ';';
+        if (j >= 0 ||
+            (j = ch_def.uni_chars.indexOf(code = input_codes[input_codes.length - 1 - has_trailing_semi])) >= 0
+                && (old_len = code_point_to_utf16_string(code).length + has_trailing_semi))
+        {
+            j += step;
+            if (j >= 0 && j < ch_def.uni_chars.length)
+            {
+                new_str = code_point_to_utf16_string(ch_def.uni_chars[j]);
+            }
+            else
+            {
+                new_str = ch_def.ascii_str;
+                i += step;
+                j = -1;
+                changed_to_ascii = true;
+            }
+        }
+        else if (input.substring(pos - ch_def.ascii_str.length - has_trailing_semi, pos - has_trailing_semi)
+            == ch_def.ascii_str)
+        {
+            old_len = ch_def.ascii_str.length + has_trailing_semi;
+            j = (step < 0) ? ch_def.uni_chars.length - 1 : 0;
+            new_str = code_point_to_utf16_string(ch_def.uni_chars[j]);
+        }
+        else
+            i += step;
+        if (old_len > 0)
+        {
+            old_str = input_elem.value;
+            input_elem.setRangeText(new_str, pos - old_len, pos, 'end');
+            if (input_elem.value.length == total_len - old_len + new_str.length)
+            {
+                changed = true;
+                pos += new_str.length - old_len;
+                if (changed_to_ascii)
+                {
+                    old_len = 0;
+                    input = input_elem.value.substring(0,pos);
+                    if (defs.is_case_insensitive)
+                    {
+                        input = ascii_to_lower_case(input);
+                    }
+                    input_codes = utf16_string_to_unicode_list(input);
+                    total_len = input_elem.value.length;
+                    changed_to_ascii = false;
+                }
+                else
+                    i = i_end;
+            }
+            else
+            {
+                input_elem.value = old_str;
+            }
+        }
+    }
+    return changed;
+}
+
+function key_down(e)
+{
+    if (e.key == 'Escape')
+    {
+        if (e.shiftKey)
+            change_char(false);
+        else
+            change_char(true);
+        save_cursor();
+        e.preventDefault();
+    }
+}
+
+function key_pressed(e)
+{
+    // Check for a semicolon at the end of the input data (there may be previously entered characters preceding the
+    // semicolon for some input methods such as mobile keypads that provide suggestions)
+    if (e.data.endsWith(';'))
+    {
+        if (change_char(true))
+        {
+            save_cursor();
+            e.preventDefault();
+        }
+    }
+}
+
+function insert_char(c)
+{
+    input_elem.setRangeText(c, selection_start, selection_end, 'end');
+    // Can't call save_cursor here, because some mobile browsers don't update
+    // cursor in a read-only textarea, so we need to calculate new cursor
+    // position manually.
+    if (selection_start != selection_end) selection_end = selection_start;
+    selection_start = selection_end += c.length;
+    scroll_top = input_elem.scrollTop;
+}
+
+function button_click(key_char)
+{
+    if (defs.button_click)
+    {
+        defs.button_click(key_char);
+    }
+    else
+    {
+        insert_char(key_char);
+    }
+}
+
+function button_down(popup_id)
+{
+    if (!popup)
+    {
+        var new_popup = document.getElementById(popup_id)
+        new_popup.style.display = 'inline';
+        popup = new_popup;
+    }
+    is_focus_locked = lock_focus_elem.checked;
+}
+
+function global_mouse_up()
+{
+    if (popup)
+    {
+        popup.style.display = 'none';
+        popup = null;
+    }
+    if (is_focus_locked) input_elem.focus();
+}
+
+var is_focus_locked = true;
+
+function lock_focus_changed()
+{
+    is_focus_locked = lock_focus_elem.checked;
+    if (is_focus_locked)
+    {
+        input_elem.focus();
+    }
+    else
+    {
+        lock_focus_elem.focus();
+    }
+}
+
+function temp_unlock_focus()
+{
+    is_focus_locked = false;
+    input_elem.readOnly = true;
+}
+
+function select_all_text()
+{
+    input_elem.readOnly = false;
+    input_elem.select();
+    save_cursor();
+}
+
+function update_sel_elem_visibility()
+{
+    var direction_choice = conv_direction_sel_elem.value;
+    var type_choice = conv_type_sel_elem.value;
+    utf_sel_elem.hidden = (type_choice == 'html');
+    radix_sel_elem.hidden = (type_choice == 'xuU' || type_choice == 'html' && direction_choice == 'to_text');
+}
+
+var hex_re = /[0-9A-F]+(?!x)/gi;
+var dec_re = /\d+/g;
+var xuU_re = /\\x[0-9A-Fa-f]{2}|\\u[0-9A-Fa-f]{4}|\\U[0-9A-Fa-f]{8}/g;
+var html_re = /&#(?:x([0-9A-F]+)|(\d+));/gi;
+
+var undo_stack = [];
+
+function convert()
+{
+    var in_str = input_elem.value;
+    undo_stack.push(in_str);
+    var out_str = '';
+    var direction_choice = conv_direction_sel_elem.value;
+    var type_choice = conv_type_sel_elem.value;
+    var radix_choice = +radix_sel_elem.value;
+    var utf_choice = utf_sel_elem.value;
+    if (direction_choice == 'to_text')
+    {
+        // Do preliminary conversion to UTF-16 string according to selected conversion type
+        switch (type_choice)
+        {
+            case 'xuU':
+                // Replace backslash escapes with UTF-16 code units
+                out_str = in_str.replace(xuU_re, function(match)
+                {
+                    return code_point_to_utf16_string(parseInt(match.slice(2), 16));
+                });
+                break;
+            case 'html':
+                // Replace HTML character references with UTF-16 code units
+                out_str = in_str.replace(html_re, function(match, p1, p2)
+                {
+                    return code_point_to_utf16_string(parseInt(p1 || p2, p1 ? 16 : 10));
+                });
+                utf_choice = 'utf-32';
+                break;
+            case 'csv':
+                var values = in_str.match(radix_choice == 10 ? dec_re : hex_re);
+                out_str = (values || []).map(function(digits)
+                {
+                    return code_point_to_utf16_string(parseInt(digits, radix_choice));
+                }).join('');
+                break;
+        }
+
+        // Do final conversion according to selected UTF encoding
+        switch (utf_choice)
+        {
+            case 'utf-8':
+                // Convert UTF-8 to UTF-16 code units
+                out_str = from_utf8(out_str);
+                break;
+            case 'utf-16':
+            case 'utf-32':
+                // No further conversion needed
+                break;
+            case 'utf-16be':
+            case 'utf-16le':
+                // Combine pairs of bytes/chars to UTF-16 code units
+                out_str = from_bytes(out_str, 2, utf_choice == 'utf-16be');
+                break;
+            case 'utf-32be':
+            case 'utf-32le':
+                // Combine groups of 4 bytes/chars to UTF-32, then convert to UTF-16 code units
+                out_str = from_bytes(out_str, 4, utf_choice == 'utf-32be');
+                break;
+        }
+
+        input_elem.value = out_str;
+    }
+    else
+    {
+        // Convert input string to real unicode code points
+        var unicode_list = utf16_string_to_unicode_list(in_str);
+
+        // Apply selected encoding
+        var encoded_list;
+        var n_nibbles_per_value;
+        if (type_choice == 'html') utf_choice = 'utf-32';
+        switch (utf_choice)
+        {
+            case 'utf-8':
+                encoded_list = unicode_to_utf8_list(unicode_list);
+                n_nibbles_per_value = 2;
+                break;
+            case 'utf-16':
+                encoded_list = unicode_to_utf16_list(unicode_list);
+                n_nibbles_per_value = 4;
+                break;
+            case 'utf-16be':
+            case 'utf-16le':
+                encoded_list = unicode_to_utf16_list(unicode_list);
+                encoded_list = to_bytes(encoded_list, 2, utf_choice == 'utf-16be');
+                n_nibbles_per_value = 2;
+                break;
+            case 'utf-32':
+                encoded_list = unicode_list;
+                n_nibbles_per_value = 8;
+                break;
+            case 'utf-32be':
+            case 'utf-32le':
+                encoded_list = unicode_list;
+                encoded_list = to_bytes(encoded_list, 4, utf_choice == 'utf-32be');
+                n_nibbles_per_value = 2;
+                break;
+        }
+
+        // Convert encoded values to string according to selected conversion type
+        for (var i = 0; i < encoded_list.length; i++)
+        {
+            var code = encoded_list[i];
+            if (type_choice == 'csv')
+            {
+                if (out_str) out_str += ', ';
+                out_str += radix_choice == 10 ? code : ('0x' + hex(code, n_nibbles_per_value));
+            }
+            else if (code >= 32 && code < 128)
+            {
+                out_str += String.fromCharCode(code);
+            }
+            else
+            {
+                switch (type_choice)
+                {
+                    case 'xuU':
+                        out_str +=
+                            (code < 0x100) ? '\\x' + hex(code, 2) :
+                            (code < 0x10000) ? '\\u' + hex(code, 4) :
+                            '\\U' + hex(code, 8);
+                        break;
+                    case 'html':
+                        out_str += '&#' + (radix_choice == 10 ? code : 'x' + hex(code, 0)) + ';';
+                }
+            }
+        }
+        input_elem.value = out_str;
+    }
+    select_all_text();
+}
+
+function undo()
+{
+    if (undo_stack.length > 0)
+    {
+        input_elem.value = undo_stack.pop();
+    }
+}
+
+// Own implementation of textarea setRangeText method (for FireFox).
+function setRangeText(replacement, start, end, selectMode)
+{
+    this.value = this.value.substring(0, start) + replacement + this.value.substring(end);
+    var new_pos = start + replacement.length;
+    this.setSelectionRange(new_pos, new_pos);
+}
+
+var keypad_sel_elem;
+var keypad_info_elem;
+var soft_keys_elem;
+var input_elem;
+var lock_focus_elem;
+var conv_direction_sel_elem;
+var conv_type_sel_elem;
+var radix_sel_elem;
+var utf_sel_elem;
+
+function init()
+{
+    // Get references to HTML elements
+    keypad_sel_elem = document.getElementById('keypad_selection');
+    keypad_info_elem = document.getElementById('keypad_info');
+    soft_keys_elem = document.getElementById('softkeys');
+    input_elem = document.getElementById('input');
+    input_elem.value = '';
+    lock_focus_elem = document.getElementById('lock_focus_checkbox');
+    lock_focus_elem.checked = true;
+    conv_direction_sel_elem = document.getElementById('conversion_direction_selection');
+    conv_type_sel_elem = document.getElementById('conversion_type_selection');
+    radix_sel_elem = document.getElementById('radix_selection');
+    utf_sel_elem = document.getElementById('utf_selection');
+
+    // Initialize keypad definition objects
+    for (var def_name in def_table)
+    {
+        var defs = def_table[def_name];
+        if (defs.initialize)
+        {
+            defs.initialize();
+        }
+    }
+
+    // If textarea setRangeText method is not supported (FireFox), define our own.
+    if (!input_elem.setRangeText)
+    {
+        input_elem.setRangeText = setRangeText;
+    }
+
+    // Add global event listeners
+    document.addEventListener('mouseup', global_mouse_up, false);
+    document.addEventListener('touchend', global_mouse_up, false);
+
+    // Add mousedown event listeners to all select elements to prevent focus from jumping back to input element before
+    // selection is complete
+    var select_elems = document.getElementsByTagName('select');
+    for (var i = 0; i < select_elems.length; i++)
+    {
+        select_elems[i].addEventListener('mousedown', temp_unlock_focus, false);
+    }
+
+    // Add other event handlers
+    keypad_sel_elem.addEventListener('change', activate_keypad, false);
+    input_elem.addEventListener('focus', textarea_focussed, false);
+    input_elem.addEventListener('blur', textarea_blurred, false);
+    input_elem.addEventListener('keydown', key_down, false);
+    input_elem.addEventListener('input', key_pressed, false);
+    lock_focus_elem.addEventListener('change', lock_focus_changed, false);
+    document.getElementById('select_all_button').addEventListener('click', select_all_text, false);
+    conv_direction_sel_elem.addEventListener('change', update_sel_elem_visibility, false);
+    conv_type_sel_elem.addEventListener('change', update_sel_elem_visibility, false);
+    document.getElementById('convert_button').addEventListener('click', convert, false);
+    document.getElementById('undo_button').addEventListener('click', undo, false);
+
+    // Handle URL arguments
+    const page_settings_spec = {
+        keys: {obj: keypad_sel_elem},
+        lockfocus: {obj: lock_focus_elem},
+        latindia_sglcodeonly: {obj: latin_diacritics_defs, attr: 'single_code_only'},
+        latindia_modcode: {
+            get: function() {return '0x' + latin_diacritics_defs.current_modifier_code.toString(16)},
+            set: function(v) {
+                const modifier_code = +v;
+                if (latin_diacritics_defs.key_layout[0].indexOf(modifier_code) >= 0)
+                {
+                    latin_diacritics_defs.current_modifier_code = modifier_code;
+                }
+            }
+        },
+        convdir: {obj: conv_direction_sel_elem},
+        convtype: {obj: conv_type_sel_elem},
+        radix: {obj: radix_sel_elem},
+        utf: {obj: utf_sel_elem},
+    };
+    genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+    is_focus_locked = lock_focus_elem.checked;
+    update_sel_elem_visibility();
+
+    // Create dynamic content
+    activate_keypad();
+    input_elem.focus();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Text Input Assistant and Converter</h1>
+
+<div class="box max_width">
+Key pad:
+<select id="keypad_selection">
+    <option value="thai">Thai
+    <option value="japanese">Japanese
+    <option value="greek">Greek
+    <option value="emoticons">Emoticons
+    <option selected value="latindiacritics">Latin diacritics
+</select>
+<div id='keypad_info'></div>
+</div>
+
+<div class="box max_width">
+<div id='softkeys'></div>
+</div>
+
+<div class="box">
+
+<textarea id='input' name='input'></textarea><br>
+
+<label><input id='lock_focus_checkbox' type='checkbox' checked>Lock focus</label>
+<button id='select_all_button' type='button'>Select all</button>
+<br>
+<button id='convert_button' type='button'>CONVERT</button><select id="conversion_direction_selection">
+    <option value="from_text" selected>from text to
+    <option value="to_text">to text from
+</select><select id="conversion_type_selection">
+    <option value="xuU" selected>\x\u\U escapes
+    <option value="html">HTML character references
+    <option value="csv">comma separated numbers
+</select><select id="radix_selection">
+    <option value="10" selected>dec
+    <option value="16">hex
+</select><select id="utf_selection">
+    <option value="utf-8">UTF-8
+    <option value="utf-16" selected>UTF-16
+    <option value="utf-16be">UTF-16BE
+    <option value="utf-16le">UTF-16LE
+    <option value="utf-32">UTF-32
+    <option value="utf-32be">UTF-32BE
+    <option value="utf-32le">UTF-32LE
+</select>
+<br>
+<button id='undo_button' type='button'>Undo conversion</button>
+
+</div>
+
+<div id="help" class="box max_width">
+Help:
+<ul>
+<li>Press and hold one of the character softkeys to see how to produce that character using a sequence of keyboard
+keys. Esc and Shift+Esc may be used instead of the semicolon to cycle forward or backwards through the possible
+interpretations of a given sequence.
+<li>A given character may be represented by a single dedicated Unicode code point such as &#xC1; (0xC1), or a
+combination of code points such as A&#x301; (0x41+0x301). Some characters have only one of these representations, others
+have both. Enable "only single-code characters" (if available) to hide characters which do not have a single dedicated
+code point, and block their keyboard key sequences.
+<li>Enable "lock focus" to make the focus automatically jump back into the text entry box after each softkey click.
+<li>When converting "to text from comma separated numbers", the numbers may be separated by any non-digit character(s),
+and hex numbers may be preceded by 0x or 0X. For a sequence of 2-digit hex numbers without separation, use
+<a href="programmers_converter.html#in_digit_base_elems=16&in_numbers_are_delimited_elems=n&in_number_field_width_elems=2&in_number_signed_type_elems=UNSIGNED&in_number_left_shift_elems=0&in_number_left_shift_uses_bits_elems=n&out_digit_base_elems=16&out_number_width_type_elems=fixed_width&out_number_n_int_digits_elems=2&out_number_signed_type_elems=SIGNED&out_number_left_shift_elems=0&out_number_left_shift_uses_bits_elems=n&out_number_has_frac_elems=n&out_number_prefix_elems=&out_number_suffix_elems=&out_number_separator_elems=%20&out_row_prefix_elems=&out_row_suffix_elems=%5Cn&out_row_separator_elems=&reshape_elems=n&reorder_read_direction_elems=cr&reorder_write_direction_elems=cr">this other tool</a>
+to insert separators, then paste the result here and complete the conversion.
+</ul>
+</div>
+
+</div>
+
+</body>
+</html>
