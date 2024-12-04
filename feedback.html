@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="stylesheet" type="text/css" href="style2.css">
+<title>Feedback</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+iframe {
+    box-sizing: border-box;
+    width: 100%;
+    height: 35em;
+    border: none;
+    margin: 0px;
+    padding: 0px;
+}
+</style>
+<script type="text/javascript">
+function init()
+{
+    if (document.documentMode)
+    {
+        // This is MSIE which is no longer supported by Google Forms
+        document.getElementById('content').innerHTML = 'Sorry, no support for your ancient browser.';
+        return;
+    }
+    var prefill_setup = '';
+    var url_parts = location.href.split("#");
+    if (url_parts.length >= 2)
+    {
+        prefill_setup = '&entry.2734402=Regarding+' + url_parts[1];
+    }
+    document.getElementById('content').innerHTML =
+        '<iframe id="iframe" src="https://docs.google.com/forms/d/1vvogGfjBhvglzMv42aLBVYm48rkGpGHx-qmzYnBYl5Q/viewform?embedded=true' +
+        prefill_setup +
+        '">Loading...</iframe>';
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Feedback</h1>
+
+<div id="content" class="box">
+</div>
+
+</div>
+
+</body>
+</html>
