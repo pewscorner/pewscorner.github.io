@@ -48,6 +48,9 @@ var QRCode = function()
     this.data_values = [];
     this.version = null;
     this.mode = null;
+    this.message_bit_length = 0;
+    this.max_data_bits = 0;
+    this.mixed_sequence = [];
     this.error_corr_level = null;
     this.max_char_count = null;
     this.matrix_width = null;
@@ -387,25 +390,61 @@ QRCode.prototype.alnum_type_flag        = 0x02;
 QRCode.prototype.byte_8859_1_type_flag  = 0x04;
 QRCode.prototype.all_type_flags         = 0x07;
 
+QRCode.prototype.mode_for = function(type_flags) {
+    return (type_flags & this.numeric_type_flag) ? 'numeric' :
+            (type_flags & this.alnum_type_flag) ? 'alphanumeric' :
+            'byte';
+}
+QRCode.prototype.bitlength_for = function(mode, length, version = 1) {
+    const {
+        char_count_bit_len: {
+            [mode]: {
+                [(version > 9) + (version > 26)]: char_count_bit_len
+            }
+        }
+    } = this;
+    
+    const preamble = 4 + char_count_bit_len;
+    switch (mode)
+    {
+        case 'numeric':
+            const triples = Math.ceil(length / 3);
+            const tripleExtra = triples * 3 - length;
+            return preamble + triples * 10 - tripleExtra * 3;
+        case 'alphanumeric':
+            const pairs = Math.floor(length / 2);
+            // const overflow = pairs - length;
+            return preamble + pairs * 11 + (length % 2) * 6;
+        case 'byte':
+            return preamble + length * 8;
+        case 'kanji':
+            return preamble + length * 13;
+    }
+    throw new Error(`Invalid mode: ${mode}`);
+}
 // FIXME: Add support for kanji mode
-QRCode.prototype.select_mode = function()
+QRCode.prototype.select_mode = function(version = 1)
 {
+    const typeSpans = [];
+    let span = null;
+    let char_flags = this.all_type_flags;
     var type_flags = this.all_type_flags;
     for (var i = 0; i < this.data.length; i++)
     {
         var utf16_code = this.data.charCodeAt(i);
+        char_flags = this.all_type_flags;
 
         if (utf16_code >= 0x80)
         {
             // The character is neither numeric nor alphanumeric, nor (if UTF-8 is preferred)
             // in the 8859-1 character set
-            type_flags &= ~(this.numeric_type_flag | this.alnum_type_flag |
+            char_flags &= ~(this.numeric_type_flag | this.alnum_type_flag |
                 (this.prefer_utf8_to_8859 && this.byte_8859_1_type_flag));
 
             if (utf16_code >= 0x100)
             {
                 // The character is not in the 8859-1 character set
-                type_flags &= ~this.byte_8859_1_type_flag;
+                char_flags &= ~this.byte_8859_1_type_flag;
             }
         }
         else
@@ -414,54 +453,130 @@ QRCode.prototype.select_mode = function()
             if (d < 0)
             {
                 // The character is neither numeric nor alphanumeric
-                type_flags &= ~(this.numeric_type_flag | this.alnum_type_flag);
+                char_flags &= ~(this.numeric_type_flag | this.alnum_type_flag);
             }
             else if (d > 9)
             {
                 // The character is not numeric
-                type_flags &= ~this.numeric_type_flag;
+                char_flags &= ~this.numeric_type_flag;
+            }
+        }
+
+        type_flags &= char_flags;
+
+        if (span?.flags != char_flags) {
+            span = null;
+        }
+        if (span == null) {
+            span = {
+                start: i,
+                length: 1,
+                flags: char_flags,
+                data: "",
+                mode: "",
+                bitLength: 0,
+            };
+            typeSpans.push(span);
+        } else {
+            span.length++;
+        }
+    }
+    this.mode = this.mode_for(type_flags);
+    // If no flags remain set, the data will need to be UTF-8 encoded
+    this.is_utf8 = (type_flags == 0);
+    const fullBitlength = this.message_bit_length = this.bitlength_for(this.mode, this.data.length, version)
+
+    if (this.data.length == 0) return;
+
+    // See if we can save on space by doing spanwise encoding
+    for (const span of typeSpans) {
+        span.data = this.data.substr(span.start, span.length);
+        span.mode = this.mode_for(span.flags);
+        span.bitLength = this.bitlength_for(span.mode, span.length, version);
+    }
+    // console.log("Start spans:", ...typeSpans);
+    for (i = 0; i < typeSpans.length - 1; i++) {
+        const thisSpan = typeSpans[i];
+        const nextSpan = typeSpans[i+1];
+        const afterSpan = typeSpans[i+2]; // may be undefined
+        const sharedMode = this.mode_for(thisSpan.flags & nextSpan.flags);
+        if (afterSpan?.mode === sharedMode) {
+            // try to merge 3
+            const totalLength = thisSpan.length + nextSpan.length + afterSpan.length;
+            const totalBitlength = thisSpan.bitLength + nextSpan.bitLength + afterSpan.bitLength;
+            const mergedSpan = {
+                start: thisSpan.i,
+                length: totalLength,
+                data: thisSpan.data + nextSpan.data + afterSpan.data,
+                mode: sharedMode,
+                bitLength: this.bitlength_for(sharedMode, totalLength, version),
+            };
+            if (mergedSpan.bitLength < totalBitlength) {
+                // console.log("Merging 3 spans:", thisSpan, nextSpan, afterSpan, "into:", mergedSpan);
+                typeSpans.splice(i, 3, mergedSpan);
+                i--;
+                continue;
+            }
+        } else {
+            // try to merge 2
+            const totalLength = thisSpan.length + nextSpan.length;
+            const totalBitlength = thisSpan.bitLength + nextSpan.bitLength;
+            const mergedSpan = {
+                start: thisSpan.i,
+                length: totalLength,
+                data: thisSpan.data + nextSpan.data,
+                mode: sharedMode,
+                bitLength: this.bitlength_for(sharedMode, totalLength, version),
+            };
+            if (mergedSpan.bitLength < totalBitlength) {
+                // console.log("Merging 2 spans:", thisSpan, nextSpan, "into:", mergedSpan);
+                typeSpans.splice(i, 2, mergedSpan);
+                i--;
+                continue;
             }
         }
     }
-    this.mode =
-        (type_flags & this.numeric_type_flag) ? 'numeric' :
-        (type_flags & this.alnum_type_flag) ? 'alphanumeric' :
-        'byte';
-    // If no flags remain set, the data will need to be UTF-8 encoded
-    this.is_utf8 = (type_flags == 0);
+    // console.log("End spans:", ...typeSpans);
+    const mixedBitLength = typeSpans.reduce((acc, span) => acc + span.bitLength, 0);
+    if (mixedBitLength < fullBitlength) {
+        // console.log(`Using mixed spans for bitlength of ${mixedBitLength} from ${fullBitlength}`);
+        this.mode = 'mixed';
+        this.mixed_sequence = typeSpans;
+        this.message_bit_length = mixedBitLength;
+    }
 }
 
-QRCode.prototype.extract_data_values = function()
+QRCode.prototype.extract_data_values = function(data_values = this.data_values, data = this.data, mode = this.mode)
 {
-    this.data_values.length = 0;
-    if (this.mode == 'numeric' || this.mode == 'alphanumeric')
+    data_values.length = 0;
+    if (mode == 'numeric' || mode == 'alphanumeric')
     {
-        for (var i = 0; i < this.data.length; i++)
+        for (var i = 0; i < data.length; i++)
         {
-            this.data_values.push(this.alphanumeric_chars.indexOf(this.data.charAt(i)));
+            data_values.push(this.alphanumeric_chars.indexOf(data.charAt(i)));
         }
     }
-    else if (this.mode == 'byte')
+    else if (mode == 'byte')
     {
         if (!this.is_utf8)
         {
-            for (var i = 0; i < this.data.length; i++)
+            for (var i = 0; i < data.length; i++)
             {
-                this.data_values.push(this.data.charCodeAt(i));
+                data_values.push(data.charCodeAt(i));
             }
         }
         else
         {
-            for (var i = 0; i < this.data.length; i++)
+            for (var i = 0; i < data.length; i++)
             {
                 // Get next UTF-16 value (this is the final Unicode codepoint if not part of a
                 // surrogate pair)
-                var unicode_code = this.data.charCodeAt(i);
+                var unicode_code = data.charCodeAt(i);
                 if (unicode_code >= 0xD800 && unicode_code < 0xE000)
                 {
                     // The UTF-16 value was part of a surrogate pair (high surrogate) so get 2nd
                     // part (low surrogate)
-                    var utf16_2nd_code = this.data.charCodeAt(++i);
+                    var utf16_2nd_code = data.charCodeAt(++i);
                     if (unicode_code >= 0xDC00 || isNaN(utf16_2nd_code) ||
                         utf16_2nd_code < 0xDC00 || utf16_2nd_code >= 0xE000)
                     {
@@ -477,44 +592,51 @@ QRCode.prototype.extract_data_values = function()
                 if (unicode_code < 0x80)
                 {
                     // UTF-8 code is 1 byte
-                    this.data_values.push(unicode_code);
+                    data_values.push(unicode_code);
                 }
                 else
                 {
                     // UTF-8 code is 2-4 bytes; calculate and store last byte
-                    this.data_values.push(unicode_code & 0x3F | 0x80);
+                    data_values.push(unicode_code & 0x3F | 0x80);
                     unicode_code >>= 6;
                     var n_bytes_stored = 1;
                     if (unicode_code > 0x1F)
                     {
                         // UTF-8 code is 3-4 bytes; calculate and store 2nd last byte
-                        this.data_values.splice(-1, 0, unicode_code & 0x3F | 0x80);
+                        data_values.splice(-1, 0, unicode_code & 0x3F | 0x80);
                         unicode_code >>= 6;
                         n_bytes_stored++;
                         if (unicode_code > 0x0F)
                         {
                             // UTF-8 code is 4 bytes; calculate and store 3rd last byte
-                            this.data_values.splice(-2, 0, unicode_code & 0x3F | 0x80);
+                            data_values.splice(-2, 0, unicode_code & 0x3F | 0x80);
                             unicode_code >>= 6;
                             n_bytes_stored++;
                         }
                     }
                     // Calculate and store 1st byte
-                    this.data_values.splice(-n_bytes_stored, 0,
+                    data_values.splice(-n_bytes_stored, 0,
                         unicode_code | ((0x7F >> n_bytes_stored) ^ 0xFF));
                 }
             }
         }
     }
-    else if (this.mode == 'kanji')
+    else if (mode == 'kanji')
     {
-        for (var i = 0; i < this.data.length; i++)
+        for (var i = 0; i < data.length; i++)
         {
-            var d = this.data.charCodeAt(i);
+            var d = data.charCodeAt(i);
             // FIXME: d first needs to be converted from UTF-16 to Shift JIS
             d -= (d < 0xE040) ? 0x8140 : 0xC140;
             d = (d >> 8) * 0xC0 + (d & 0xFF);
-            this.data_values.push(d);
+            data_values.push(d);
+        }
+    }
+    else if (mode == 'mixed')
+    {
+        for (const span of this.mixed_sequence) {
+            span.data_values ??= [];
+            this.extract_data_values(span.data_values, span.data, span.mode);
         }
     }
 }
@@ -528,9 +650,8 @@ QRCode.prototype.calc_misc_parameters = function()
     }
 
     // If version is set to auto, find smallest version that will hold all data
-    var max_char_counts = this.max_char_counts[this.mode][this.error_corr_level];
-    this.max_char_count = max_char_counts[version];
-    while (this.data_values.length > this.max_char_count)
+    this.max_data_bits = this.codeword_info[version][this.error_corr_level][this.n_all_data_cws_idx] * 8;
+    while (this.message_bit_length > this.max_data_bits)
     {
         if (this.version != 'auto')
         {
@@ -543,7 +664,18 @@ QRCode.prototype.calc_misc_parameters = function()
             this.error = 'Text too long to fit in largest QR code!';
             return;
         }
-        this.max_char_count = max_char_counts[version];
+        if (version === 10 || version === 27) { // bitcount changes, recalculate spans
+            this.select_mode(version);
+        }
+        this.max_data_bits = this.codeword_info[version][this.error_corr_level][this.n_all_data_cws_idx] * 8;
+    }
+    if (this.mode === 'mixed') {
+        // "max chars" based on how many more chars of the final mode could we fit
+        const lastMode = this.mixed_sequence[this.mixed_sequence.length - 1].mode;
+        this.max_char_count = this.data.length + Math.floor(this.max_char_counts[lastMode][this.error_corr_level][version] * (this.max_data_bits - this.message_bit_length) / this.max_data_bits);
+    }
+    else {
+        this.max_char_count = this.max_char_counts[this.mode][this.error_corr_level][version];
     }
 
     // Save results
@@ -559,14 +691,25 @@ QRCode.prototype.calc_misc_parameters = function()
     this.n_err_corr_codewords_per_blk = codeword_info[this.n_ec_cws_per_blk_idx];
 }
 
-QRCode.prototype.encode = function()
+QRCode.prototype.encode_data = function(data_values = this.data_values, mode = this.mode)
 {
+    if (mode == 'mixed')
+    {
+        let data = '';
+        for (const span of this.mixed_sequence) {
+            const span_data = this.encode_data(span.data_values, span.mode);
+            if (this.error || span_data == undefined) return;
+            data += span_data;
+        }
+        return data;
+    }
+    
     // First bits of encoded data are mode indicator and character count
-    var encoded_data = this.mode_indicator[this.mode];
-    var char_count = this.data_values.length;
+    var encoded_data = this.mode_indicator[mode];
+    var char_count = data_values.length;
     var char_count_bits = char_count.toString(2);
     var char_count_bit_len =
-        this.char_count_bit_len[this.mode][(this.version > 9) + (this.version > 26)];
+        this.char_count_bit_len[mode][(this.version > 9) + (this.version > 26)];
     if (char_count_bits.length > char_count_bit_len)
     {
         this.error = 'Text too long (too many bits in character count)!';
@@ -575,58 +718,64 @@ QRCode.prototype.encode = function()
     encoded_data += ('000000000000000' + char_count_bits).slice(-char_count_bit_len);
 
     // Do mode specific encoding
-    if (this.mode == 'numeric')
+    if (mode == 'numeric')
     {
         for (var i = 0; i < char_count; i += 3)
         {
             var n_digits = Math.min(3, char_count - i);
-            var group = this.data_values[i];
+            var group = data_values[i];
             if (n_digits > 1)
             {
-                group = 10 * group + this.data_values[i + 1];
+                group = 10 * group + data_values[i + 1];
             }
             if (n_digits > 2)
             {
-                group = 10 * group + this.data_values[i + 2];
+                group = 10 * group + data_values[i + 2];
             }
             var group_bit_len = 1 + n_digits * 3;
             encoded_data += ('000000000' + group.toString(2)).slice(-group_bit_len);
         }
     }
-    else if (this.mode == 'alphanumeric')
+    else if (mode == 'alphanumeric')
     {
         var idx = 0;
         for (var i = 0; i < (char_count >> 1); i++)
         {
-            var group = 45 * this.data_values[idx] + this.data_values[idx + 1];
+            var group = 45 * data_values[idx] + data_values[idx + 1];
             encoded_data += ('0000000000' + group.toString(2)).slice(-11);
             idx += 2;
         }
         if (idx < char_count)
         {
-            encoded_data += ('00000' + this.data_values[idx].toString(2)).slice(-6);
+            encoded_data += ('00000' + data_values[idx].toString(2)).slice(-6);
         }
     }
-    else if (this.mode == 'byte')
+    else if (mode == 'byte')
     {
         for (var i = 0; i < char_count; i++)
         {
-            encoded_data += ('0000000' + this.data_values[i].toString(2)).slice(-8);
+            encoded_data += ('0000000' + data_values[i].toString(2)).slice(-8);
         }
     }
-    else if (this.mode == 'kanji')
+    else if (mode == 'kanji')
     {
         for (var i = 0; i < char_count; i++)
         {
-            encoded_data += ('000000000000' + this.data_values[i].toString(2)).slice(-13);
+            encoded_data += ('000000000000' + data_values[i].toString(2)).slice(-13);
         }
     }
     else
     {
-        this.error = 'Mode "' + this.mode + '" not supported!';
+        this.error = 'Mode "' + mode + '" not supported!';
         return;
     }
 
+    return encoded_data;
+}
+QRCode.prototype.encode = function()
+{
+    var encoded_data = this.encode_data(this.data_values, this.mode);
+    if (this.error || encoded_data == undefined) return;
     // Add padding
     var total_bit_len = this.n_all_data_codewords * 8;
     var n_padding_bits = total_bit_len - encoded_data.length;
@@ -1143,14 +1292,22 @@ QRCode.prototype.create = function(data, version, error_corr_level, prefer_utf8_
     // Ensure that unmasked module matrix ends up in space allocated for first masked module matrix
     this.module_matrix = this.masked_module_matrices[0];
 
-    this.select_mode();
+    this.select_mode(version == 'auto' ? 1 : version);
+    this.calc_misc_parameters();
     this.extract_data_values();
     if (this.error) return;
-    this.info1 += 'Text length: ' + this.data_values.length +
-        (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
-    this.calc_misc_parameters();
-    this.info1 += '<br>Max text length: ' + this.max_char_count +
-        (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
+    if (this.mode == 'mixed') {
+        this.info1 += `Message uses ${this.message_bit_length} of ${this.max_data_bits} bits`;
+        for (const span of this.mixed_sequence) {
+            this.info1 += `<br>${span.bitLength} bits for ${span.length} characters of ${span.mode} data`;
+        }
+    }
+    else {
+        this.info1 += 'Text length: ' + this.data_values.length +
+            (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
+        this.info1 += '<br>Max text length: ' + this.max_char_count +
+            (this.is_utf8 ? ' UTF-8 bytes' : ' characters');
+    }
     this.info1 += '<br>Mode: ' + this.mode + (this.is_utf8 ? ' (UTF-8)' : '');
     if (this.error) return;
     if (version == 'auto')
