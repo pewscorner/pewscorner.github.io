@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relativistic Effect Calculator</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.box.form_container {
+    -webkit-flex: 100 1 20rem;
+    flex: 100 1 20rem;
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+    -webkit-align-items: baseline;
+    align-items: baseline;
+}
+
+div.box.figure_container {
+    -webkit-flex: 1 1 calc(120px + 2em);
+    flex: 1 1 calc(120px + 2em);
+    -webkit-align-content: flex-start;
+    align-content: flex-start;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 1rem 0rem 0.5rem 0rem;
+    width: 100%;
+}
+
+div.text, div.comment {
+    margin-left: 1rem; 
+    margin-right: 0rem; 
+}
+
+div.output {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid;
+    padding: 0.3em;
+    font-weight: bold;
+    color: #000000;
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.3em;
+    font-size: 100%;
+}
+
+div.comment {
+    font-size: 80%; 
+}
+
+#figure1 {
+    width: 120px;
+    height: 150px;
+}
+
+#contractable_object {
+    transform: scale(0, 1);
+    -webkit-transition: -webkit-transform 1s ease-in-out;
+    transition: transform 1s ease-in-out;
+}
+
+#original_face {
+    fill: #ffffff;
+    stroke: #888888;
+    stroke-width: 1px;
+    stroke-dasharray: 4;
+}
+
+#face {
+    fill: url(#gradient1);
+    stroke: #000000;
+    stroke-width: 1px;
+}
+
+#gradient1_stop0 {
+    stop-color: #fff39b;
+}
+
+#gradient1_stop50 {
+    stop-color: #ffe600;
+}
+
+#gradient1_stop100 {
+    stop-color: #b8a100;
+}
+
+#mouth {
+    fill: #000000;
+    stroke: #000000;
+    stroke-width: 1px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#eye {
+    fill: #ffffff;
+    stroke: #000000;
+    stroke-width: 1px;
+}
+
+#right_eye {
+    transform: scale(-1, 1);
+}
+
+#v_direction {
+    fill: #000000;
+    stroke: #000000;
+    stroke-width: 1px;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#v_text {
+    font-size: 12px;
+    font-family: sans-serif;
+    text-anchor: middle;
+    fill: #000000;
+}
+</style>
+<script type="text/javascript">
+genericPageSetup.extra_menu_buttons = [['theory_button', 'Theory', 'window.open("relativity_theory/doc.html", "_blank")']];
+
+var velocity_elem;
+var lorentz_factor_elem;
+var time_dilation_elem;
+var lorentz_contraction_elem;
+var contractable_object_elem;
+
+function update() {
+    const velocity = +velocity_elem.value;
+    const lorentz_factor = 1 / Math.sqrt(1 - velocity * velocity);
+    lorentz_factor_elem.innerHTML = isNaN(lorentz_factor) ? 'Invalid velocity!' : lorentz_factor;
+    const time_dilation = lorentz_factor - 1;
+    time_dilation_elem.innerHTML =
+        !isFinite(time_dilation) ? time_dilation :
+        time_dilation >= 0.001 ? time_dilation * 100 + '%' :
+        time_dilation * 1e6 + ' ppm';
+    const lorentz_contraction_factor = 1 / lorentz_factor;
+    const lorentz_contraction = 1 - lorentz_contraction_factor;
+    lorentz_contraction_elem.innerHTML =
+        !isFinite(lorentz_contraction) ? lorentz_contraction :
+        lorentz_contraction >= 0.001 ? lorentz_contraction * 100 + '%' :
+        lorentz_contraction * 1e6 + ' ppm';
+    if (isFinite(lorentz_contraction_factor)) {
+        contractable_object_elem.style.transform = 'scale(' + lorentz_contraction_factor + ', 1)';
+    }
+}
+
+function init() {
+    velocity_elem = document.getElementById('velocity');
+    lorentz_factor_elem = document.getElementById('lorentz_factor');
+    time_dilation_elem = document.getElementById('time_dilation');
+    lorentz_contraction_elem = document.getElementById('lorentz_contraction');
+    contractable_object_elem = document.getElementById('contractable_object');
+
+    update();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Relativistic Effect Calculator</h1>
+
+<div class="box hcontainer form_container">
+
+<h2>Velocity (relative to that of light in vacuum)</h2>
+<div class="text"><input id="velocity" type="text" value=0 maxlength=30 onKeyUp="update()" onBlur="update()"></div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is the velocity of the other frame relative to the observer's frame.
+Valid range: -1 to 1.
+Example: 0.5 is half the velocity of light.</div>
+
+<h2>Resulting Lorentz factor</h2>
+<div class="text"><div id="lorentz_factor" class="output"></div></div>
+<div class="linebreak"></div>
+
+<h2>Resulting time dilation</h2>
+<div class="text"><div id="time_dilation" class="output"></div></div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is the amount by which a period of time measured in the other frame appears to be
+lengthened in the observer's frame.</div>
+
+<h2>Resulting Lorentz contraction</h2>
+<div class="text"><div id="lorentz_contraction" class="output"></div></div>
+<div class="linebreak"></div>
+<div class="comment">Note: This is the amount by which a length or distance measured in the other frame appears to be
+shortened in the observer's frame.</div>
+
+</div>
+
+<div class="box hcontainer figure_container">
+<h2>Observed contraction</h2>
+<svg id="figure1" viewBox="-52 -52 104 130">
+    <defs>
+        <radialGradient
+            id="gradient1"
+            cx="20%"
+            cy="20%"
+            r="80%">
+            <stop offset="0" id="gradient1_stop0" />
+            <stop offset="50%" id="gradient1_stop50" />
+            <stop offset="100%" id="gradient1_stop100" />
+        </radialGradient>
+    </defs>
+    <circle id="original_face" r="50" cx="0" cy="0" />
+    <g id="contractable_object">
+        <circle id="face" r="50" cx="0" cy="0" />
+        <path id="mouth" d="M-22,20 q22,25 44,0 -22,8 -44,0" />
+        <g id="left_eye">
+            <circle id="eye" r="14" cx="-15" cy="-10" />
+            <circle id="eyeball" r="6" cx="-11" cy="-4" />
+        </g>
+        <use id="right_eye" xlink:href="#left_eye" />
+    </g>
+    <path id="v_direction" d="m-30,70 h60 m0,0 -5,-4 0,8 z" />
+    <text id="v_text" x="0" y="65">velocity</text>
+</svg>
+</div>
+
+</div>
+
+</body>
+</html>
