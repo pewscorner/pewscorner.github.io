@@ -1,0 +1,3 @@
+User-agent: *
+Disallow:
+Sitemap: https://pewscorner.github.io/sitemap.txt
