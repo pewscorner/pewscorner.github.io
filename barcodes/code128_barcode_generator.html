@@ -1,0 +1,1304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Code 128 Barcode Generator</title>
+<script type="text/javascript" src="../page.js"></script>
+<style type="text/css">
+#input {
+    box-sizing: border-box;
+    width: 100%;
+}
+
+#output {
+    text-align: center;
+}
+
+a[href].downloadbut {
+    display: inline-block;
+    width: auto;
+}
+
+#error_msg {
+    display: none;
+    color: red;
+}
+
+#raw_codes {
+    background-color: transparent;
+    font-family: 'Courier New', Courier, monospace;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    min-width: 100%;
+    height: 10em;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+const debug = false; // debug logging
+
+class Graph
+{
+    start_node;
+    end_node;
+    next_node_id; // for debug logging only
+
+    constructor()
+    {
+        if (debug) console.log('-'.repeat(80));
+        this.start_node = new Graph.Node(this);
+        this.start_node.id = 'start';
+        this.start_node.shortest_path_position = 0;
+        this.end_node = new Graph.Node(this);
+        this.end_node.id = 'end';
+        this.next_node_id = 0;
+    }
+
+    static Node = class
+    {
+        id; // for debug logging only
+        graph;
+        outgoing_edges = [];
+        is_visited = false;
+        shortest_path_position = Infinity;
+        shortest_path_incoming_edge = null;
+
+        constructor(graph)
+        {
+            this.graph = graph;
+            this.id = graph.next_node_id++;
+        }
+
+        connect_node(target_node, text, chars_per_path_len_unit = undefined)
+        {
+            new Graph.Edge(this, target_node, text, chars_per_path_len_unit);
+            return target_node;
+        }
+
+        connect_new_node(text, chars_per_path_len_unit = undefined)
+        {
+            return this.connect_node(new Graph.Node(this.graph), text, chars_per_path_len_unit);
+        }
+
+        mark_as_visited()
+        {
+            this.is_visited = true;
+            if (debug) console.log('Graph.Node ' + this.id + ' visited');
+        }
+
+        update_shortest_path(position, incoming_edge)
+        {
+            this.shortest_path_position = position;
+            this.shortest_path_incoming_edge = incoming_edge;
+            if (debug) console.log('Graph.Node ' + this.id + ' pos=' + this.shortest_path_position +
+                ' via node ' + this.shortest_path_incoming_edge.source_node.id);
+        }
+    };
+
+    static Edge = class
+    {
+        source_node;
+        target_node;
+        text;
+        edge_length;
+
+        constructor(source_node, target_node, text, chars_per_path_len_unit = 1)
+        {
+            this.source_node = source_node;
+            this.target_node = target_node;
+            this.text = text;
+            this.edge_length = text.length / chars_per_path_len_unit;
+            source_node.outgoing_edges.push(this);
+            if (debug) console.log('Graph.Edge: ' + source_node.id + ' --"' + text + '"--> ' + target_node.id +
+                ' (len ' + this.edge_length + ')');
+        }
+    };
+}
+
+class Code128Barcode
+{
+    // Widths (in "modules") of bars and spaces for each symbol
+    static SYMBOL_ENCODING = [
+        [2,1,2,2,2,2],  // 0
+        [2,2,2,1,2,2],
+        [2,2,2,2,2,1],
+        [1,2,1,2,2,3],
+        [1,2,1,3,2,2],
+        [1,3,1,2,2,2],
+        [1,2,2,2,1,3],
+        [1,2,2,3,1,2],
+        [1,3,2,2,1,2],
+        [2,2,1,2,1,3],
+        [2,2,1,3,1,2],
+        [2,3,1,2,1,2],
+        [1,1,2,2,3,2],
+        [1,2,2,1,3,2],
+        [1,2,2,2,3,1],
+        [1,1,3,2,2,2],
+        [1,2,3,1,2,2],
+        [1,2,3,2,2,1],
+        [2,2,3,2,1,1],
+        [2,2,1,1,3,2],
+        [2,2,1,2,3,1],
+        [2,1,3,2,1,2],
+        [2,2,3,1,1,2],
+        [3,1,2,1,3,1],
+        [3,1,1,2,2,2],
+        [3,2,1,1,2,2],
+        [3,2,1,2,2,1],
+        [3,1,2,2,1,2],
+        [3,2,2,1,1,2],
+        [3,2,2,2,1,1],
+        [2,1,2,1,2,3],
+        [2,1,2,3,2,1],
+        [2,3,2,1,2,1],
+        [1,1,1,3,2,3],
+        [1,3,1,1,2,3],
+        [1,3,1,3,2,1],
+        [1,1,2,3,1,3],
+        [1,3,2,1,1,3],
+        [1,3,2,3,1,1],
+        [2,1,1,3,1,3],
+        [2,3,1,1,1,3],
+        [2,3,1,3,1,1],
+        [1,1,2,1,3,3],
+        [1,1,2,3,3,1],
+        [1,3,2,1,3,1],
+        [1,1,3,1,2,3],
+        [1,1,3,3,2,1],
+        [1,3,3,1,2,1],
+        [3,1,3,1,2,1],
+        [2,1,1,3,3,1],
+        [2,3,1,1,3,1],
+        [2,1,3,1,1,3],
+        [2,1,3,3,1,1],
+        [2,1,3,1,3,1],
+        [3,1,1,1,2,3],
+        [3,1,1,3,2,1],
+        [3,3,1,1,2,1],
+        [3,1,2,1,1,3],
+        [3,1,2,3,1,1],
+        [3,3,2,1,1,1],
+        [3,1,4,1,1,1],
+        [2,2,1,4,1,1],
+        [4,3,1,1,1,1],
+        [1,1,1,2,2,4],
+        [1,1,1,4,2,2],
+        [1,2,1,1,2,4],
+        [1,2,1,4,2,1],
+        [1,4,1,1,2,2],
+        [1,4,1,2,2,1],
+        [1,1,2,2,1,4],
+        [1,1,2,4,1,2],
+        [1,2,2,1,1,4],
+        [1,2,2,4,1,1],
+        [1,4,2,1,1,2],
+        [1,4,2,2,1,1],
+        [2,4,1,2,1,1],
+        [2,2,1,1,1,4],
+        [4,1,3,1,1,1],
+        [2,4,1,1,1,2],
+        [1,3,4,1,1,1],
+        [1,1,1,2,4,2],
+        [1,2,1,1,4,2],
+        [1,2,1,2,4,1],
+        [1,1,4,2,1,2],
+        [1,2,4,1,1,2],
+        [1,2,4,2,1,1],
+        [4,1,1,2,1,2],
+        [4,2,1,1,1,2],
+        [4,2,1,2,1,1],
+        [2,1,2,1,4,1],
+        [2,1,4,1,2,1],
+        [4,1,2,1,2,1],
+        [1,1,1,1,4,3],
+        [1,1,1,3,4,1],
+        [1,3,1,1,4,1],
+        [1,1,4,1,1,3],  // 95
+        [1,1,4,3,1,1],  // 96:  FNC 3   | FNC 3   | 96
+        [4,1,1,1,1,3],  // 97:  FNC 2   | FNC 2   | 97
+        [4,1,1,3,1,1],  // 98:  Shift B | Shift A | 98
+        [1,1,3,1,4,1],  // 99:  Code C  | Code C  | 99
+        [1,1,4,1,3,1],  // 100: Code B  | FNC 4   | Code B
+        [3,1,1,1,4,1],  // 101: FNC 4   | Code A  | Code A
+        [4,1,1,1,3,1],  // 102: FNC 1
+        [2,1,1,4,1,2],  // 103: Start Code A
+        [2,1,1,2,1,4],  // 104: Start Code B
+        [2,1,1,2,3,2],  // 105: Start Code C
+        [2,3,3,1,1,1],  // 106: Stop
+    ];
+
+    static FNC1_VALUE = 102;
+    static FNC2_VALUE = 97;
+    static FNC3_VALUE = 96;
+    static FNC4_A_VALUE = 101;
+    static FNC4_B_VALUE = 100;
+    static CODE_A_SWITCH_VALUE = 101;
+    static CODE_B_SWITCH_VALUE = 100;
+    static CODE_C_SWITCH_VALUE = 99;
+    static SHIFT_AB_VALUE = 98;
+    static START_CODE_A_VALUE = 103;
+    static START_CODE_B_VALUE = 104;
+    static START_CODE_C_VALUE = 105;
+    static STOP_CODE_VALUE = 106;
+
+    static FNC1_CODEPOINT = 0x2460; // Use "CIRCLED DIGIT ONE" etc. ('①②③④') to represent FNC1-3
+    static FNC2_CODEPOINT = 0x2461;
+    static FNC3_CODEPOINT = 0x2462;
+    static FNC4_CODEPOINT = 0x2463;
+    static CODE_A_CODEPOINT = 0x24B6; // Use "CIRCLED LATIN CAPITAL LETTER A" etc. ('ⒶⒷⒸ') to represent Code A-C
+    static CODE_B_CODEPOINT = 0x24B7;
+    static CODE_C_CODEPOINT = 0x24B8;
+    static SHIFT_AB_CODEPOINT = 0x24C8; // Use "CIRCLED LATIN CAPITAL LETTER S" ('Ⓢ') to represent Shift A/B
+
+    static FNC1_CHAR = String.fromCodePoint(Code128Barcode.FNC1_CODEPOINT);
+    static FNC2_CHAR = String.fromCodePoint(Code128Barcode.FNC2_CODEPOINT);
+    static FNC3_CHAR = String.fromCodePoint(Code128Barcode.FNC3_CODEPOINT);
+    static FNC4_CHAR = String.fromCodePoint(Code128Barcode.FNC4_CODEPOINT);
+    static CODE_A_CHAR = String.fromCodePoint(Code128Barcode.CODE_A_CODEPOINT);
+    static CODE_B_CHAR = String.fromCodePoint(Code128Barcode.CODE_B_CODEPOINT);
+    static CODE_C_CHAR = String.fromCodePoint(Code128Barcode.CODE_C_CODEPOINT);
+    static SHIFT_AB_CHAR = String.fromCodePoint(Code128Barcode.SHIFT_AB_CODEPOINT);
+
+    static ESCAPE_CONVERSION = {
+        '\\F1': Code128Barcode.FNC1_CHAR,
+        '\\F2': Code128Barcode.FNC2_CHAR,
+        '\\F3': Code128Barcode.FNC3_CHAR,
+        '\\F4': Code128Barcode.FNC4_CHAR,
+        '\\CA': Code128Barcode.CODE_A_CHAR,
+        '\\CB': Code128Barcode.CODE_B_CHAR,
+        '\\CC': Code128Barcode.CODE_C_CHAR,
+        '\\S': Code128Barcode.SHIFT_AB_CHAR,
+        '"': '\\"',
+    };
+
+    static QUIET_ZONE_WIDTH = 10; // unit: modules
+    static SYMBOL_PATTERN_WIDTH = 11; // unit: modules
+    static FINAL_BAR_WIDTH = 2;
+    static SYMBOL_PITCH = 5.5; // unit: modules
+    static SYMBOL_HEIGHT = 10; // unit: modules
+
+    // Regexps that match a sequence of chars in each possible subrange
+    static subrange_regexes = [
+        /[\u2461\u2462]*(?:[\x00-\x1F]+[\u2461\u2462]*)+/y,                         // 0: Sequence of subrange \x00-\x1F with optional FNC2/FNC3
+        /[\u2461\u2462]*(?:(?:[\x20-\x2F\x3A-\x5F]|\d(?!\d))+[\u2461\u2462]*)+/y,   // 1: Sequence of subrange \x20-\x5F with optional FNC2/FNC3, but no multidigits
+        /\d{2,}/y,                                                                  // 2: Multidigit sequence
+        /[\u2461\u2462]*(?:[\x60-\x7F]+[\u2461\u2462]*)+/y,                         // 3: Sequence of subrange \x60-\x7F with optional FNC2/FNC3
+        /[\u2461\u2462]*(?:[\x80-\x9F]+[\u2461\u2462]*)+/y,                         // 4: Sequence of subrange \x80-\x9F with optional FNC2/FNC3
+        /[\u2461\u2462]*(?:[\xA0-\xDF]+[\u2461\u2462]*)+/y,                         // 5: Sequence of subrange \xA0-\xDF with optional FNC2/FNC3
+        /[\u2461\u2462]*(?:[\xE0-\xFF]+[\u2461\u2462]*)+/y,                         // 6: Sequence of subrange \xE0-\xFF with optional FNC2/FNC3
+        /[\u2461\u2462]+/y,                                                         // 7: Sequence of only FNC2/FNC3
+    ];
+    static ANY_NORMAL_CHAR_REGEX = /[\x00-\xFF]/g;
+
+    static CODE_C_CHARS_PER_BARCODE_SYMBOL = 2;
+
+    are_codes_visible = true;
+    plaintext;
+    label_items = [];
+    raw_codes = [];
+    start_codeset;
+    codeset;
+    temp_shift_active = false;
+    temp_fnc4_active = false;
+    permanent_fnc4_active = false;
+    error;
+    bar_widths = [];
+    total_width;
+
+    graph;
+
+    /**
+    * Returns a string that is the specified string with all escape sequences converted to their corresponding
+    * characters, i.e. '\\n' to '\n', '\\t' to '\t', and similarly for all other Javascript escapes.
+    * The special non-standard escapes '\\F1', '\\F2', '\\F3', '\\F4', '\\CA', '\\CB', '\\CC', '\\S' are also supported
+    * as representations of FNC, code set switch, and shift codes.
+    */
+    apply_escapes(str)
+    {
+        // Replace the special non-standard escapes with suitable single characters, replace unescaped double quotes
+        // with escaped ones, and enclose the whole string in double quotes, so it becomes a Javascript string literal
+        // within a Javascript string
+        str = '"' + str.replace(/(?<!\\)((?:\\\\)*)(\\F[1-4]|\\C[A-C]|\\S|")/g, (match, p1, p2) =>
+            p1 + Code128Barcode.ESCAPE_CONVERSION[p2]) + '"';
+        // Evaluate the string as a Javascript expression in order to return the value of the string literal within the
+        // string - with all standard escapes converted to their corresponding characters
+        return eval(str);
+    }
+
+    make_codeset_selection_graph()
+    {
+        // This method creates a graph of nodes and edges representing several possible encodings of the plaintext using
+        // the various code set switching options. The path length of each edge is the number of barcode symbols
+        // represented by that edge, which in turn is the length of the character sequence held by the edge divided by
+        // the number of characters per barcode symbol (2 chars/symbol for code set C, 1 char/symbol for others).
+        //
+        // Subgraphs AL and BL for the low range (0x00-0x7F) of code sets A and B are always created from the start
+        // node, and their first edge holds the start code for code set A and B, respectively. Subgraphs AH and BH for
+        // the high range (0x80-0xFF) of code sets A and B are created when the first high-range character is
+        // encountered, and their first edge holds two FNC4 codes to switch to the high range. Each sequence of
+        // plaintext characters belonging to a given subrange is added as a horizontal edge in all the subgraphs and
+        // coded appropriately according to the code set represented by the respective subgraph (i.e. each character in
+        // the sequence is prefixed with an FNC4 and/or shift code as needed). After each sequence has been added to all
+        // subgraphs, edges are added between the subgraphs to allow switching to a different code set (see further down
+        // for details). When there are no more sequences in the plaintext, edges holding empty sequences are added from
+        // all subgraphs to the end node.
+        //
+        //                           (seq1)    (seq2)    (seq3)                    (empty)
+        //                                   ●────────>●────────>●───>AH       ──>●──''───╮
+        //                     (A)           ↑         ↕↖        ↕↖                       │
+        //                     ╭──>●────────>●────────>●─┼──────>●─┼─>AL       ──>●──''──>↓
+        //                  start                      ↕ │       ↕ │                      end
+        //                     ╰──>●────────>●────────>●─┼──────>●─┼─>BL       ──>●──''──>↑
+        //                     (B)           ↓         ↕↙        ↕↙                       │
+        //                                   ●────────>●────────>●───>BH       ──>●──''───╯
+        //
+        // Examples of sequences in the above graph (④ is FNC4, Ⓢ is shift):
+        //      seq1: 'ABC' for AL/BL
+        //      seq2: '④Á④É④Ó' for AL/BL, 'ÁÉÓ' for AH/BH
+        //      seq3: '④Ⓢá④Ⓢé④Ⓢó' for AL, '④á④é④ó' for BL, 'ⓈáⓈéⓈó' for AH, 'áéó' for BH
+        //
+        // Subgraphs CL and CH for code set C are created whenever a sequence of at least 2 digits is encountered -
+        // possibly already at the start node. Subgraph CL is branched out from AL and BL, and CH is branched out from
+        // AH and BH if they exist. Note that code set C does not have low- and high-range variants, but two separate
+        // subgraphs CL and CH are created to keep track of the low-/high-range state of the A and B subgraphs they were
+        // branched from, so they can merge back into the same subgraphs when done and thus restore the original state.
+        // If the sequence of digits contains an odd number of digits, two more subgraphs CLskip1 and CHskip1 are
+        // branched out from AL/BL and AH/BH after the first digit and will thus contain all digits except the first
+        // one, while CL and CH will contain all digits except the last one. An example of the AL, BL, CL, and CLskip1
+        // subgraphs for the sequence '12345' is shown below. If AH and BH exist, CH and CHskip1 subgraphs are created
+        // from them in the same way.
+        //
+        //                            AL──────>●──'1'──>●─'234'─>●──'5'──>●──────>AL
+        //                                    (C)      (C)       ↑        ↑
+        //                                     ↓        │       (A)       │
+        //                                   CL●─'1234'─┼───────>●        │
+        //                                     ↑        ↓       (B)      (A)
+        //                                     │ CLskip1●─'2345'─┼───────>●
+        //                                     │        ↑        │       (B)
+        //                                    (C)      (C)       ↓        ↓
+        //                            BL──────>●──'1'──>●─'234'─>●──'5'──>●──────>BL
+        //
+        // As mentioned, code set switching edges are added between the subgraphs after every sequence. The possible
+        // edges added for this purpose are shown below. There are no edges between C subgraphs and other subgraphs,
+        // except when the C subgraphs are branched out from and merged back into the other subgraphs. The parenthesized
+        // labels on the edges indicate the codes held by those edges to perform the code set switch, e.g. the edge from
+        // subgraph AL to BL holds the code set B switch code, the edge in the opposite direction holds the code set A
+        // switch code, and the edges between AL and AH both hold two FNC4 codes.
+        //
+        //                                   (A/C)       (FNC4²)       (A/C)
+        //                                 ╭─────────>AL<───────>AH<─────────╮
+        //                                 ↓          ↑           ↑          ↓
+        //                         CL/CLskip1    (A/B)│           │(A/B)    CH/CHskip1
+        //                                 ↑          ↓           ↓          ↑
+        //                                 ╰─────────>BL<───────>BH<─────────╯
+        //                                   (A/C)       (FNC4²)       (A/C)
+
+        const DOUBLE_FNC4_CHAR = Code128Barcode.FNC4_CHAR + Code128Barcode.FNC4_CHAR;
+        const FNC4_SHIFT_CHAR = Code128Barcode.FNC4_CHAR + Code128Barcode.SHIFT_AB_CHAR;
+
+        this.graph = new Graph();
+        var plaintext_pos = 0;
+        // Create subgraphs AL and BL for low codepoint range (0x00-0x7F) of code sets A and B
+        var subgraph_a_low_last_node = this.graph.start_node.connect_new_node('A');
+        var subgraph_b_low_last_node = this.graph.start_node.connect_new_node('B');
+        // Create subgraph CL for code set C only if plaintext starts with a digit pair (after an optional FNC1)
+        var subgraph_c_low_last_node = null;
+        if (/^\u2460?\d\d/.test(this.plaintext)) {
+            subgraph_c_low_last_node = this.graph.start_node.connect_new_node('C');
+        }
+        // Add any initial FNC1 to all subgraphs
+        if (this.plaintext.codePointAt(plaintext_pos) == Code128Barcode.FNC1_CODEPOINT) {
+            subgraph_a_low_last_node = subgraph_a_low_last_node.connect_new_node(Code128Barcode.FNC1_CHAR);
+            subgraph_b_low_last_node = subgraph_b_low_last_node.connect_new_node(Code128Barcode.FNC1_CHAR);
+            if (subgraph_c_low_last_node) {
+                subgraph_c_low_last_node = subgraph_c_low_last_node.connect_new_node(Code128Barcode.FNC1_CHAR);
+            }
+            plaintext_pos++;
+        }
+        // High-range subgraphs AH, BH, and CH are not created until the first high-range char is encountered
+        // (Note: Code set C does not have separate low and high ranges, but separate low- and high-range subgraphs are
+        // maintained anyway in order to restore the previously active range when transitioning back to code set A or B)
+        var subgraph_a_high_last_node = null;
+        var subgraph_b_high_last_node = null;
+        var subgraph_c_high_last_node = null;
+        // Code set C potentially needs 2 additional subgraphs CLskip1 and CHskip1 to handle digit sequences that have
+        // an odd number of digits; these extra "skip1" subgraphs skip the first digit, whereas the already defined
+        // subgraphs CL and CH skip the last digit in such sequences
+        var subgraph_c_low_skip1_last_node = null;
+        var subgraph_c_high_skip1_last_node = null;
+
+        // Find boundaries between runs of each of 6 character classes: 00-1F, 20-5F, 60-7F, 80-9F, A0-DF, E0-FF, and
+        // around runs of digit pairs (30-39). Transitions between subgraphs can only happen at these boundaries. Runs
+        // of FNC2-3 do not introduce boundaries (except when they delimit a digit pair run, of course).
+        var current_subrange = null;
+        while (plaintext_pos < this.plaintext.length) {
+            // If this is not first iteration, then add transitions between subgraphs for code sets A and B and their
+            // low and high ranges
+            if (current_subrange != null) {
+                // Add transitions between low-range subgraphs for code sets A and B
+                subgraph_a_low_last_node.connect_node(subgraph_b_low_last_node, Code128Barcode.CODE_B_CHAR);
+                subgraph_b_low_last_node.connect_node(subgraph_a_low_last_node, Code128Barcode.CODE_A_CHAR);
+                // If high-range subgraphs exist for code sets A and B, then add transitions involving those as well
+                if (subgraph_a_high_last_node) {
+                    subgraph_a_high_last_node.connect_node(subgraph_b_high_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_b_high_last_node.connect_node(subgraph_a_high_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_a_low_last_node.connect_node(subgraph_a_high_last_node, DOUBLE_FNC4_CHAR);
+                    subgraph_a_high_last_node.connect_node(subgraph_a_low_last_node, DOUBLE_FNC4_CHAR);
+                    subgraph_b_low_last_node.connect_node(subgraph_b_high_last_node, DOUBLE_FNC4_CHAR);
+                    subgraph_b_high_last_node.connect_node(subgraph_b_low_last_node, DOUBLE_FNC4_CHAR);
+                }
+                // If any subgraphs exist for code set C, then transition those back to subgraphs for code sets A and B
+                if (subgraph_c_low_last_node) {
+                    subgraph_c_low_last_node.connect_node(subgraph_a_low_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_c_low_last_node.connect_node(subgraph_b_low_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_c_low_last_node = null;
+                }
+                if (subgraph_c_high_last_node) {
+                    subgraph_c_high_last_node.connect_node(subgraph_a_high_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_c_high_last_node.connect_node(subgraph_b_high_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_c_high_last_node = null;
+                }
+                if (subgraph_c_low_skip1_last_node) {
+                    subgraph_c_low_skip1_last_node.connect_node(subgraph_a_low_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_c_low_skip1_last_node.connect_node(subgraph_b_low_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_c_low_skip1_last_node = null;
+                }
+                if (subgraph_c_high_skip1_last_node) {
+                    subgraph_c_high_skip1_last_node.connect_node(subgraph_a_high_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_c_high_skip1_last_node.connect_node(subgraph_b_high_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_c_high_skip1_last_node = null;
+                }
+            }
+
+            // Check all possible subranges to find the one that applies to the next sequence of chars
+            for (current_subrange = 0; current_subrange < Code128Barcode.subrange_regexes.length; current_subrange++) {
+                let subrange_regex = Code128Barcode.subrange_regexes[current_subrange];
+                subrange_regex.lastIndex = plaintext_pos;
+                if (subrange_regex.test(this.plaintext)) {
+                    var next_plaintext_pos = subrange_regex.lastIndex;
+                    break;
+                }
+            }
+
+            // If current sequence subrange is a high range, and subgraphs for that range don't yet exist, then create
+            // them
+            if (current_subrange >= 4 && current_subrange <= 6 && !subgraph_a_high_last_node) {
+                subgraph_a_high_last_node = subgraph_a_low_last_node.connect_new_node(DOUBLE_FNC4_CHAR);
+                subgraph_b_high_last_node = subgraph_b_low_last_node.connect_new_node(DOUBLE_FNC4_CHAR);
+            }
+
+            // If current sequence subrange is multidigit, then add sequence to subgraphs for code set C
+            if (current_subrange == 2) {
+                // If subgraphs for code set C don't already exist, then create them (only the low-range subgraph for
+                // code set C might exist already - if the plaintext started with a digit pair)
+                if (!subgraph_c_low_last_node) {
+                    subgraph_c_low_last_node = subgraph_a_low_last_node.connect_new_node(Code128Barcode.CODE_C_CHAR);
+                    subgraph_b_low_last_node.connect_node(subgraph_c_low_last_node, Code128Barcode.CODE_C_CHAR);
+                    if (subgraph_a_high_last_node) {
+                        subgraph_c_high_last_node = subgraph_a_high_last_node.connect_new_node(Code128Barcode.CODE_C_CHAR);
+                        subgraph_b_high_last_node.connect_node(subgraph_c_high_last_node, Code128Barcode.CODE_C_CHAR);
+                    }
+                }
+                if ((next_plaintext_pos - plaintext_pos) & 0x1) {
+                    // Sequence has odd number of digits, so handle it in 3 parts: 1st digit, remaining digits except
+                    // last, and finally last digit.
+                    // Add sequence except last digit to subgraphs for code set C
+                    let text = this.plaintext.slice(plaintext_pos, next_plaintext_pos - 1);
+                    subgraph_c_low_last_node = subgraph_c_low_last_node.connect_new_node(text,
+                        Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    if (subgraph_c_high_last_node) {
+                        subgraph_c_high_last_node = subgraph_c_high_last_node.connect_new_node(text,
+                            Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    }
+                    // Add first digit to subgraphs for code sets A and B
+                    text = this.plaintext.slice(plaintext_pos, plaintext_pos + 1);
+                    subgraph_a_low_last_node = subgraph_a_low_last_node.connect_new_node(text);
+                    subgraph_b_low_last_node = subgraph_b_low_last_node.connect_new_node(text);
+                    if (subgraph_a_high_last_node) {
+                        subgraph_a_high_last_node = subgraph_a_high_last_node.connect_new_node(Code128Barcode.FNC4_CHAR + text);
+                        subgraph_b_high_last_node = subgraph_b_high_last_node.connect_new_node(Code128Barcode.FNC4_CHAR + text);
+                    }
+                    // Create "skip1" subgraphs for code set C
+                    subgraph_c_low_skip1_last_node = subgraph_a_low_last_node.connect_new_node(Code128Barcode.CODE_C_CHAR);
+                    subgraph_b_low_last_node.connect_node(subgraph_c_low_skip1_last_node, Code128Barcode.CODE_C_CHAR);
+                    if (subgraph_a_high_last_node) {
+                        subgraph_c_high_skip1_last_node = subgraph_a_high_last_node.connect_new_node(Code128Barcode.CODE_C_CHAR);
+                        subgraph_b_high_last_node.connect_node(subgraph_c_high_skip1_last_node, Code128Barcode.CODE_C_CHAR);
+                    }
+                    // Add sequence except first digit to "skip1" subgraphs for code set C
+                    text = this.plaintext.slice(plaintext_pos + 1, next_plaintext_pos);
+                    subgraph_c_low_skip1_last_node = subgraph_c_low_skip1_last_node.connect_new_node(text,
+                        Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    if (subgraph_c_high_skip1_last_node) {
+                        subgraph_c_high_skip1_last_node = subgraph_c_high_skip1_last_node.connect_new_node(text,
+                            Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    }
+                    // Add sequence except first and last digits to subgraphs for code sets A and B
+                    text = this.plaintext.slice(plaintext_pos + 1, next_plaintext_pos - 1);
+                    subgraph_a_low_last_node = subgraph_a_low_last_node.connect_new_node(text);
+                    subgraph_b_low_last_node = subgraph_b_low_last_node.connect_new_node(text);
+                    if (subgraph_a_high_last_node) {
+                        subgraph_a_high_last_node = subgraph_a_high_last_node.connect_new_node(Code128Barcode.FNC4_CHAR + text);
+                        subgraph_b_high_last_node = subgraph_b_high_last_node.connect_new_node(Code128Barcode.FNC4_CHAR + text);
+                    }
+                    // Transition non-"skip1" subgraphs for code set C back to subgraphs for code sets A and B
+                    subgraph_c_low_last_node.connect_node(subgraph_a_low_last_node, Code128Barcode.CODE_A_CHAR);
+                    subgraph_c_low_last_node.connect_node(subgraph_b_low_last_node, Code128Barcode.CODE_B_CHAR);
+                    subgraph_c_low_last_node = null;
+                    if (subgraph_c_high_last_node) {
+                        subgraph_c_high_last_node.connect_node(subgraph_a_high_last_node, Code128Barcode.CODE_A_CHAR);
+                        subgraph_c_high_last_node.connect_node(subgraph_b_high_last_node, Code128Barcode.CODE_B_CHAR);
+                        subgraph_c_high_last_node = null;
+                    }
+                    // Update text position to point to last digit (then proceed below to add last digit to subgraphs
+                    // for code sets A and B)
+                    plaintext_pos = next_plaintext_pos - 1;
+                } else {
+                    // Sequence has even number of digits, so just add sequence directly to subgraphs for code set C
+                    // (then proceed below to add same sequence to subgraphs for code sets A and B)
+                    const text = this.plaintext.slice(plaintext_pos, next_plaintext_pos);
+                    subgraph_c_low_last_node = subgraph_c_low_last_node.connect_new_node(text,
+                        Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    if (subgraph_c_high_last_node) {
+                        subgraph_c_high_last_node = subgraph_c_high_last_node.connect_new_node(text,
+                            Code128Barcode.CODE_C_CHARS_PER_BARCODE_SYMBOL);
+                    }
+                }
+            }
+
+            // Add found sequence of chars to subgraphs for code sets A and B
+            const text = this.plaintext.slice(plaintext_pos, next_plaintext_pos);
+            subgraph_a_low_last_node = subgraph_a_low_last_node.connect_new_node(
+                current_subrange <= 2 ? text :
+                current_subrange == 3 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.SHIFT_AB_CHAR + '$&') :
+                current_subrange <= 5 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.FNC4_CHAR + '$&') :
+                                        text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, FNC4_SHIFT_CHAR + '$&')
+                );
+            subgraph_b_low_last_node = subgraph_b_low_last_node.connect_new_node(
+                current_subrange == 0 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.SHIFT_AB_CHAR + '$&') :
+                current_subrange <= 3 ? text :
+                current_subrange == 4 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, FNC4_SHIFT_CHAR + '$&') :
+                                        text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.FNC4_CHAR + '$&')
+                );
+            if (subgraph_a_high_last_node) {
+                subgraph_a_high_last_node = subgraph_a_high_last_node.connect_new_node(
+                    current_subrange <= 2 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.FNC4_CHAR + '$&') :
+                    current_subrange == 3 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, FNC4_SHIFT_CHAR + '$&') :
+                    current_subrange <= 5 ? text :
+                                            text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.SHIFT_AB_CHAR + '$&')
+                    );
+                subgraph_b_high_last_node = subgraph_b_high_last_node.connect_new_node(
+                    current_subrange == 0 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, FNC4_SHIFT_CHAR + '$&') :
+                    current_subrange <= 3 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.FNC4_CHAR + '$&') :
+                    current_subrange == 4 ? text.replace(Code128Barcode.ANY_NORMAL_CHAR_REGEX, Code128Barcode.SHIFT_AB_CHAR + '$&') :
+                                            text
+                    );
+            }
+
+            plaintext_pos = next_plaintext_pos;
+        }
+
+        // Connect all subgraphs to shared end node using empty text edges (do C first to prioritize it over A and B)
+        if (subgraph_c_low_last_node) {
+            subgraph_c_low_last_node.connect_node(this.graph.end_node, '');
+        }
+        if (subgraph_c_high_last_node) {
+            subgraph_c_high_last_node.connect_node(this.graph.end_node, '');
+        }
+        if (subgraph_c_low_skip1_last_node) {
+            subgraph_c_low_skip1_last_node.connect_node(this.graph.end_node, '');
+        }
+        if (subgraph_c_high_skip1_last_node) {
+            subgraph_c_high_skip1_last_node.connect_node(this.graph.end_node, '');
+        }
+        subgraph_a_low_last_node.connect_node(this.graph.end_node, '');
+        subgraph_b_low_last_node.connect_node(this.graph.end_node, '');
+        if (subgraph_a_high_last_node) {
+            subgraph_a_high_last_node.connect_node(this.graph.end_node, '');
+            subgraph_b_high_last_node.connect_node(this.graph.end_node, '');
+        }
+    }
+
+    find_shortest_codeset_selection_path()
+    {
+        // This method uses Dijkstra's algorithm to find the shortest path from the start node to the end node in the
+        // graph created by make_codeset_selection_graph. The shortest path corresponds to the shortest barcode.
+
+        let next_candidate_nodes = new Set();
+        let best_candidate_node = null;
+        let current_node = this.graph.start_node;
+
+        // Determine shortest path lengths from start node to all other nodes until the end node is reached
+        while (current_node !== this.graph.end_node) {
+            // Update shortest path positions of all unvisited neighbors of current node, include those neighbors in the
+            // set of candidates to become the next current node
+            for (let edge of current_node.outgoing_edges) {
+                let neighbor_node = edge.target_node;
+                if (neighbor_node.is_visited) continue;
+                let new_shortest_path_position = current_node.shortest_path_position + edge.edge_length;
+                if (new_shortest_path_position < neighbor_node.shortest_path_position) {
+                    if (neighbor_node.shortest_path_position == Infinity) {
+                        next_candidate_nodes.add(neighbor_node);
+                    }
+                    neighbor_node.update_shortest_path(new_shortest_path_position, edge);
+                }
+            }
+            current_node.mark_as_visited();
+
+            // Find the candidate with the shortest path position, set it as the new current node, and remove it from
+            // the set of candidates
+            let best_candidate_node = null;
+            for (let candidate_node of next_candidate_nodes) {
+                if (best_candidate_node == null ||
+                    candidate_node.shortest_path_position < best_candidate_node.shortest_path_position) {
+                    best_candidate_node = candidate_node;
+                }
+            }
+            current_node = best_candidate_node;
+            next_candidate_nodes.delete(current_node);
+        }
+
+        // Find shortest path by backtracking from end node to start node - following shortest_path_incoming_edge for
+        // each node
+        let texts = [];
+        while (current_node !== this.graph.start_node) {
+            let edge = current_node.shortest_path_incoming_edge;
+            texts.unshift(edge.text);
+            current_node = edge.source_node;
+        }
+        // The text on the first edge is always the initial code set
+        this.start_codeset = texts.shift();
+        // Join the remaining texts to form the new plaintext for the shortest barcode
+        this.plaintext = texts.join('');
+    }
+
+    create(plaintext, codeset, are_codes_visible)
+    {
+        this.are_codes_visible = are_codes_visible;
+        this.start_codeset = codeset;
+        this.error = null;
+        this.label_items.length = 0;
+        this.raw_codes.length = 0;
+        try {
+            this.plaintext = this.apply_escapes(plaintext);
+        } catch (e) {
+            this.error = "Invalid backslash escape!";
+            return;
+        }
+
+        if (this.plaintext.includes(Code128Barcode.FNC1_CHAR, 1)) {
+            this.error = 'FNC1 is only allowed at start of text!';
+            return;
+        }
+
+        var result = /[^\x00-\xFF\u2460-\u2463\u24B6-\u24B8\u24C8]/.exec(this.plaintext);
+        if (result) {
+            this.error = '"' + result[0] + '" is not a supported character in any code set!';
+            return;
+        }
+
+        // If code set selection is automatic, then find best initial code set and insert best code set selection codes
+        // into plaintext to produce shortest possible barcode
+        if (this.start_codeset == '*') {
+            // Remove all manual code set selection codes from plaintext
+            this.plaintext = this.plaintext.replace(new RegExp('[' +
+                Code128Barcode.FNC4_CHAR +
+                Code128Barcode.CODE_A_CHAR +
+                Code128Barcode.CODE_B_CHAR +
+                Code128Barcode.CODE_C_CHAR +
+                Code128Barcode.SHIFT_AB_CHAR +
+                ']', 'g'), '');
+            this.make_codeset_selection_graph();
+            this.find_shortest_codeset_selection_path();
+        }
+        this.codeset = this.start_codeset;
+
+        this.bar_widths.length = 0;
+        this.temp_shift_active = false;
+        this.temp_fnc4_active = false;
+        this.permanent_fnc4_active = false;
+
+        this.total_width = Code128Barcode.QUIET_ZONE_WIDTH;
+        var sum = 0;
+        var symbol_position = 1;
+        var that = this;
+
+        function append_symbol(value, char, raw_code_comment)
+        {
+            if (value != null) {
+                that.bar_widths.push(...Code128Barcode.SYMBOL_ENCODING[value]);
+                that.total_width += Code128Barcode.SYMBOL_PATTERN_WIDTH;
+                sum += value * symbol_position;
+                symbol_position++;
+                raw_code_comment = raw_code_comment.replace(/[\x00-\x1F\x7F-\x9F\xAD]/g,
+                    (match) => '\\x' + match.codePointAt().toString(16).toUpperCase().padStart(2, '0'));
+                that.raw_codes.push('Value ' + value.toString().padStart(3) + ': ' + raw_code_comment);
+            }
+            if (char != null) {
+                if (char.length > 1 || char >= ' ' && char <= '~' || char >= '\xA1' && char <= '\xFF' && char != '\xAD') {
+                    that.label_items.push(char);
+                } else {
+                    that.label_items.push(char.codePointAt().toString(16).toUpperCase().padStart(4, '0'));
+                }
+            }
+        }
+
+        // Append bars for start symbol to bar_widths
+        var start_code_value = Code128Barcode.START_CODE_A_VALUE + this.codeset.charCodeAt() - 'A'.charCodeAt();
+        append_symbol(start_code_value, null, 'Start Code ' + this.codeset);
+        symbol_position = 1; // reset symbol position back to 1 (according to spec)
+
+        var is_first_half_symbol = true; // used for code set C only
+        var value;
+
+        for (const char of this.plaintext) {
+            var codepoint = char.codePointAt();
+            if (codepoint == Code128Barcode.FNC1_CODEPOINT) {
+                append_symbol(Code128Barcode.FNC1_VALUE, 'FNC1', 'FNC1');
+            } else if (codepoint == Code128Barcode.FNC2_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC2 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC2 is not a supported code in code set C!';
+                    return;
+                }
+                append_symbol(Code128Barcode.FNC2_VALUE, 'FNC2', 'FNC2');
+            } else if (codepoint == Code128Barcode.FNC3_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC3 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC3 is not a supported code in code set C!';
+                    return;
+                }
+                append_symbol(Code128Barcode.FNC3_VALUE, 'FNC3', 'FNC3');
+            } else if (codepoint == Code128Barcode.FNC4_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + FNC4 is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'FNC4 is not a supported code in code set C!';
+                    return;
+                }
+                if (this.temp_fnc4_active) {
+                    this.permanent_fnc4_active = !this.permanent_fnc4_active;
+                }
+                this.temp_fnc4_active = !this.temp_fnc4_active;
+                append_symbol(this.codeset == 'A' ? Code128Barcode.FNC4_A_VALUE : Code128Barcode.FNC4_B_VALUE, null, 'FNC4');
+            } else if (codepoint == Code128Barcode.CODE_A_CODEPOINT) {
+                if (!is_first_half_symbol) {
+                    this.error = 'Odd number of digits is not supported in code set C!';
+                    return;
+                }
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code A is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'A') {
+                    this.error = 'Code A is not a supported code in code set A!';
+                    return;
+                }
+                this.codeset = 'A';
+                append_symbol(Code128Barcode.CODE_A_SWITCH_VALUE, null, 'Code A');
+            } else if (codepoint == Code128Barcode.CODE_B_CODEPOINT) {
+                if (!is_first_half_symbol) {
+                    this.error = 'Odd number of digits is not supported in code set C!';
+                    return;
+                }
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code B is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'B') {
+                    this.error = 'Code B is not a supported code in code set B!';
+                    return;
+                }
+                this.codeset = 'B';
+                append_symbol(Code128Barcode.CODE_B_SWITCH_VALUE, null, 'Code B');
+            } else if (codepoint == Code128Barcode.CODE_C_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Code C is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'Code C is not a supported code in code set C!';
+                    return;
+                }
+                this.codeset = 'C';
+                append_symbol(Code128Barcode.CODE_C_SWITCH_VALUE, null, 'Code C');
+            } else if (codepoint == Code128Barcode.SHIFT_AB_CODEPOINT) {
+                if (this.temp_shift_active) {
+                    this.error = 'Shift A/B + Shift A/B is not a supported code sequence!';
+                    return;
+                }
+                if (this.codeset == 'C') {
+                    this.error = 'Shift A/B is not a supported code in code set C!';
+                    return;
+                }
+                this.temp_shift_active = true;
+                append_symbol(Code128Barcode.SHIFT_AB_VALUE, null, this.codeset == 'A' ? 'Shift B' : 'Shift A');
+            } else {
+                switch (this.temp_shift_active ? (this.codeset == 'A' ? 'B' : 'A') : this.codeset) {
+                    case 'A':
+                        if (this.temp_fnc4_active != this.permanent_fnc4_active) {
+                            // ISO-8859-1 codes
+                            if (codepoint < 0x80 || codepoint > 0xDF) {
+                                this.error = '"' + char + '" is not a supported character in code set A, ISO-8859-1!';
+                                return;
+                            }
+                            if (codepoint < 0xA0) {
+                                // Map codepoints 0x80-0x9F to values 0x40-0x5F
+                                value = codepoint - 0x40;
+                            } else {
+                                // Map codepoints 0xA0-0xDF to values 0x00-0x3F
+                                value = codepoint - 0xA0;
+                            }
+                        } else {
+                            if (char > '_') {
+                                this.error = '"' + char + '" is not a supported character in code set A!';
+                                return;
+                            }
+                            if (char < ' ') {
+                                // Map codepoints 0x00-0x1F to values 0x40-0x5F
+                                value = codepoint + 0x40;
+                            } else {
+                                // Map codepoints 0x20-0x5F to values 0x00-0x3F
+                                value = codepoint - 0x20;
+                            }
+                        }
+                        this.temp_fnc4_active = false;
+                        this.temp_shift_active = false;
+                        // Append bars for this symbol to bar_widths
+                        append_symbol(value, char, '"' + char + '"');
+                        break;
+                    case 'B':
+                        if (this.temp_fnc4_active != this.permanent_fnc4_active) {
+                            // ISO-8859-1 codes
+                            if (codepoint < 0xA0 || codepoint > 0xFF) {
+                                this.error = '"' + char + '" is not a supported character in code set B, ISO-8859-1!';
+                                return;
+                            }
+                            // Map codepoints 0xA0-0xFF to values 0x00-0x5F
+                            value = codepoint - 0xA0;
+                        } else {
+                            if (char < ' ' || char > '\x7F') {
+                                this.error = '"' + char + '" is not a supported character in code set B!';
+                                return;
+                            }
+                            // Map codepoints 0x20-0x7F to values 0x00-0x5F
+                            value = codepoint - 0x20;
+                        }
+                        this.temp_fnc4_active = false;
+                        this.temp_shift_active = false;
+                        // Append bars for this symbol to bar_widths
+                        append_symbol(value, char, '"' + char + '"');
+                        break;
+                    case 'C':
+                        if (char < '0' || char > '9') {
+                            this.error = '"' + char + '" is not a supported character in code set C!';
+                            return;
+                        }
+                        if (is_first_half_symbol) {
+                            value = codepoint - '0'.codePointAt();
+                            is_first_half_symbol = false;
+                        } else {
+                            // Append first digit in digit pair without bars
+                            append_symbol(null, String.fromCodePoint('0'.codePointAt() + value), null);
+                            value = 10 * value + codepoint - '0'.codePointAt();
+                            is_first_half_symbol = true;
+                            // Append bars for both digits in digit pair
+                            append_symbol(value, char, '"' + value.toString().padStart(2, '0') + '"');
+                            break;
+                        }
+                }
+            }
+        }
+
+        if (!is_first_half_symbol) {
+            this.error = 'Odd number of digits is not supported in code set C!';
+            return;
+        }
+
+        var check_value = sum % 103;
+        append_symbol(check_value, null, 'Checksum')
+
+        append_symbol(Code128Barcode.STOP_CODE_VALUE, null, 'Stop')
+
+        this.bar_widths.push(Code128Barcode.FINAL_BAR_WIDTH);
+        this.total_width += Code128Barcode.FINAL_BAR_WIDTH;
+
+        this.total_width += Code128Barcode.QUIET_ZONE_WIDTH;
+    }
+
+    draw_on_canvas(canvas_context)
+    {
+        var module_width = Math.floor(canvas_context.canvas.width / this.total_width);
+        var bar_top = 2 * module_width;
+        var bar_height = canvas_context.canvas.height - 15 * module_width;
+        var x = Math.floor((canvas_context.canvas.width - this.total_width * module_width) / 2);
+        x += Code128Barcode.QUIET_ZONE_WIDTH * module_width;
+        var symbol_pitch = Code128Barcode.SYMBOL_PITCH * module_width;
+        var symbol_height = Code128Barcode.SYMBOL_HEIGHT * module_width;
+        var symbol_x = x + symbol_pitch;
+        var symbol_y = bar_top + bar_height + symbol_height;
+        var is_bar = true;
+        for (var i = 0; i < this.bar_widths.length; i++) {
+            var bar_width = this.bar_widths[i] * module_width;
+            if (is_bar) {
+                canvas_context.fillRect(x, bar_top, bar_width, bar_height);
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        for (var label_item of this.label_items) {
+            if (label_item.length == 1) {
+                canvas_context.font = symbol_height + 'px monospace';
+                canvas_context.fillText(label_item, symbol_x, symbol_y);
+                symbol_x += symbol_pitch;
+            } else if (this.are_codes_visible) {
+                canvas_context.font = symbol_height/2 + 'px monospace';
+                canvas_context.fillText(label_item.slice(0, 2), symbol_x, symbol_y - symbol_height/2);
+                canvas_context.fillText(label_item.slice(2), symbol_x, symbol_y);
+                // Put a bar under the code to indicate where the code starts and ends
+                canvas_context.fillRect(
+                    symbol_x + module_width,
+                    symbol_y + module_width,
+                    symbol_pitch - 2 * module_width,
+                    module_width);
+                symbol_x += symbol_pitch;
+            }
+        }
+    }
+
+    to_svg()
+    {
+        var aspect_ratio = canvas_context.canvas.height / canvas_context.canvas.width;
+        var total_height = Math.ceil(aspect_ratio * this.total_width);
+        var bar_top = 2;
+        var bar_height = total_height - 15;
+        var x = Code128Barcode.QUIET_ZONE_WIDTH;
+        var symbol_pitch = Code128Barcode.SYMBOL_PITCH;
+        var symbol_x = x + symbol_pitch;
+        var symbol_y = bar_top + bar_height + Code128Barcode.SYMBOL_HEIGHT;
+        var is_bar = true;
+        var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg width="' +
+            (5 / aspect_ratio) + 'cm" height="5cm" viewBox="0 0 ' +
+            this.total_width + ' ' + total_height +'" version="1.1" xmlns="http://www.w3.org/2000/svg">\n' +
+            '<style>text {font-size:' + Code128Barcode.SYMBOL_HEIGHT + 'px;font-family:monospace}\n' +
+            'text.small {font-size:' + Code128Barcode.SYMBOL_HEIGHT/2 + 'px;font-family:monospace}</style>\n' +
+            '<rect style="fill:white" x="0" y="0" width="100%" height="100%"/>\n';
+        for (var i = 0; i < this.bar_widths.length; i++) {
+            var bar_width = this.bar_widths[i];
+            if (is_bar) {
+                svg += '<rect x="' + x + '" y="' + bar_top +
+                    '" width="' + bar_width + '" height="' + bar_height + '"/>\n';
+            }
+            x += bar_width;
+            is_bar = !is_bar;
+        }
+        for (var label_item of this.label_items) {
+            if (label_item.length == 1) {
+                svg += '<text x="' + symbol_x + '" y="' + symbol_y + '">&#' + label_item.charCodeAt() + ';</text>\n';
+                symbol_x += symbol_pitch;
+            } else if (this.are_codes_visible) {
+                svg += '<text class="small" x="' + symbol_x + '" y="' + (symbol_y - Code128Barcode.SYMBOL_HEIGHT/2) +
+                    '">' + label_item.slice(0, 2) + '</text>\n';
+                svg += '<text class="small" x="' + symbol_x + '" y="' + symbol_y +
+                    '">' + label_item.slice(2) + '</text>\n';
+                // Put a bar under the code to indicate where the code starts and ends
+                svg += '<rect x="' + (symbol_x + 1) + '" y="' + (symbol_y + 1) +
+                    '" width="' + (symbol_pitch - 2) + '" height="' + 1 + '"/>\n';
+                symbol_x += symbol_pitch;
+            }
+        }
+        svg += '</svg>';
+        return svg;
+    }
+}
+
+function input_focus_handler()
+{
+    input_elem.select();
+}
+
+function png_download_link_click_handler(ev)
+{
+    png_download_link_elem.href = barcode_canvas_elem.toDataURL();
+    png_download_link_elem.download = 'code128.png';
+}
+
+function svg_download_link_click_handler(ev)
+{
+    svg_download_link_elem.href = 'data:image/svg+xml,' + encodeURIComponent(code.to_svg());
+    svg_download_link_elem.download = 'code128.svg';
+}
+
+function show_code()
+{
+    input_elem.focus();
+    code.create(input_elem.value, codeset_elem.value, codes_visible_elem.checked);
+    if (code.error)
+    {
+        barcode_output_elem.style.display = 'none';
+        error_msg_elem.innerHTML = 'ERROR: ' + code.error;
+        error_msg_elem.style.display = 'block';
+        raw_codes_elem.value = '';
+        return;
+    }
+    error_msg_elem.style.display = 'none';
+    barcode_output_elem.style.display = 'block';
+    var canvas_width = code.total_width * 3;
+    barcode_canvas_elem.width = canvas_width;
+    canvas_context.fillStyle = '#FFFFFF';
+    canvas_context.fillRect(0, 0, barcode_canvas_elem.width, barcode_canvas_elem.height);
+    canvas_context.fillStyle = '#000000';
+    code.draw_on_canvas(canvas_context);
+    raw_codes_elem.value = code.raw_codes.join('\n');
+}
+
+var self_tests = [
+    {
+        args: ['Abc', '*', false],
+        start_codeset: 'B',
+        plaintext: 'Abc',
+        raw_codes: [
+            'Value 104: Start Code B',
+            'Value  33: "A"',
+            'Value  66: "b"',
+            'Value  67: "c"',
+            'Value  58: Checksum',
+            'Value 106: Stop'
+            ],
+        bar_widths: [2,1,1,2,1,4,1,1,1,3,2,3,1,2,1,4,2,1,1,4,1,1,2,2,3,1,2,3,1,1,2,3,3,1,1,1,2],
+    },
+    {
+        args: ['\u2460\x00\x1F\u2461\u2462 _', '*', false],
+        start_codeset: 'A',
+        plaintext: '\u2460\x00\x1F\u2461\u2462 _',
+    },
+    {
+        args: ['\u2460 _\u2461\u2462`\x7F', '*', false],
+        start_codeset: 'B',
+        plaintext: '\u2460 _\u2461\u2462`\x7F',
+    },
+    {
+        args: ['\u2460\x80\x9F\u2461\u2462\xA0\xDF', '*', false],
+        start_codeset: 'A',
+        plaintext: '\u2460\u2463\u2463\x80\x9F\u2461\u2462\xA0\xDF',
+    },
+    {
+        args: ['\u2460\xA0\xDF\u2461\u2462\xE0\xFF', '*', false],
+        start_codeset: 'B',
+        plaintext: '\u2460\u2463\u2463\xA0\xDF\u2461\u2462\xE0\xFF',
+    },
+    {
+        args: ['\u246001', '*', false],
+        start_codeset: 'C',
+        plaintext: '\u246001',
+    },
+    {
+        args: ['012345a678', '*', false],
+        start_codeset: 'C',
+        plaintext: '012345\u24B7a6\u24B878',
+        raw_codes: [
+            'Value 105: Start Code C',
+            'Value   1: "01"',
+            'Value  23: "23"',
+            'Value  45: "45"',
+            'Value 100: Code B',
+            'Value  65: "a"',
+            'Value  22: "6"',
+            'Value  99: Code C',
+            'Value  78: "78"',
+            'Value  92: Checksum',
+            'Value 106: Stop'
+            ],
+    },
+    {
+        args: ['012345a6789012b', '*', false],
+        start_codeset: 'C',
+        plaintext: '012345\u24B7a\u24B8678901\u24B72b',
+    },
+];
+
+function self_test_error(test_idx, property)
+{
+    return 'Test ' + test_idx + ': ' + property + ': Mismatch:' +
+        '<br>Expected: ' + self_tests[test_idx][property] +
+        '<br>Received: ' + code[property];
+}
+
+function run_self_test()
+{
+    for (var test_idx = 0; test_idx < self_tests.length; test_idx++)
+    {
+        var test_data = self_tests[test_idx];
+        code.create(test_data.args[0], test_data.args[1], test_data.args[2]);
+        if (code.error) return 'Test ' + test_idx + ': ' + code.error;
+        for (var property in test_data)
+        {
+            if (property == 'args') continue;
+            var ref_val = test_data[property];
+            if (Array.isArray(ref_val))
+            {
+                if (!Array.isArray(code[property]) || code[property].length != ref_val.length)
+                {
+                    return self_test_error(test_idx, property);
+                }
+                for (var i = 0; i < ref_val.length; i++)
+                {
+                    if (Array.isArray(ref_val[i]))
+                    {
+                        if (!Array.isArray(code[property][i]) ||
+                            code[property][i].length != ref_val[i].length)
+                        {
+                            return self_test_error(test_idx, property);
+                        }
+                        for (var j = 0; j < ref_val[i].length; j++)
+                        {
+                            if (code[property][i][j] != ref_val[i][j])
+                            {
+                                return self_test_error(test_idx, property);
+                            }
+                        }
+                    }
+                    else if (code[property][i] != ref_val[i])
+                    {
+                        return self_test_error(test_idx, property);
+                    }
+                }
+            }
+            else if (code[property] != ref_val)
+            {
+                return self_test_error(test_idx, property);
+            }
+        }
+    }
+    return 'OK';
+}
+
+var codeset_elem;
+var input_elem;
+var generate_button_elem;
+var codes_visible_elem;
+var barcode_output_elem;
+var barcode_canvas_elem;
+var png_download_link_elem;
+var svg_download_link_elem;
+var error_msg_elem;
+var raw_codes_elem;
+var canvas_context;
+// Instantiate Code128Barcode (and reuse this instance for all codes)
+var code = new Code128Barcode();
+
+function init()
+{
+    var result = run_self_test();
+    if (result != 'OK')
+    {
+        // Replace the content of 'main' with an error message, and remove all subsequent child nodes
+        let main_elem = document.getElementById('main');
+        let parent_elem = main_elem.parentNode;
+        main_elem.innerHTML = 'Self-test failed! Page will be disabled!<br>' + result;
+        while (main_elem.nextSibling) {
+            parent_elem.removeChild(main_elem.nextSibling);
+        }
+        return;
+    }
+
+    codeset_elem = document.getElementById('codeset');
+    codeset_elem.addEventListener('change', show_code, false);
+    input_elem = document.getElementById('input');
+    input_elem.addEventListener('keyup', show_code, false);
+    input_elem.addEventListener('focus', input_focus_handler, false);
+    generate_button_elem = document.getElementById('generate_button');
+    generate_button_elem.addEventListener('click', show_code, false);
+    codes_visible_elem = document.getElementById('codes_visible');
+    codes_visible_elem.addEventListener('change', show_code, false);
+    barcode_output_elem = document.getElementById('output');
+    barcode_canvas_elem = document.getElementById('canvas');
+    png_download_link_elem = document.getElementById('png_download_link');
+    svg_download_link_elem = document.getElementById('svg_download_link');
+    error_msg_elem = document.getElementById('error_msg');
+    raw_codes_elem = document.getElementById('raw_codes');
+    canvas_context = barcode_canvas_elem.getContext("2d");
+
+    // Handle URL arguments
+    const page_settings_spec = {
+        codeset: {obj: codeset_elem},
+        input: {obj: input_elem},
+        codes_visible: {obj: codes_visible_elem},
+    };
+    genericPageSetup.apply_settings_from_url(page_settings_spec);
+
+    show_code();
+    png_download_link_elem.addEventListener('click', png_download_link_click_handler, false);
+    svg_download_link_elem.addEventListener('click', svg_download_link_click_handler, false);
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+<body>
+
+<div class="hcontainer">
+
+<h1>Code 128 Barcode Generator</h1>
+
+<div id="main" class="box">
+Code set selection: <select id="codeset">
+    <option value="*" selected>Automatic</option>
+    <option value="A">Manual, start with code set A</option>
+    <option value="B">Manual, start with code set B</option>
+    <option value="C">Manual, start with code set C</option>
+</select>
+<br>
+Input text:
+<input type="text" id="input" value="Code 128">
+<label><input id="codes_visible" type="checkbox" checked> Show non-printable (but not code set selection) codes in barcode label</label><br>
+<button id="generate_button" type="button">Generate</button>
+</div>
+
+<div class="box imgbox">
+<div id="output">
+<canvas id="canvas" width=339 height=200><span style="color:red"><b>ERROR! Your browser doesn't support the HTML5 canvas element!</b></span></canvas>
+<a id="png_download_link" class="navbut downloadbut" href="">Download PNG</a>
+<a id="svg_download_link" class="navbut downloadbut" href="">Download SVG</a>
+</div>
+<div id="error_msg"></div>
+</div>
+
+<div class="box">
+Raw barcode values:<br>
+<textarea id="raw_codes" readonly></textarea>
+<p>
+Supported characters/codes in input text:
+</p>
+<ul>
+<li><b>Code set A:</b> ASCII codes 0-95 (chars 0-9, A-Z, special, control), or 128-223 with FNC4.</li>
+<li><b>Code set B:</b> ASCII codes 32-127 (chars 0-9, A-Z, a-z, special), or 160-255 with FNC4.</li>
+<li><b>Code set C:</b> ASCII codes 48-57 (chars 0-9 in double density).</li>
+</ul>
+<ul>
+<li>Javascript backslash escapes are supported, e.g. \n, \x0a, \u000a (use \\ to get a literal backslash).</li>
+<li>FNC codes 1-4 may be specified as \F1, \F2, \F3, \F4.</li>
+<li>Code set A-C switch codes may be specified as \CA, \CB, \CC, and Shift A/B as \S.</li>
+</ul>
+<p>
+In automatic mode, code set selection and switching is done automatically to produce the shortest possible barcode,
+and \F4, \CA, \CB, \CC, and \S are ignored in the input text.
+</p>
+</div>
+
+</div>
+
+</body>
+</html>
