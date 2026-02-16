@@ -1,0 +1,389 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Date Converter</title>
+<script type="text/javascript" src="page.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+div.linebreak > hr {
+    background-color: #66AA66;
+    border: none;
+    height: 3px;
+    margin: 1em 0em;
+}
+
+h2 {
+    -webkit-flex: 1 1 auto;
+    flex: 1 1 auto;
+    margin: 0rem 0rem 0.5rem 0rem;
+}
+
+div.hcontainer {
+    -webkit-justify-content: flex-start;
+    justify-content: flex-start;
+}
+
+div.hcontainer > div.text {
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+div.hcontainer > div.right {
+    -webkit-flex: 0 1 auto;
+    flex: 0 1 auto;
+    margin-left: 1rem; 
+    margin-right: 1rem; 
+}
+
+input[type="text"] {
+    box-sizing: border-box;
+    width: 100%;
+    font-size: 100%; 
+}
+
+div.message {
+    color: red;
+    width: 100%;
+    margin-left: 1rem;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+/**
+ * Calculates x mod y which takes the sign of y and uses floored division (JavaScript's x % y takes the sign of x and
+ * uses truncated division).
+ */
+function mod(x, y)
+{
+    return (x % y + y) % y;
+}
+
+/**
+ * Asserts that the given condition is true. If it isn't, an exception is thrown.
+ *
+ * @param {boolean} condition - condition that must be true.
+ * @param {string} msg - message to throw on failure.
+ */
+function assert(condition, msg)
+{
+    if (!condition) throw msg;
+}
+
+/**
+ * Class representing a year.
+ */
+class Year {
+    year;
+    is_leapyear;
+    jan_1_daynum;
+    week1_daynum;
+    last_week;
+
+    static _daysinmonth = [undefined, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    // Calculate cumulative days at start of each month
+    static _month_daysum = Year._daysinmonth.slice(0, -1).reduce((last_result, days) => {
+        last_result.push((last_result[last_result.length - 1] || 0) + (days || 0));
+        return last_result;
+    }, [undefined]);
+
+    constructor(year, firstdayofweek)
+    {
+        this.year = year;
+        this.is_leapyear = mod(year, 4) == 0 && (mod(year, 100) != 0 || mod(year, 400) == 0);
+        // Calculate daynum of (i.e. days from Jan 1 of year 0001 to) Jan 1 of this year
+        const prev_year = year - 1;
+        this.jan_1_daynum = prev_year * 365
+            + Math.floor(prev_year / 4)
+            - Math.floor(prev_year / 100)
+            + Math.floor(prev_year / 400);
+        // Calculate weekday of first day of this year (0=Mon, 6=Sun)
+        const jan_1_wday = mod(this.jan_1_daynum, 7);
+        // Calculate daynum of first day of week 1 of this year
+        const jan_1_days_since_firstdayofweek = mod(jan_1_wday - firstdayofweek, 7);
+        this.week1_daynum = this.jan_1_daynum
+            - jan_1_days_since_firstdayofweek
+            + 7 * (jan_1_days_since_firstdayofweek >= 4);
+        // Calculate last week number of this year (i.e. last week that ends before next year's Jan 4)
+        const next_year_jan_4_daynum = this.jan_1_daynum + 365 + this.is_leapyear + 3;
+        this.last_week = Math.floor((next_year_jan_4_daynum - this.week1_daynum) / 7);
+    }
+
+    days_in_month(month)
+    {
+        return Year._daysinmonth[month] + (month == 2 && this.is_leapyear);
+    }
+
+    month_daysum(month)
+    {
+        return Year._month_daysum[month] + (month > 2 && this.is_leapyear);
+    }
+}
+
+/**
+ * Converts date to week-date.
+ *
+ * @param {string} date_str - date string in format "yyyy-mm-dd".
+ * @param {number} firstdayofweek - first day of week (0=Mon, 6=Sun).
+ * @returns {[string, number]} array of week-date string in format "yyyy-ww" and weekday (0=Mon, 6=Sun).
+ */
+function convert_date_to_wdate(date_str, firstdayofweek = 0)
+{
+    // Validate input date
+    const ar = date_str.split('-');
+    assert(ar.length == 3 && !isNaN(ar[0]) && !isNaN(ar[1]) && !isNaN(ar[2]), 'Invalid date format');
+    const year = +ar[0];
+    const month = +ar[1];
+    const day = +ar[2];
+    assert(Number.isInteger(year) && Number.isInteger(month) && Number.isInteger(day), 'Invalid date format');
+    assert(year >= 1 && year <= 9999, 'Year out of range (1-9999)');
+    assert(month >= 1 && month <= 12, 'Month out of range (1-12)');
+    const year_obj = new Year(year, firstdayofweek);
+    const maxday = year_obj.days_in_month(month);
+    assert(day >= 1 && day <= maxday, `Day out of range (1-${maxday})`);
+
+    // Calculate daynum of (i.e. days from Jan 1 of year 0001 to) this date
+    const daynum = year_obj.jan_1_daynum + year_obj.month_daysum(month) + day - 1;
+    // Calculate week-year and week of this date
+    let wyear = year;
+    let week = 1 + Math.floor((daynum - year_obj.week1_daynum) / 7);
+    if (week < 1) {
+        wyear--;
+        const prev_year_obj = new Year(wyear, firstdayofweek);
+        week = prev_year_obj.last_week;
+    } else if (week > year_obj.last_week) {
+        wyear++;
+        week = 1;
+    }
+    // Calculate weekday of this date
+    const wday = mod(daynum, 7);
+
+    return [
+        `${wyear.toString().padStart(4,'0')}-${week.toString().padStart(2,'0')}`,
+        wday
+    ];
+}
+
+/**
+ * Converts week-date to date.
+ *
+ * @param {string} wyear_and_week_str - week-date string in format "yyyy-ww".
+ * @param {number} wday - weekday (0=Mon, 6=Sun).
+ * @param {number} firstdayofweek - first day of week (0=Mon, 6=Sun).
+ * @returns {string} date string in format "yyyy-mm-dd".
+ */
+function convert_wdate_to_date(wyear_and_week_str, wday, firstdayofweek = 0)
+{
+    // Validate input week-date
+    const ar = wyear_and_week_str.split('-');
+    assert(ar.length == 2 && !isNaN(ar[0]) && !isNaN(ar[1]), 'Invalid week-date format');
+    const wyear = +ar[0];
+    const week = +ar[1];
+    assert(Number.isInteger(wyear) && Number.isInteger(week), 'Invalid week-date format');
+    assert(wyear >= 1 && wyear <= 9999, 'Week-year out of range (1-9999)');
+    const year_obj = new Year(wyear, firstdayofweek);
+    const maxweek = year_obj.last_week;
+    assert(week >= 1 && week <= maxweek, `Week out of range (1-${maxweek})`);
+
+    // Calculate date
+    let year = wyear;
+    let month;
+    let day;
+    const daynum = year_obj.week1_daynum + (week - 1) * 7 + mod(wday - firstdayofweek, 7);
+    const day_in_year = daynum - year_obj.jan_1_daynum; // 0-based day in year
+    if (day_in_year < 0) {
+        // Date is in previous year
+        year--;
+        month = 12;
+        day = 32 + day_in_year;
+    } else {
+        const day_in_next_year = day_in_year - (365 + year_obj.is_leapyear);
+        if (day_in_next_year >= 0) {
+            // Date is in next year
+            year++;
+            month = 1;
+            day = day_in_next_year + 1;
+        } else {
+            // Date is in this year
+            month = 12;
+            let month_daysum;
+            while (day_in_year < (month_daysum = year_obj.month_daysum(month))) {
+                month--;
+            }
+            day = day_in_year - month_daysum + 1;
+        }
+    }
+
+    return `${year.toString().padStart(4,'0')}-${month.toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}`;
+}
+
+function self_test()
+{
+    const test_vectors = [
+        // date, wyear-week, wday, firstdayofweek
+        ['0001-01-01', '0001-01', 0, 0],
+        ['0001-01-07', '0001-01', 6, 0],
+        ['0001-01-07', '0001-02', 6, 6],
+        ['0001-01-08', '0001-02', 0, 0],
+        ['0001-02-28', '0001-09', 2, 0],
+        ['0001-03-01', '0001-09', 3, 0],
+        ['0001-03-31', '0001-13', 5, 0],
+        ['0001-04-01', '0001-13', 6, 0],
+        ['0001-04-30', '0001-18', 0, 0],
+        ['0001-05-01', '0001-18', 1, 0],
+        ['0001-05-31', '0001-22', 3, 0],
+        ['0001-06-01', '0001-22', 4, 0],
+        ['0001-06-30', '0001-26', 5, 0],
+        ['0001-07-01', '0001-26', 6, 0],
+        ['0001-07-31', '0001-31', 1, 0],
+        ['0001-08-01', '0001-31', 2, 0],
+        ['0001-08-31', '0001-35', 4, 0],
+        ['0001-09-01', '0001-35', 5, 0],
+        ['0001-09-30', '0001-39', 6, 0],
+        ['0001-10-01', '0001-40', 0, 0],
+        ['0001-10-31', '0001-44', 2, 0],
+        ['0001-11-01', '0001-44', 3, 0],
+        ['0001-11-30', '0001-48', 4, 0],
+        ['0001-12-01', '0001-48', 5, 0],
+        ['0001-12-30', '0001-52', 6, 0],
+        ['0001-12-31', '0002-01', 0, 0],
+        ['1900-02-28', '1900-09', 2, 0],
+        ['1900-03-01', '1900-09', 3, 0],
+        ['2000-01-01', '1999-52', 5, 0],
+        ['2000-02-29', '2000-09', 1, 0],
+        ['2000-03-01', '2000-09', 2, 0],
+        ['2020-02-29', '2020-09', 5, 0],
+        ['2020-03-01', '2020-09', 6, 0],
+        ['2020-12-31', '2020-53', 3, 0],
+        ['2021-01-01', '2020-53', 4, 0],
+    ];
+    for (const vector of test_vectors) {
+        const msg = `Self-test failed for ${JSON.stringify(vector)}: `;
+        const [date_str, wyear_and_week_str, wday, firstdayofweek] = vector;
+
+        const result = convert_date_to_wdate(date_str, firstdayofweek);
+        const [calcd_wyear_and_week_str, calcd_wday] = result;
+        assert(calcd_wyear_and_week_str == wyear_and_week_str && calcd_wday == wday,
+            msg + `convert_date_to_wdate returned ${JSON.stringify(result)}`);
+
+        const calcd_date_str = convert_wdate_to_date(wyear_and_week_str, wday, firstdayofweek);
+        assert(calcd_date_str == date_str,
+            msg + `convert_wdate_to_date returned ${JSON.stringify(calcd_date_str)}`);
+    }
+}
+
+let date_elem;
+let date_message_elem;
+let wyear_and_week_elem;
+let wyear_and_week_message_elem;
+let wday_elem;
+let firstdayofweek_elem;
+
+function update(changedfield) {
+    const firstdayofweek = +firstdayofweek_elem.value;
+    date_message_elem.textContent = '';
+    wyear_and_week_message_elem.textContent = '';
+    if (changedfield >= 2 && changedfield <= 3) {
+        try {
+            date_elem.value =
+                convert_wdate_to_date(wyear_and_week_elem.value, wday_elem.selectedIndex, firstdayofweek);
+        } catch (e) {
+            wyear_and_week_message_elem.textContent = e;
+        }
+    } else {
+        try {
+            [wyear_and_week_elem.value, wday_elem.selectedIndex] =
+                convert_date_to_wdate(date_elem.value, firstdayofweek);
+        } catch (e) {
+            date_message_elem.textContent = e;
+        }
+    }
+}
+
+function init()
+{
+    try {
+        self_test();
+    } catch (e) {
+        console.trace(e);
+        document.getElementById('content').innerHTML = `Initialization failed:<br>${e}`;
+        return;
+    }
+
+    date_elem = document.getElementById('date');
+    date_message_elem = document.getElementById('date_message');
+    wyear_and_week_elem = document.getElementById('wyear_and_week');
+    wyear_and_week_message_elem = document.getElementById('wyear_and_week_message');
+    wday_elem = document.getElementById('wday');
+    firstdayofweek_elem = document.getElementById('firstdayofweek');
+
+    date_elem.addEventListener('input', () => { update(1); }, false);
+    date_elem.addEventListener('focus', () => { date_elem.select(); }, false);
+    wyear_and_week_elem.addEventListener('input', () => { update(2); }, false);
+    wyear_and_week_elem.addEventListener('focus', () => { wyear_and_week_elem.select(); }, false);
+    wday_elem.addEventListener('change', () => { update(3); }, false);
+    firstdayofweek_elem.addEventListener('change', () => { update(4); }, false);
+
+    const date1 = new Date();
+    const year = date1.getFullYear();
+    const month = date1.getMonth() + 1;
+    const day = date1.getDate();
+    date_elem.value =
+        year.toString().padStart(4,'0') + '-' +
+        month.toString().padStart(2,'0') + '-' +
+        day.toString().padStart(2,'0');
+    update(1);
+}
+
+window.addEventListener('load', init, false);
+</script>
+
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>Date Converter</h1>
+
+<div class="box hcontainer vcenter" id="content">
+
+<h2>Date (yyyy-mm-dd)</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="date" maxlength=10></div>
+<div class="message" id="date_message"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>Week-year and week (yyyy-ww)</h2>
+<div class="linebreak"></div>
+<div class="text"><input type="text" id="wyear_and_week" maxlength=7></div>
+<div class="right"><select id="wday">
+  <option>Monday
+  <option>Tuesday
+  <option>Wednesday
+  <option>Thursday
+  <option>Friday
+  <option>Saturday
+  <option>Sunday
+</select></div>
+<div class="message" id="wyear_and_week_message"></div>
+
+<div class="linebreak"><hr></div>
+
+<h2>First day of week</h2>
+<div class="linebreak"></div>
+<div class="text"><select id="firstdayofweek"><option value="6">Sunday<option value="0" selected>Monday
+</select></div>
+
+</div>
+
+</div>
+
+</body>
+</html>

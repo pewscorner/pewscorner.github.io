@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLE Random Address Generator</title>
+<script type="text/javascript" src="../page.js"></script>
+<script type="text/javascript" src="ble_lib.js"></script>
+<style type="text/css">
+div.linebreak {
+    width: 100%;
+}
+
+.label {
+    display: block;
+    margin: 0.5em 0 0.1em 0;
+}
+
+#irk {
+    box-sizing: border-box;
+    width: 100%;
+    font-family: monospace;
+}
+
+#prand_rand {
+    box-sizing: border-box;
+    width: 10em;
+    font-family: monospace;
+}
+
+#output {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid black;
+    padding: 0.3em;
+    overflow-x: auto;
+    white-space: pre;
+    font-family: monospace;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+genericPageSetup.extra_menu_buttons = [
+    ['demo_button', 'Insert demo IRK', 'demo()'],
+    ['up_button', 'Back to overview', 'location.href="index.html"']
+    ];
+
+let addr_type_elem;
+let rpa_params_elem;
+let irk_elem;
+let prand_rand_elem;
+let output_elem;
+
+async function process_input()
+{
+    const addr_type = addr_type_elem.value;
+
+    try {
+        let addr;
+        if (addr_type == 'rpa') {
+            rpa_params_elem.style.display = 'block';
+            const irk = BLELib.hex_to_bytes(irk_elem.value);
+            if (irk.length != 16) {
+                output_elem.innerHTML = 'Invalid IRK';
+                return;
+            }
+            const prand_rand_str = prand_rand_elem.value.trim();
+            if (prand_rand_str.length > 0) {
+                const prand_rand = BLELib.hex_to_bytes(prand_rand_str);
+                if (prand_rand.length != 3) {
+                    output_elem.innerHTML = 'Invalid random part (wrong number of bytes)';
+                    return;
+                }
+                addr = await BLELib.generate_resolvable_address(irk, prand_rand);
+                if (addr === null) {
+                    output_elem.innerHTML = 'Invalid random part (all zeroes or all ones)';
+                    return;
+                }
+            } else {
+                addr = await BLELib.generate_resolvable_address(irk);
+            }
+        } else {
+            rpa_params_elem.style.display = 'none';
+            if (addr_type == 'nrpa') {
+                addr = BLELib.generate_non_resolvable_address();
+            } else {
+                addr = BLELib.generate_static_address();
+            }
+        }
+        output_elem.innerHTML = BLELib.bytes_to_hex(addr, ':');
+    } catch (e) {
+        console.trace(e);
+        output_elem.innerHTML = `ERROR: ${e}`;
+    }
+}
+
+async function demo()
+{
+    if (irk_elem.value.trim().length > 0 && !confirm('Overwrite existing IRK with demo value?')) return;
+    irk_elem.value = '00010203:04050607:08090A0B:0C0D0E0F';
+    await process_input();
+}
+
+async function init()
+{
+    try {
+        await BLELib.self_test();
+    } catch (e) {
+        console.trace(e);
+        document.getElementById('content').innerHTML = `Initialization failed:<br>${e}`;
+        return;
+    }
+
+    addr_type_elem = document.getElementById('addr_type');
+    addr_type_elem.addEventListener('change', process_input, false);
+    rpa_params_elem = document.getElementById('rpa_params');
+    irk_elem = document.getElementById('irk');
+    irk_elem.addEventListener('input', process_input, false);
+    prand_rand_elem = document.getElementById('prand_rand');
+    prand_rand_elem.addEventListener('input', process_input, false);
+    output_elem = document.getElementById('output');
+    document.getElementById('generatebut').addEventListener('click', process_input, false);
+    await process_input();
+    irk_elem.focus();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>BLE Random Address Generator</h1>
+
+<div class="box" id="content">
+
+<label class="label" for="addr_type">Select address type to generate:</label>
+<select id="addr_type">
+    <option value="rpa">Resolvable Private Address</option>
+    <option value="nrpa">Non-Resolvable Private Address</option>
+    <option value="static">Static Random Address</option>
+</select>
+
+<div id="rpa_params">
+    <label class="label" for="irk">Input 16-byte identity resolving key (IRK) - as hex-digit pairs separated by anything
+    or nothing (or try demo in menu):</label>
+    <input id="irk" type="text">
+
+    <label class="label" for="prand_rand">Input 3-byte random part of address - as hex-digit pairs separated by anything
+    or nothing - or leave empty to generate randomly:</label>
+    <input id="prand_rand" type="text">
+</div>
+
+<div class="linebreak"></div>
+<button id="generatebut">Generate</button>
+
+<div class="label">Generated address:</div>
+<div id="output"></div>
+</div>
+
+</div>
+
+</body>
+</html>
