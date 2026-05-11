@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BLE Random Address Resolver</title>
+<script type="text/javascript" src="../page.js"></script>
+<script type="text/javascript" src="ble_lib.js"></script>
+<style type="text/css">
+.label {
+    display: block;
+    margin: 0.5em 0 0.1em 0;
+}
+
+#input {
+    box-sizing: border-box;
+    width: 100%;
+    height: 10em;
+    font-family: monospace;
+    white-space: pre;
+}
+
+#output {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid black;
+    padding: 0.3em;
+    overflow-x: auto;
+    white-space: pre;
+    font-family: monospace;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+genericPageSetup.extra_menu_buttons = [
+    ['demo_button', 'Insert demo data', 'demo()'],
+    ['up_button', 'Back to overview', 'location.href="index.html"']
+    ];
+
+let input_elem;
+let output_elem;
+
+async function process_input()
+{
+    // Read input lines and remove comments (from '#' to end of line)
+    const input_lines = input_elem.value.split('\n').map(line => line.split('#')[0]);
+
+    let output_html = '';
+    const addresses = [];
+    const irks = [];
+    for (const line of input_lines) {
+        const bytes = BLELib.hex_to_bytes(line);
+        if (bytes.length === 6) {
+            addresses.push(bytes);
+            const addr_str = BLELib.bytes_to_hex(bytes, ':');
+            const addr_type = BLELib.rand_addr_type(bytes);
+            if (addr_type === BLELib.AddrType.NON_RESOLVABLE_PRIVATE_RANDOM) {
+                output_html += `WARNING: ${addr_str} is a non-resolvable private random address - not an RPA.<br>`;
+            } else if (addr_type === BLELib.AddrType.STATIC_RANDOM) {
+                output_html += `WARNING: ${addr_str} is a static random address - not an RPA.<br>`;
+            } else if (addr_type !== BLELib.AddrType.RESOLVABLE_PRIVATE_RANDOM) {
+                output_html += `WARNING: ${addr_str} is not a valid random address of any known type.<br>`;
+            }
+        } else if (bytes.length === 16) {
+            irks.push(bytes);
+        } else if (bytes.length > 0) {
+            output_html += `Ignoring invalid bytes: ${BLELib.bytes_to_hex(bytes)}.<br>`;
+        }
+    }
+    if (addresses.length == 0) {
+        output_html += 'No RPAs provided.<br>';
+    }
+    if (irks.length == 0) {
+        output_html += 'No IRKs provided.<br>';
+    }
+    if (addresses.length > 0 && irks.length > 0) {
+        for (const addr of addresses) {
+            try {
+                const addr_str = BLELib.bytes_to_hex(addr, ':');
+                const matching_irks = await BLELib.resolve_address(addr, irks);
+                if (matching_irks.length == 0) {
+                    output_html += `FAILURE: RPA ${addr_str} matches no IRK.<br>`;
+                } else {
+                    matching_irks.forEach((irk) => {
+                        output_html += `SUCCESS: RPA ${addr_str} matches IRK ${BLELib.bytes_to_hex(irk, ':', [2])}<br>`;
+                    });
+                }
+            } catch (e) {
+                console.trace(e);
+                output_html = `ERROR: ${e}`;
+            }
+        }
+    }
+    output_elem.innerHTML = output_html;
+}
+
+async function demo()
+{
+    if (input_elem.value.trim().length > 0 && !confirm('Overwrite existing input with demo data?')) return;
+    input_elem.value = `# Demo data
+40:01:02:32:e3:93       # RPA matching IRK 1
+6d674a50da5a            # RPA matching IRKs 2 and 3
+0x78, 0x9abc, 0xdef012  # RPA matching no IRK
+
+00010203-04050607-08090A0B-0C0D0E0F  # IRK 1
+c0ca938922c729ccd3f4984d382b4bfe     # IRK 2
+088D58EEBCF53855   F79CE5070B57AD7F  # IRK 3`;
+    await process_input();
+}
+
+async function init()
+{
+    try {
+        await BLELib.self_test();
+    } catch (e) {
+        console.trace(e);
+        document.getElementById('content').innerHTML = `Initialization failed:<br>${e}`;
+        return;
+    }
+
+    input_elem = document.getElementById('input');
+    output_elem = document.getElementById('output');
+    input_elem.addEventListener('input', process_input, false);
+    await process_input();
+    input_elem.focus();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>BLE Random Address Resolver</h1>
+<p class="page_subtitle">- and address type detector</p>
+
+<div class="box" id="content">
+
+<div>
+Input any number of the following items on separate lines (each item written as hex-digit pairs separated by anything or
+nothing):
+<ul>
+<li>6-byte resolvable private random address (RPA) - or any other type of random address (for address type detection)</li>
+<li>16-byte identity resolving key (IRK)</li>
+</ul>
+(or try demo in menu).
+</div>
+
+<label class="label" for="input">Input:</label>
+<textarea id="input"></textarea>
+
+<div class="label">Results:</div>
+<div id="output"></div>
+</div>
+
+</div>
+
+</body>
+</html>
