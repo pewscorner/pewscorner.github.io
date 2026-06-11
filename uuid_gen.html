@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UUID Generator/Tester</title>
+<script type="text/javascript" src="page.js"></script>
+<script type="text/javascript" src="ble/ble_lib.js"></script>
+<style type="text/css">
+.label {
+    display: block;
+    margin: 0.5em 0 0.1em 0;
+}
+
+#code {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid black;
+    font-family: monospace;
+}
+
+#verdict {
+    box-sizing: border-box;
+    width: 100%;
+    border: 1px solid black;
+    padding: 0.3em;
+    overflow-x: auto;
+    white-space: pre;
+    font-family: monospace;
+}
+</style>
+<script type="text/javascript">
+"use strict";
+
+let code_elem;
+let verdict_elem;
+
+function generate_uuid()
+{
+    const uuid_bytes = new Uint8Array(16);
+    crypto.getRandomValues(uuid_bytes);
+    // Set variant to 10xx
+    uuid_bytes[8] = (uuid_bytes[8] & 0x3F) | 0x80;
+    // Set version to 4
+    uuid_bytes[6] = (uuid_bytes[6] & 0x0F) | 0x40;
+
+    code_elem.value = BLELib.bytes_to_hex(uuid_bytes, '-', [4, 2, 2, 2, 6]);
+    check_uuid();
+}
+
+function check_uuid()
+{
+    const uuid_bytes = BLELib.hex_to_bytes(code_elem.value);
+    let uuid_info = 'Bytes: ' + BLELib.bytes_to_hex(uuid_bytes) + '\n';
+    if (uuid_bytes.length != 16) {
+        uuid_info += `Invalid UUID (${uuid_bytes.length} byte(s) found, expected 16)`;
+    } else {
+        uuid_info += 'Variant: ';
+        if ((uuid_bytes[8] & 0x80) == 0x00) {
+            uuid_info += '0xxx (reserved, NCS backward compatibility)';
+        } else if ((uuid_bytes[8] & 0xC0) == 0x80) {
+            uuid_info += '10xx (RFC 9562)\n';
+            const version = (uuid_bytes[6] & 0xF0) >> 4;
+            uuid_info += `Version: ${version} `;
+            switch (version) {
+                case 0:
+                    uuid_info += '(unused)';
+                    break;
+                case 1:
+                    uuid_info += '(Gregorian time-based UUID)';
+                    break;
+                case 2:
+                    uuid_info += '(DCE Security UUID)';
+                    break;
+                case 3:
+                    uuid_info += '(name-based UUID using MD5 hashing)';
+                    break;
+                case 4:
+                    uuid_info += '(randomly generated UUID)';
+                    break;
+                case 5:
+                    uuid_info += '(name-based UUID using SHA-1 hashing)';
+                    break;
+                case 6:
+                    uuid_info += '(reordered Gregorian time-based UUID)';
+                    break;
+                case 7:
+                    uuid_info += '(Unix Epoch time-based UUID)';
+                    break;
+                case 8:
+                    uuid_info += '(custom UUID)';
+                default:
+                    uuid_info += '(reserved for future definition)';
+            }
+        } else if ((uuid_bytes[8] & 0xE0) == 0xC0) {
+            uuid_info += '110x (reserved, Microsoft compatibility)';
+        } else {
+            uuid_info += '111x (reserved for future definition)';
+        }
+    }
+    verdict_elem.innerHTML = uuid_info;
+    code_elem.focus();
+}
+
+function init()
+{
+    document.getElementById('generatebut').addEventListener('click', generate_uuid, false);
+    code_elem = document.getElementById('code');
+    verdict_elem = document.getElementById('verdict');
+    code_elem.addEventListener('input', check_uuid, false);
+    code_elem.addEventListener('focus', () => code_elem.select(), false);
+    generate_uuid();
+}
+
+window.addEventListener('load', init, false);
+</script>
+</head>
+
+<body>
+
+<div class="hcontainer">
+
+<h1>UUID Generator/Tester</h1>
+<p class="page_subtitle">(RFC 9562 UUID variant 10xx version 4)</p>
+
+<div class="box">
+<button id="generatebut" type="button">Generate new UUID</button>
+
+<label class="label" for="code">Generated or entered UUID (hex-digit pairs separated by anything or nothing):</label>
+<input id="code" type="text">
+
+<div class="label">UUID info:</div>
+<div id="verdict"></div>
+</div>
+
+</div>
+
+</body>
+</html>
